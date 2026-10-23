@@ -6,26 +6,27 @@
 
 **[Запустить Abyss Loop в браузере](https://9t299wdwt6-source.github.io/abyss-loop-web/)**
 
-Публикация GitHub Pages успешно завершена. Сборка экспортирована и прошла автоматическую проверку загрузки в Chromium.
+## Последняя подтверждённая сборка
 
-## Проверенная сборка
+GitHub Actions: [успешная сборка, runtime приёмка, Chromium gameplay flow и деплой](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40022721056).
 
-- База проекта: **Prototype 61 RC7 / Stage68C Web Export Pipeline**.
-- Godot 4.7.2: импорт ресурсов и Web-экспорт завершились успешно.
-- Python static/regression suite: **81/81 PASS**.
-- Chromium Web smoke-test: **PASS** — HTTP 200, canvas 1280×800, WebGL 2 доступен, JavaScript/WASM/PCK загружаются с HTTP 200, MIME WASM корректен, ошибок JavaScript/console и неудачных запросов нет.
-- Деплой GitHub Pages: **успешен**.
-- Web UI: заменены неподдерживаемые Unicode-иконки ресурсов на понятные текстовые обозначения.
+- Godot 4.7.2: импорт и Web-экспорт — PASS.
+- Static/regression suite — **81/81 PASS**.
+- Godot gameplay runtime — **41 проверки PASS**: новая экспедиция, дорожное/ландшафтное размещение, событие, бой, checkpoint save/restore, возврат с debrief.
+- Chromium smoke — **PASS**: WebGL 2, JS/WASM/PCK, HTTP/MIME, без JS/console errors.
+- Chromium pointer flow — **PASS**: реальные клики закрывают tutorial и открывают экспедицию.
+- GitHub Pages deployment — **PASS**.
 
-[Результаты последнего GitHub Actions](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40019051389)
+QA-артефакт с JSON-отчётами и скриншотами доступен в разделе Artifacts этого запуска.
 
-## Репозиторий и pipeline
+## Репозиторий и разработка
 
-Исходники Godot находятся в `AbyssLoop/`.
+Godot-исходники расположены в `AbyssLoop/`.
 
-- [Инструкция по сборке и публикации](WEB_DEPLOYMENT_GUIDE_RU.md)
+- [Инструкция сборки и Web QA](WEB_DEPLOYMENT_GUIDE_RU.md)
 - [Workflow экспорта, тестирования и публикации](.github/workflows/abyssloop-web.yml)
+- [Актуальная дорожная карта runtime/Web](AbyssLoop/ROADMAP_STATUS_STAGE68C_RU.md)
 
-## Что ещё нужно проверить вручную
+## Оставшиеся проверки
 
-Chromium smoke-test подтверждает начальную загрузку Web-сборки, но не заменяет полное игровое прохождение. Следующий этап приёмки — проверить ключевые игровые сценарии, сохранение/загрузку, сенсорное управление, поворот экрана и Safari на iPhone.
+Автоматические проверки не заменяют полное прохождение: нужно отдельно проверить босса и длинную экспедицию, сохранение после reload, сенсорное управление и Safari на реальном iPhone. Stage64B real-run balance capture ещё открыт; версия 1.0 не объявлена готовой.

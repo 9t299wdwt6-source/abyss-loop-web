@@ -76,6 +76,7 @@ def _run_browser(url: str, timeout_seconds: int, screenshot_path: Path | None) -
     startup_error: str | None = None
     screenshot_result: str | None = None
     canvas_info: dict[str, Any] | None = None
+    viewport_results: list[dict[str, Any]] = []
     webgl2_supported = False
     page_title = ""
     response_status: int | None = None
@@ -127,6 +128,25 @@ def _run_browser(url: str, timeout_seconds: int, screenshot_path: Path | None) -
                 screenshot_path.parent.mkdir(parents=True, exist_ok=True)
                 page.screenshot(path=str(screenshot_path), full_page=False)
                 screenshot_result = str(screenshot_path)
+
+            # Exercise the actual exported canvas after startup at desktop, portrait,
+            # landscape, and tablet viewport sizes. This checks resize wiring in the
+            # real Web build; it does not replace manual touch/Safari acceptance.
+            for width, height in ((1280, 800), (390, 844), (844, 390), (768, 1024)):
+                page.set_viewport_size({"width": width, "height": height})
+                page.wait_for_timeout(350)
+                resized_info = page.locator("canvas").first.evaluate(
+                    "el => ({width: el.width, height: el.height, clientWidth: el.clientWidth, clientHeight: el.clientHeight, visible: !!(el.offsetWidth || el.offsetHeight)})"
+                )
+                width_ok = float(resized_info.get("clientWidth", 0)) >= width * 0.75
+                height_ok = float(resized_info.get("clientHeight", 0)) >= height * 0.75
+                viewport_results.append({
+                    "viewport": {"width": width, "height": height},
+                    "passed": bool(resized_info.get("visible")) and width_ok and height_ok,
+                    "canvas": resized_info,
+                })
+            page.set_viewport_size({"width": 1280, "height": 800})
+            page.wait_for_timeout(150)
         except Exception as exc:  # include browser navigation/selector errors in durable report
             startup_error = f"{type(exc).__name__}: {exc}"
         finally:
@@ -152,6 +172,11 @@ def _run_browser(url: str, timeout_seconds: int, screenshot_path: Path | None) -
     checks.append({"name": "no browser console errors", "passed": not console_errors, "detail": console_errors or "none"})
     relevant_failed = [item for item in failed_requests if any(ext in item.lower().split("?", 1)[0] for ext in (".js", ".wasm", ".pck"))]
     checks.append({"name": "no failed JS/WASM/PCK requests", "passed": not relevant_failed, "detail": relevant_failed or "none"})
+    checks.append({
+        "name": "canvas adapts to desktop, portrait, landscape, and tablet viewports",
+        "passed": len(viewport_results) == 4 and all(bool(item.get("passed")) for item in viewport_results),
+        "detail": json.dumps(viewport_results, ensure_ascii=False),
+    })
     if startup_error:
         checks.append({"name": "browser navigation completed", "passed": False, "detail": startup_error})
     else:
@@ -167,6 +192,7 @@ def _run_browser(url: str, timeout_seconds: int, screenshot_path: Path | None) -
         "response_status": response_status,
         "page_title": page_title,
         "canvas": canvas_info,
+        "viewport_results": viewport_results,
         "webgl2_supported": webgl2_supported,
         "runtime_asset_responses": asset_responses,
         "console_errors": console_errors,

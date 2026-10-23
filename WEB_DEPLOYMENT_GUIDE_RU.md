@@ -1,57 +1,31 @@
-# Abyss Loop Web — сборка, проверка и публикация
+# Abyss Loop Web — сборка, тестирование и публикация
 
-## Текущий релиз
+## Последний проверенный релиз
 
-**[Запустить опубликованную игру](https://9t299wdwt6-source.github.io/abyss-loop-web/)**
+**[Запустить игру](https://9t299wdwt6-source.github.io/abyss-loop-web/)**
 
-- Релизный исходный коммит: `79a31d8d1d3e07297884851f6a0952cce0aa0064`.
-- GitHub Actions: [успешная сборка и публикация](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40019051389).
-- Godot 4.7.2: импорт проекта и Web-экспорт — PASS.
-- Static/regression suite: 81/81 PASS.
-- Chromium Web smoke-test: PASS.
-- GitHub Pages deployment: PASS.
-- Russian Web labels: removed missing glyphs from navigation arrows and resource-cost markers.
+[Успешный pipeline: build + 81 static checks + Godot runtime + Chromium smoke/interaction + deploy](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40022721056)
 
-В preflight остаётся одно предупреждение о вызове буфера обмена в отладочной функции диагностики. Оно не блокировало экспорт; всё равно следует проверить, что отладочная функция не доступна в release Web-сборке.
+Проверенная база: Prototype 61 RC7 / Godot 4.7.2 / version 0.61.0.
 
-## Что делает workflow
+## Что запускает workflow
 
-Файл: `.github/workflows/abyssloop-web.yml`.
+Файл `.github/workflows/abyssloop-web.yml`. Изменения исходников, тестов и самого workflow запускают:
+1. Проверку SHA-256 официальных архивов Godot 4.7.2 и Web export templates.
+2. Source Web preflight и Python regression suite.
+3. Импорт ресурсов Godot.
+4. Оригинальный Godot smoke-suite, запускаемый через обычную сцену с доступными autoload.
+5. Отдельную Godot runtime-приёмку меню, старта, seed, дорожного/ландшафтного размещения, события, боя, сохранения/восстановления и возврата на базу.
+6. Web-экспорт HTML/JS/WASM/PCK.
+7. Chromium Web smoke с проверкой WebGL 2, MIME WASM, загрузки файлов и отсутствия ошибок.
+8. Chromium pointer flow, который настоящими кликами закрывает onboarding и запускает экспедицию.
+9. Публикацию GitHub Pages только после успешного прохождения предыдущих шагов.
 
-При изменениях исходников, тестов или самого workflow он:
-1. Проверяет SHA-256 архивов Godot 4.7.2 и Web export templates.
-2. Проверяет Web-настройки проекта, включая варианты сжатия текстур ETC2/ASTC и S3TC/BPTC.
-3. Запускает Python static/regression suite.
-4. Импортирует ресурсы Godot в headless-режиме.
-5. Экспортирует `index.html`, `index.js`, `index.wasm` и `index.pck`.
-6. Проверяет размеры и структуру экспортированных файлов.
-7. Запускает Chromium smoke-test: HTTP, canvas, WebGL 2, runtime-файлы, MIME WASM, console и JavaScript errors.
-8. Публикует артефакт на GitHub Pages только после успешных проверок.
+## Дальнейшая разработка
 
-## Как вносить дальнейшие изменения
+Любые изменения Godot вносить в `AbyssLoop/`, затем отправлять в `main`. Успешная сборка подтверждает entry path и базовые сценарии, но не полное прохождение. Не закрыты: ручная проверка боссов/длинной экспедиции, user-origin save/reload, touch и Safari/iPhone. Stage64B баланс нужно оценивать на независимых воспроизводимых забегах обычного игрового цикла, а не на фикстурах со скриптово изменённым HP.
 
-Исходники проекта расположены в папке `AbyssLoop/`.
+## GitHub Pages
 
-1. Измени нужные GDScript/сцены/настройки или тесты.
-2. Отправь commit в ветку `main`.
-3. Открой [GitHub Actions](https://github.com/9t299wdwt6-source/abyss-loop-web/actions) и проверь, что этапы сборки, Chromium smoke-test и deploy завершились успешно.
-4. После успешного deploy проверь игру по опубликованной ссылке.
-
-Изменения документации сами по себе не запускают сборку. Изменения `AbyssLoop/**/*.gd`, `*.tscn`, `*.tres`, `project.godot`, `export_presets.cfg`, `AbyssLoop/tools/web_*.py`, `AbyssLoop/tests/**` или `.github/workflows/**` запускают workflow.
-
-## Что не покрывает автоматический smoke-test
-
-Smoke-test подтверждает начальную загрузку настоящего Godot Web-экспорта в Chromium, но не полное прохождение. Вручную на опубликованном URL ещё нужно проверить:
-
-- главное меню, запуск экспедиции, размещение тайлов на маршруте и ландшафте;
-- обычный бой, эффекты состояний, события, элитного врага и босса;
-- корректность наград, выхода и возврата в деревню/меню;
-- сохранение после перезагрузки и восстановление прогресса;
-- сенсорное управление и изменение ориентации;
-- Safari на iPhone.
-
-## Настройка GitHub Pages
-
-Для текущего репозитория уже выбран источник **Settings → Pages → Build and deployment → Source → GitHub Actions**.
-
-Публичный адрес: `https://9t299wdwt6-source.github.io/abyss-loop-web/`.
+Source настроен как **Settings → Pages → Build and deployment → Source → GitHub Actions**.
+Публичный URL: `https://9t299wdwt6-source.github.io/abyss-loop-web/`.
