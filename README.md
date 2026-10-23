@@ -1,22 +1,23 @@
 # Abyss Loop — Web
 
-Репозиторий для браузерной версии Abyss Loop на Godot 4.7.2.
+Репозиторий браузерной версии Abyss Loop на Godot 4.7.2.
 
-## Состояние
+## Статус проекта
 
 - Исходная база: **Prototype 61 RC7 / Stage68C Web Export Pipeline**.
-- Web pipeline: добавлен workflow GitHub Actions для экспорта, проверки в Chromium и последующей публикации в GitHub Pages.
-- **Исходники игрового проекта ещё не загружены**, поэтому браузерная сборка не запускалась, а публичная игровая ссылка пока не подтверждена.
+- GitHub Actions workflow настроен: импорт исходников, Python-регрессии, экспорт HTML5/WebAssembly, Chromium smoke-test и GitHub Pages.
+- **Игровой ZIP ещё не загружен в этот репозиторий**, поэтому сборка и публичный запуск пока не подтверждены.
 
-## Документация
+## Следующий шаг
 
-- [Инструкция по публикации Web-версии](WEB_DEPLOYMENT_GUIDE_RU.md)
-- [Workflow экспорта, браузерной проверки и публикации](.github/workflows/abyssloop-web.yml)
+Однократно загрузите `AbyssLoop_Prototype61_Stage68C_Web_Export_Pipeline.zip` в корень репозитория через **Add file → Upload files** и нажмите **Commit changes** в ветку `main`. Workflow проверит SHA-256, распакует проект, сохранит обычные файлы исходников в `AbyssLoop/` и продолжит сборку.
 
-## Адрес GitHub Pages
+Затем в **Settings → Pages → Build and deployment → Source** выберите **GitHub Actions**.
 
-Ожидаемый адрес после успешного деплоя:
+Полная последовательность описана в [руководстве по публикации](WEB_DEPLOYMENT_GUIDE_RU.md). Workflow: [Abyss Loop Web Export and Browser QA](.github/workflows/abyssloop-web.yml).
+
+## Ожидаемый адрес
 
 https://9t299wdwt6-source.github.io/abyss-loop-web/
 
-Не считайте ссылку готовой до успешного прохождения GitHub Actions и появления опубликованной сборки.
+Адрес не считается рабочим до успешного завершения GitHub Actions и деплоя.
