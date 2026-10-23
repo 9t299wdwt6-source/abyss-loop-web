@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'AbyssLoop_Web_Source_Bundle.zip'
+      - 'AbyssLoop_Prototype61_Stage68C_Web_Export_Pipeline.zip'
       - 'AbyssLoop/**/*.gd'
       - 'AbyssLoop/**/*.tscn'
       - 'AbyssLoop/**/*.tres'
@@ -49,16 +49,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -f AbyssLoop_Web_Source_Bundle.zip ]]; then
-            echo '03aa1b25dcca51d2cf9227f9bc8a17f6ee2344ba974a28bea3986ca0f66eefa8  AbyssLoop_Web_Source_Bundle.zip' | sha256sum --check --status
-            unzip -q AbyssLoop_Web_Source_Bundle.zip -d .
+          if [[ -f AbyssLoop_Prototype61_Stage68C_Web_Export_Pipeline.zip ]]; then
+            echo '2b2656914a826a77474eccf522cb7e8cedf276be2b9925e25a646536644050e2  AbyssLoop_Prototype61_Stage68C_Web_Export_Pipeline.zip' | sha256sum --check --status
+            unzip -q AbyssLoop_Prototype61_Stage68C_Web_Export_Pipeline.zip -d .
             test -f AbyssLoop/project.godot
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add AbyssLoop/
-            git rm AbyssLoop_Web_Source_Bundle.zip
+            git rm AbyssLoop_Prototype61_Stage68C_Web_Export_Pipeline.zip
             git commit -m "Import Abyss Loop Prototype 61 RC7 source"
-            git push
+            if ! git push; then
+              echo "::warning::Could not persist extracted source files to main; continuing this build from the extracted working tree."
+            fi
           fi
 
       - name: Configure Pages metadata
