@@ -116,9 +116,9 @@ jobs:
           sed -i 's/^config\/name="Abyss Loop"$/config\/name="Abyss Loop CI Acceptance"/' "$test_root/project.godot"
           grep -q '^config/name="Abyss Loop CI Acceptance"$' "$test_root/project.godot"
           "$GODOT_BIN" --headless --editor --path "$test_root" --import
-          "$GODOT_BIN" --headless --path "$test_root" --script res://tests/smoke_test.gd
+          timeout 120s "$GODOT_BIN" --headless --path "$test_root" res://tests/smoke_test_runner.tscn
           rm -rf "$HOME/.local/share/godot/app_userdata/Abyss Loop CI Acceptance"
-          "$GODOT_BIN" --headless --path "$test_root" --script res://tests/expedition_runtime_acceptance.gd
+          timeout 120s "$GODOT_BIN" --headless --path "$test_root" res://tests/expedition_runtime_acceptance_runner.tscn
 
       - name: Export Godot Web build
         run: |

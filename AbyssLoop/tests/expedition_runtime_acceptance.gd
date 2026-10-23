@@ -1,4 +1,4 @@
-extends SceneTree
+extends Node
 
 const MainScene: PackedScene = preload("res://scenes/main.tscn")
 const ExpeditionManagerScript = preload("res://scripts/systems/expedition_manager.gd")
@@ -6,7 +6,7 @@ const ExpeditionManagerScript = preload("res://scripts/systems/expedition_manage
 var _check_count: int = 0
 var _failures: Array[String] = []
 
-func _initialize() -> void:
+func _ready() -> void:
 	call_deferred("_run_acceptance")
 
 func _check(condition: bool, description: String) -> void:
@@ -20,12 +20,12 @@ func _check(condition: bool, description: String) -> void:
 func _finish() -> void:
 	if _failures.is_empty():
 		print("EXPEDITION RUNTIME ACCEPTANCE PASSED: %d checks" % _check_count)
-		quit(0)
+		get_tree().quit(0)
 	else:
 		printerr("EXPEDITION RUNTIME ACCEPTANCE FAILED: %d/%d checks failed" % [_failures.size(), _check_count])
 		for failure in _failures:
 			printerr(" - ", failure)
-		quit(1)
+		get_tree().quit(1)
 
 func _run_acceptance() -> void:
 	print("Abyss Loop runtime acceptance — real Godot scene, isolated CI profile")
@@ -35,30 +35,30 @@ func _run_acceptance() -> void:
 		return
 
 	var ui: Node = MainScene.instantiate()
-	root.add_child(ui)
-	await process_frame
-	await process_frame
+	get_tree().root.add_child(ui)
+	await get_tree().process_frame
+	await get_tree().process_frame
 	_check(str(ui.get("screen_mode")) == "base", "main scene opens on the shelter screen")
 	if str(ui.get("modal_kind")) == "tutorial":
 		ui.call("_finish_tutorial")
-	await process_frame
+	await get_tree().process_frame
 	_check(bool(GameState.tutorial_completed), "tutorial can be dismissed and its completion persists")
 
 	var seed_input := ui.get("seed_input") as LineEdit
 	_check(seed_input != null, "expedition preparation exposes the seed input")
 	if seed_input == null:
 		ui.queue_free()
-		await process_frame
+		await get_tree().process_frame
 		_finish()
 		return
 	seed_input.text = "8675309"
 	ui.call("_start_expedition")
-	await process_frame
+	await get_tree().process_frame
 	var manager = ui.get("manager")
 	_check(manager != null and bool(manager.active), "the real UI start action creates an active expedition")
 	if manager == null or not bool(manager.active):
 		ui.queue_free()
-		await process_frame
+		await get_tree().process_frame
 		_finish()
 		return
 
@@ -95,7 +95,7 @@ func _run_acceptance() -> void:
 		_check(not restored.run_baseline.is_empty() and float(restored.run_elapsed_seconds) >= 0.0, "restoration preserves available real-run telemetry without inventing missing values")
 	restored.active = false
 	restored.queue_free()
-	await process_frame
+	await get_tree().process_frame
 
 	manager.run_ledger["scrap"] = maxi(100, int(manager.run_ledger.get("scrap", 0)))
 	manager._begin_expedition_event(1, 0.0, 0.0, 0.0)
@@ -103,7 +103,7 @@ func _run_acceptance() -> void:
 	_check(not event.is_empty() and typeof(event.get("choices", null)) == TYPE_ARRAY and not event.get("choices", []).is_empty(), "a real event is drawn from the event registry with actionable choices")
 	if not event.is_empty():
 		manager.changed.emit()
-		await process_frame
+		await get_tree().process_frame
 		_check(str(ui.get("modal_kind")) == "event", "the real UI opens the event-decision modal")
 		var tile_count_during_event: int = manager.tile_hand.size()
 		var blocked_placement: Dictionary = manager.place_tile(0, 2)
@@ -127,7 +127,7 @@ func _run_acceptance() -> void:
 		if not chosen_id.is_empty():
 			var events_before: int = int(manager.run_ledger.get("events_resolved", 0))
 			ui.call("_resolve_event_choice", chosen_id)
-			await process_frame
+			await get_tree().process_frame
 			_check(manager.pending_event.is_empty(), "resolving a choice closes the pending event")
 			_check(int(manager.run_ledger.get("events_resolved", 0)) == events_before + 1, "an accepted choice increments event telemetry exactly once")
 			_check(not manager.run_ledger.get("event_history", []).is_empty(), "the selected event decision is kept in the expedition history")
@@ -179,7 +179,7 @@ func _run_acceptance() -> void:
 	_check(manager.save_run_snapshot(), "the final expedition checkpoint remains saveable after gameplay changes")
 
 	manager.end_run("return")
-	await process_frame
+	await get_tree().process_frame
 	_check(not bool(manager.active), "return ends the active expedition")
 	_check(not GameState.has_saved_expedition(), "successful return atomically removes the saved checkpoint")
 	_check(str(GameState.last_summary.get("outcome", "")) == "return", "the run result is written as a return")
@@ -187,8 +187,8 @@ func _run_acceptance() -> void:
 	_check(str(ui.get("screen_mode")) == "summary", "the completion signal renders the real debrief screen")
 
 	ui.call("_render_base")
-	await process_frame
+	await get_tree().process_frame
 	_check(str(ui.get("screen_mode")) == "base", "the debrief can return to the shelter screen")
 	ui.queue_free()
-	await process_frame
+	await get_tree().process_frame
 	_finish()
