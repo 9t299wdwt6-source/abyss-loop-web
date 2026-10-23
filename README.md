@@ -15,8 +15,9 @@
 - Python static/regression suite: **81/81 PASS**.
 - Chromium Web smoke-test: **PASS** — HTTP 200, canvas 1280×800, WebGL 2 доступен, JavaScript/WASM/PCK загружаются с HTTP 200, MIME WASM корректен, ошибок JavaScript/console и неудачных запросов нет.
 - Деплой GitHub Pages: **успешен**.
+- Web UI: заменены неподдерживаемые Unicode-иконки ресурсов на понятные текстовые обозначения.
 
-[Результаты последнего GitHub Actions](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40016205413)
+[Результаты последнего GitHub Actions](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40019051389)
 
 ## Репозиторий и pipeline
 
