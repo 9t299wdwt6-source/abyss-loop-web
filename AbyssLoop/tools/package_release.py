@@ -38,6 +38,8 @@ REQUIRED = (
     "tools/export_web.sh",
     "tools/web_export_preflight.py",
     "tools/web_browser_smoke_test.py",
+    "tools/web_gameplay_browser_acceptance.py",
+    "tests/web_gameplay_browser_acceptance_regression.py",
     "tools/serve_web_export.py",
     "tests/web_export_readiness_regression.py",
     "tests/reports/WEB_EXPORT_READINESS_AUDIT_STAGE68C_RU.md",

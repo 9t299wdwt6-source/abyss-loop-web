@@ -42,6 +42,7 @@ def main() -> int:
     errors: list[str] = []
     console_errors: list[str] = []
     assets: dict[str, bool] = {".js": False, ".wasm": False, ".pck": False}
+    asset_response_counts: dict[str, int] = {".js": 0, ".wasm": 0, ".pck": 0}
     screenshots: dict[str, str] = {}
     checks: list[dict[str, Any]] = []
 
@@ -72,6 +73,7 @@ def main() -> int:
                 suffix = Path(response.url.split("?", 1)[0]).suffix.lower()
                 if suffix in assets and 200 <= response.status < 300:
                     assets[suffix] = True
+                    asset_response_counts[suffix] += 1
 
             page.on("response", collect_response)
             try:
@@ -125,6 +127,50 @@ def main() -> int:
                 add("selected tile is placed on a free road node by pointer", placed_hash != selected_hash,
                     {"selected": selected_hash, "placed": placed_hash})
 
+                # Verify the actual Godot user:// filesystem survives a browser reload.
+                # Wait for a complete autosave interval, then require the exported JS,
+                # WASM, and PCK files to be requested again by the reloaded page.
+                page.wait_for_timeout(2200)
+                road_node_clip = {"x": 545, "y": 319, "width": 88, "height": 67}
+                placed_node_hash = hashlib.sha256(page.screenshot(clip=road_node_clip)).hexdigest()
+                counts_before_reload = dict(asset_response_counts)
+                page.reload(wait_until="domcontentloaded", timeout=args.timeout * 1000)
+                page.wait_for_selector("canvas", state="visible", timeout=min(20000, args.timeout * 1000))
+                reload_deadline = time.monotonic() + args.timeout
+                while time.monotonic() < reload_deadline:
+                    if all(asset_response_counts[suffix] > counts_before_reload[suffix] for suffix in asset_response_counts):
+                        break
+                    page.wait_for_timeout(250)
+                reload_assets = {
+                    suffix: asset_response_counts[suffix] > counts_before_reload[suffix]
+                    for suffix in asset_response_counts
+                }
+                add("Godot JS/WASM/PCK are requested again after browser reload",
+                    all(reload_assets.values()), reload_assets)
+                page.wait_for_timeout(1400)
+                page.mouse.move(900, 110)
+                page.wait_for_timeout(150)
+                reload_hash = capture(page, "07-shelter-after-browser-reload")
+                reload_node_hash = hashlib.sha256(page.screenshot(clip=road_node_clip)).hexdigest()
+                add("browser reload leaves the expedition and returns to a shelter view",
+                    reload_hash != placed_hash and reload_node_hash != placed_node_hash,
+                    {"before_reload": placed_hash, "after_reload": reload_hash,
+                     "road_node_before": placed_node_hash, "road_node_after": reload_node_hash})
+
+                # With a valid persisted checkpoint, the primary shelter action resumes
+                # the saved run. A crop of the original placed road node must match after
+                # restoration, proving state survived rather than merely changing screens.
+                page.mouse.click(450, 378)
+                page.wait_for_timeout(1000)
+                page.mouse.move(900, 110)
+                page.wait_for_timeout(180)
+                resumed_hash = capture(page, "08-expedition-resumed-after-browser-reload")
+                resumed_node_hash = hashlib.sha256(page.screenshot(clip=road_node_clip)).hexdigest()
+                add("saved expedition resumes after reload with the placed road tile preserved",
+                    resumed_hash != reload_hash and resumed_node_hash == placed_node_hash,
+                    {"shelter_after_reload": reload_hash, "resumed": resumed_hash,
+                     "road_node_before": placed_node_hash, "road_node_after_resume": resumed_node_hash})
+
                 canvas_info = page.locator("canvas").first.evaluate(
                     "el => ({width: el.width, height: el.height, clientWidth: el.clientWidth, clientHeight: el.clientHeight, visible: !!(el.offsetWidth || el.offsetHeight)})"
                 )
@@ -150,7 +196,7 @@ def main() -> int:
         "checked_utc": datetime.now(timezone.utc).isoformat(),
         "url": url,
         "result": "FAIL" if failures else "PASS",
-        "scope": "real Chromium pointer interaction through tutorial dismiss, expedition launch, pause, tile selection, and road placement; not full-playthrough or iPhone Safari acceptance",
+        "scope": "real Chromium pointer interaction through tutorial dismiss, expedition launch, pause, tile selection, road placement, browser reload, and saved-run resume; not full-playthrough or iPhone Safari acceptance",
         "runtime_assets": assets,
         "screenshots": screenshots,
         "javascript_errors": errors,

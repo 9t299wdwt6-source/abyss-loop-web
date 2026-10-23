@@ -31,7 +31,7 @@ STAGE68C_REQUIRED = {
     "ROADMAP_STATUS_STAGE68C_RU.md", "STAGE68C_BUILD_REPORT_RU.md",
     "WEB_EXPORT_RUNTIME_CHECKLIST_STAGE68C_RU.md", "README_WEB_RU.md", "export_presets.cfg",
     ".github/workflows/abyssloop-web.yml", "tools/export_web.sh", "tools/web_export_preflight.py",
-    "tools/web_browser_smoke_test.py", "tools/serve_web_export.py", "tests/web_export_readiness_regression.py",
+    "tools/web_browser_smoke_test.py", "tools/web_gameplay_browser_acceptance.py", "tests/web_gameplay_browser_acceptance_regression.py", "tools/serve_web_export.py", "tests/web_export_readiness_regression.py",
     "tests/reports/WEB_EXPORT_READINESS_AUDIT_STAGE68C_RU.md", "tests/reports/WEB_EXPORT_PREFLIGHT_STAGE68C_RU.txt",
 }
 assert STAGE68C_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage68C Web export and browser QA pipeline evidence must be mandatory in independent preflight"
@@ -114,6 +114,10 @@ def write_fixture(root: Path) -> None:
             content = "source_checks build_checks\n"
         elif name == "tools/web_browser_smoke_test.py":
             content = "WebGL 2 index.wasm\n"
+        elif name == "tools/web_gameplay_browser_acceptance.py":
+            content = "sync_playwright; page.reload; saved expedition resume\n"
+        elif name == "tests/web_gameplay_browser_acceptance_regression.py":
+            content = "WEB GAMEPLAY RELOAD REGRESSION PASSED; saved expedition resumes after reload\n"
         elif name == "tools/serve_web_export.py":
             content = "application/wasm 127.0.0.1\n"
         elif name == "tests/web_export_readiness_regression.py":
