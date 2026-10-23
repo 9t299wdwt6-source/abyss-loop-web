@@ -4,7 +4,7 @@ const ExpeditionManagerScript = preload("res://scripts/systems/expedition_manage
 const RUN_SEEDS: Array[int] = [8675309, 8675311, 8675313, 8675317, 8675323]
 const TARGET_LOOPS: int = 1
 const MAX_PROCESS_FRAMES_PER_RUN: int = 3000
-const OUTPUT_PATH: String = "res://tests/reports/STAGE64B_AUTOMATED_ENGINE_RUNS.json"
+const OUTPUT_PATH: String = "user://STAGE64B_AUTOMATED_ENGINE_RUNS.json"
 
 var _runs: Array[Dictionary] = []
 var _failures: Array[String] = []
