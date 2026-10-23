@@ -26,7 +26,9 @@ with tempfile.TemporaryDirectory(prefix="abyssloop-web-source-fixture-") as temp
     (base / "project.godot").write_text(
         'config/name="Abyss Loop"\n'
         'renderer/rendering_method="gl_compatibility"\n'
-        'renderer/rendering_method.mobile="gl_compatibility"\n', encoding="utf-8")
+        'renderer/rendering_method.mobile="gl_compatibility"\n'
+        'textures/vram_compression/import_s3tc_bptc=true\n'
+        'textures/vram_compression/import_etc2_astc=true\n', encoding="utf-8")
     (base / "scenes/main.tscn").write_text('[gd_scene format=3]\n', encoding="utf-8")
     (base / "scripts/core/save_system.gd").write_text('const SAVE_PATH := "user://loop_roguelite_save.json"\n', encoding="utf-8")
     (base / "export_presets.cfg").write_text(
@@ -41,7 +43,9 @@ with tempfile.TemporaryDirectory(prefix="abyssloop-web-source-fixture-") as temp
     (base / "project.godot").write_text(
         'config/name="Abyss Loop"\n'
         'renderer/rendering_method="forward_plus"\n'
-        'renderer/rendering_method.mobile="forward_plus"\n', encoding="utf-8")
+        'renderer/rendering_method.mobile="forward_plus"\n'
+        'textures/vram_compression/import_s3tc_bptc=true\n'
+        'textures/vram_compression/import_etc2_astc=true\n', encoding="utf-8")
     invalid = source_checks(base)
     assert "Web-compatible Compatibility renderer" in {check.name for check in invalid if check.status == "FAIL"}, "preflight must reject non-Web rendering methods"
 
