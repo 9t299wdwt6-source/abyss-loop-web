@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     paths:
-      - '.bootstrap/READY'
+      - 'AbyssLoop_Web_Source_Bundle.zip'
       - 'AbyssLoop/**/*.gd'
       - 'AbyssLoop/**/*.tscn'
       - 'AbyssLoop/**/*.tres'
@@ -45,19 +45,18 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Restore project source from one-time bootstrap bundle
+      - name: Import source folder from one-time ZIP upload
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -f .bootstrap/READY ]]; then
-            cat .bootstrap/part-*.b64 | base64 --decode > "$RUNNER_TEMP/abyssloop-source.zip"
-            echo '03aa1b25dcca51d2cf9227f9bc8a17f6ee2344ba974a28bea3986ca0f66eefa8  '"$RUNNER_TEMP/abyssloop-source.zip" | sha256sum --check --status
-            unzip -q "$RUNNER_TEMP/abyssloop-source.zip" -d .
+          if [[ -f AbyssLoop_Web_Source_Bundle.zip ]]; then
+            echo '03aa1b25dcca51d2cf9227f9bc8a17f6ee2344ba974a28bea3986ca0f66eefa8  AbyssLoop_Web_Source_Bundle.zip' | sha256sum --check --status
+            unzip -q AbyssLoop_Web_Source_Bundle.zip -d .
             test -f AbyssLoop/project.godot
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add AbyssLoop/
-            git rm -r .bootstrap
+            git rm AbyssLoop_Web_Source_Bundle.zip
             git commit -m "Import Abyss Loop Prototype 61 RC7 source"
             git push
           fi
