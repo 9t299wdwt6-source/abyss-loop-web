@@ -1,0 +1,150 @@
+{
+  "Тайлы ландшафта": [
+    "cache",
+    "hunt",
+    "rift",
+    "signal",
+    "snare",
+    "ward"
+  ],
+  "Обычные противники": [
+    "brute",
+    "hexer",
+    "hunter",
+    "medic",
+    "scout"
+  ],
+  "Роли и способности элит": [
+    "caster",
+    "fast",
+    "hunter",
+    "support",
+    "tank"
+  ],
+  "Боссы": [
+    "harvester",
+    "warden"
+  ],
+  "Боевые статусы": [
+    "barrier",
+    "bleed",
+    "distortion",
+    "exposed",
+    "poison",
+    "regeneration",
+    "weakness",
+    "wound"
+  ],
+  "Постройки убежища": [
+    "forge",
+    "infirmary",
+    "salvage"
+  ],
+  "Ветки исследований": [
+    "economy",
+    "preparation",
+    "scouting",
+    "tactics"
+  ],
+  "Постоянные исследования": [
+    "advanced_salvage",
+    "boss_analysis",
+    "crystal_study",
+    "event_forecasting",
+    "field_training",
+    "medical_relay",
+    "rare_survey",
+    "route_archive",
+    "supply_contracts"
+  ],
+  "Перки": [
+    "ambush",
+    "bulwark",
+    "field_medic",
+    "fortune",
+    "power",
+    "precision",
+    "scavenger",
+    "tempo",
+    "vampirism",
+    "vitality"
+  ],
+  "События экспедиции": [
+    "beacon_echo",
+    "cache_echo",
+    "damaged_beacon",
+    "lost_trader",
+    "sealed_cache",
+    "signal_pursuit",
+    "unstable_anomaly"
+  ],
+  "Цели экспедиции": [
+    "boss_contract",
+    "combat_record",
+    "cycle_milestone",
+    "event_research",
+    "material_survey"
+  ],
+  "Контракты": [
+    "boss_bounty",
+    "bounty_hunter",
+    "event_archive",
+    "landscape_survey",
+    "none",
+    "salvage_quota"
+  ],
+  "Сложности": [
+    "abyssal",
+    "attrition",
+    "standard",
+    "volatile"
+  ],
+  "Режимы экспедиции": [
+    "long_expedition",
+    "standard"
+  ],
+  "Модификаторы маршрута": [
+    "resonance",
+    "scarce",
+    "standard",
+    "unstable"
+  ],
+  "Типы узлов маршрута": [
+    "cache",
+    "danger",
+    "event",
+    "plain",
+    "shrine"
+  ],
+  "Синергии ландшафта": [
+    "double_cache",
+    "hunt_rift",
+    "signal_cache",
+    "supply_ward",
+    "ward_hunt",
+    "ward_pair"
+  ],
+  "Сеты экипировки": [
+    "resonance",
+    "scavenger",
+    "vanguard"
+  ],
+  "Синергии экипировки": [
+    "bastion_siphon",
+    "overclock_assault",
+    "precision_resonance",
+    "salvage_route"
+  ],
+  "Архетипы экипировки": [
+    "armor.bastion",
+    "armor.field_medic",
+    "armor.scavenger",
+    "core.pathfinder",
+    "core.resonance",
+    "core.tempo",
+    "weapon.assault",
+    "weapon.precision",
+    "weapon.siphon",
+    "weapon.wound"
+  ]
+}

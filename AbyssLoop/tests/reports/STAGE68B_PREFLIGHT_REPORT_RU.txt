@@ -1,0 +1,8 @@
+Abyss Loop Stage68B — final source evidence checkpoint
+Project version: 0.61.0
+Python regression: 80/80 PASS; individual scripts run separately; aggregate runner not claimed PASS.
+Targeted local balance capture analyzer: 17/17 PASS on synthetic fixtures only.
+Source preflight: 7/7 PASS with complete static report.
+Archive hash/integrity is recorded after packaging in the external Stage68B delivery report; this file records source gates and intentionally does not embed a self-referential ZIP digest.
+Runtime: NOT RUN — Godot 4.7.2 executable unavailable in this environment.
+Real-run data: NOT PROVIDED. Stage64B balance decision remains open; no balance verdict is claimed.

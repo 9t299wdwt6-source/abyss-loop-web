@@ -1,0 +1,8 @@
+ABYSS LOOP — STAGE67 SOURCE PREFLIGHT
+
+Source preflight: 7/7 PASS (including complete static/regression report validation).
+Static/regression suite: 78/78 Python test scripts PASS, 0 failed or timed out. Each script was executed by the suite's isolated subprocess runner.
+Archive preflight: performed after packaging and recorded in the external Stage67 final preflight report.
+Godot runtime: NOT RUN; the Godot 4.7.2 executable is unavailable in this environment.
+
+Scope: source/docs/report consistency only. This does not prove GDScript compilation, UI layout, save/resume behavior in Godot, or completion of a real first-hour playthrough.

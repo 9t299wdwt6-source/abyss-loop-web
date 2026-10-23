@@ -1,0 +1,10 @@
+PASS: required project and release files — all 54 required files exist
+PASS: stable app identity and exact version — name=Abyss Loop; version=0.61.0; expected=0.61.0
+PASS: README/manifest/checklist/roadmap version consistency — version, RC7 status, and release docs agree
+PASS: packager enforces current version and preflight/archive audits — current version lock and both audit hooks are wired
+PASS: Windows launchers reference matching preflight and output — both launchers preflight and name the matching artifact
+PASS: source tree is safe to package — 198 regular project files; symlinks rejected; local artifacts filtered
+PASS: latest static/regression report is complete and all-pass — Checks discovered: 76; checks completed: 76; passed: 76; failed/timed out: 0
+
+RELEASE PREFLIGHT: 7/7 PASS; 0 FAIL
+Scope: source/docs/artifact consistency only; no Godot engine was executed by this tool.

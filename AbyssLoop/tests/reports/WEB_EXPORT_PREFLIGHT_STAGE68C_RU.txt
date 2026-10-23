@@ -1,0 +1,23 @@
+# Abyss Loop — Web Export Preflight
+
+- Mode: `source`
+- Root: `AbyssLoop/` (project root)
+- Checked (UTC): `2026-10-23T19:03:04.924057+00:00`
+- Result: **READY WITH WARNINGS**
+- Checks: 7/7 non-failing; 1 warning(s); 0 failure(s)
+
+| Status | Check | Detail |
+|---|---|---|
+| PASS | Godot project and main scene exist | project.godot and scenes/main.tscn are present |
+| PASS | Web-compatible Compatibility renderer | both default and mobile renderers use GL Compatibility |
+| PASS | No C# project code | no C# project files found; this project is GDScript-based |
+| PASS | Web export preset is configured for portable hosting | Web preset exists, disables thread/extension support, resizes to browser, and enables mobile virtual keyboard |
+| PASS | No native extension binaries required by Web export | no GDExtension descriptors or native binaries found |
+| PASS | Save system targets user data storage | save paths use user://, allowing Godot to apply its platform-specific user-data storage |
+| WARN | Platform-specific clipboard call is gated | clipboard API is inside a debug-only diagnostics action; confirm debug actions remain unavailable in release Web export |
+
+Source-mode checks do not compile GDScript. Build-mode checks do not replace browser runtime testing.
+
+## Runtime limitation
+
+WebGL 2.0 runtime compatibility has not been executed in this container. This report checks source readiness only; it does not claim an exported WebAssembly build or a successful browser launch.

@@ -1,0 +1,53 @@
+"""Fail-closed static audit of Godot resource references across source, scenes and project config.
+
+This checks resource existence and scene resource identifiers only. It is not a GDScript compiler
+and does not replace editor import or runtime acceptance in Godot.
+"""
+from __future__ import annotations
+from pathlib import Path
+import re
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+SCAN_SUFFIXES = {".gd", ".tscn", ".tres", ".godot", ".import"}
+RES_PATH = re.compile(r"res://[^\"'\s<>]+")
+EXT_RESOURCE = re.compile(r'^\[ext_resource\s+type="[^"]+"\s+path="([^"]+)"\s+id="([^"]+)"', re.M)
+EXT_RESOURCE_FLEX = re.compile(r'^\[ext_resource\b[^\]]*\bpath="([^"]+)"[^\]]*\bid="([^"]+)"', re.M)
+EXT_ID_REF = re.compile(r'ExtResource\("([^"]+)"\)')
+
+errors: list[str] = []
+refs_checked = 0
+scene_count = 0
+for source in sorted(p for p in ROOT.rglob("*") if p.is_file() and p.suffix.lower() in SCAN_SUFFIXES):
+    try:
+        text = source.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        errors.append(f"{source.relative_to(ROOT)}: text resource is not UTF-8")
+        continue
+
+    for raw in RES_PATH.findall(text):
+        ref = raw.rstrip(".,:;)]}")
+        # Godot subresource suffixes (e.g. image.png::AtlasTexture) refer to a real file before ::.
+        ref = ref.split("::", 1)[0]
+        target = ROOT / ref.removeprefix("res://")
+        refs_checked += 1
+        if not target.exists():
+            errors.append(f"{source.relative_to(ROOT)}: missing resource {ref}")
+
+    if source.suffix.lower() == ".tscn":
+        scene_count += 1
+        declared = set()
+        for match in EXT_RESOURCE_FLEX.finditer(text):
+            declared.add(match.group(2))
+        used = set(EXT_ID_REF.findall(text))
+        missing_ids = sorted(used - declared)
+        if missing_ids:
+            errors.append(f"{source.relative_to(ROOT)}: ExtResource ids not declared: {', '.join(missing_ids)}")
+
+if errors:
+    print("RESOURCE GRAPH REGRESSION FAILED")
+    print("\n".join(errors))
+    sys.exit(1)
+print(f"RESOURCE GRAPH REGRESSION: PASS — {refs_checked} res:// references checked across {scene_count} scenes.")
+print("All referenced paths exist and every ExtResource reference used by a scene is declared.")
+print("Static source check only; Godot import, GDScript compilation and runtime remain separate gates.")

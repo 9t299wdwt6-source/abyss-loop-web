@@ -1,0 +1,12 @@
+Abyss Loop — Stage68A source preflight
+
+Result: PASS — 7/7 checks passed.
+Required project and release files: 67/67 present.
+Project identity/version: Abyss Loop / 0.61.0.
+Release docs and manifest: RC7 consistent; runtime status remains unverified.
+Packager and Windows launcher contract: PASS.
+Source tree hygiene: PASS; regular project files only, symlinks rejected, local artifacts filtered.
+Static regression evidence: 79/79 individual Python test processes passed; aggregate runner did not finish in this environment, so it is not claimed as PASS.
+Resource graph audit: PASS — 53 res:// references checked across 1 scene; no missing targets or undeclared ExtResource identifiers.
+
+Scope limitation: this is a source/document/package-input preflight. Godot 4.7.2 import, GDScript compilation, in-engine behavior, manual UI acceptance and Stage64B real-run balance validation are not confirmed.
