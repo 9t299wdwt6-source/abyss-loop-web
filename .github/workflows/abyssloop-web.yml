@@ -5,6 +5,7 @@ on:
   push:
     branches: [main]
     paths:
+      - '.github/workflows/**'
       - 'AbyssLoop_Prototype61_Stage68C_Web_Export_Pipeline.zip'
       - 'AbyssLoop/**/*.gd'
       - 'AbyssLoop/**/*.tscn'
