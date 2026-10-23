@@ -4,12 +4,13 @@
 
 **[Запустить опубликованную игру](https://9t299wdwt6-source.github.io/abyss-loop-web/)**
 
-- Релизный исходный коммит: `adcfd96c50cdb6e8571604ec308be8c994789641`.
-- GitHub Actions: [успешная сборка и публикация](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40016205413).
+- Релизный исходный коммит: `79a31d8d1d3e07297884851f6a0952cce0aa0064`.
+- GitHub Actions: [успешная сборка и публикация](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40019051389).
 - Godot 4.7.2: импорт проекта и Web-экспорт — PASS.
 - Static/regression suite: 81/81 PASS.
 - Chromium Web smoke-test: PASS.
 - GitHub Pages deployment: PASS.
+- Russian Web labels: removed missing glyphs from navigation arrows and resource-cost markers.
 
 В preflight остаётся одно предупреждение о вызове буфера обмена в отладочной функции диагностики. Оно не блокировало экспорт; всё равно следует проверить, что отладочная функция не доступна в release Web-сборке.
 
