@@ -5,30 +5,31 @@ on:
   push:
     branches: [main]
     paths:
-      - '**/*.gd'
-      - '**/*.tscn'
-      - '**/*.tres'
-      - '**/*.json'
-      - '**/*.png'
-      - '**/*.jpg'
-      - '**/*.jpeg'
-      - '**/*.webp'
-      - '**/*.svg'
-      - '**/*.ogg'
-      - '**/*.wav'
-      - '**/*.mp3'
-      - '**/*.ttf'
-      - '**/*.import'
-      - '**/*.gdshader'
-      - 'assets/**'
-      - 'localization/**'
-      - 'project.godot'
-      - 'export_presets.cfg'
-      - 'tools/web_*.py'
-      - 'tools/export_web.sh'
+      - '.bootstrap/READY'
+      - 'AbyssLoop/**/*.gd'
+      - 'AbyssLoop/**/*.tscn'
+      - 'AbyssLoop/**/*.tres'
+      - 'AbyssLoop/**/*.json'
+      - 'AbyssLoop/**/*.png'
+      - 'AbyssLoop/**/*.jpg'
+      - 'AbyssLoop/**/*.jpeg'
+      - 'AbyssLoop/**/*.webp'
+      - 'AbyssLoop/**/*.svg'
+      - 'AbyssLoop/**/*.ogg'
+      - 'AbyssLoop/**/*.wav'
+      - 'AbyssLoop/**/*.mp3'
+      - 'AbyssLoop/**/*.ttf'
+      - 'AbyssLoop/**/*.import'
+      - 'AbyssLoop/**/*.gdshader'
+      - 'AbyssLoop/assets/**'
+      - 'AbyssLoop/localization/**'
+      - 'AbyssLoop/project.godot'
+      - 'AbyssLoop/export_presets.cfg'
+      - 'AbyssLoop/tools/web_*.py'
+      - 'AbyssLoop/tools/export_web.sh'
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -43,6 +44,23 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Restore project source from one-time bootstrap bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f .bootstrap/READY ]]; then
+            cat .bootstrap/part-*.b64 | base64 --decode > "$RUNNER_TEMP/abyssloop-source.zip"
+            echo '03aa1b25dcca51d2cf9227f9bc8a17f6ee2344ba974a28bea3986ca0f66eefa8  '"$RUNNER_TEMP/abyssloop-source.zip" | sha256sum --check --status
+            unzip -q "$RUNNER_TEMP/abyssloop-source.zip" -d .
+            test -f AbyssLoop/project.godot
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add AbyssLoop/
+            git rm -r .bootstrap
+            git commit -m "Import Abyss Loop Prototype 61 RC7 source"
+            git push
+          fi
 
       - name: Configure Pages metadata
         uses: actions/configure-pages@v5
@@ -74,19 +92,22 @@ jobs:
           cp "$template_source"/* "$HOME/.local/share/godot/export_templates/4.7.2.stable/"
 
       - name: Source Web export preflight
-        run: python3 tools/web_export_preflight.py --mode source --report "$RUNNER_TEMP/web-source-preflight.md"
+        run: python3 AbyssLoop/tools/web_export_preflight.py --mode source --root AbyssLoop --report "$RUNNER_TEMP/web-source-preflight.md"
+
+      - name: Run static regression suite
+        run: python3 AbyssLoop/tests/run_static_suite.py
 
       - name: Import project resources
         run: |
           set -euo pipefail
-          "$GODOT_BIN" --headless --editor --path . --import
+          "$GODOT_BIN" --headless --editor --path AbyssLoop --import
 
       - name: Export Godot Web build
         run: |
           set -euo pipefail
-          mkdir -p build/web
-          "$GODOT_BIN" --headless --path . --export-release "Web" build/web/index.html
-          python3 tools/web_export_preflight.py --mode build --root build/web --report "$RUNNER_TEMP/web-build-preflight.md"
+          mkdir -p AbyssLoop/build/web
+          "$GODOT_BIN" --headless --path AbyssLoop --export-release "Web" AbyssLoop/build/web/index.html
+          python3 AbyssLoop/tools/web_export_preflight.py --mode build --root AbyssLoop/build/web --report "$RUNNER_TEMP/web-build-preflight.md"
 
       - name: Install Playwright Chromium
         run: |
@@ -97,15 +118,15 @@ jobs:
       - name: Run browser smoke test
         run: |
           mkdir -p "$RUNNER_TEMP/web-qa"
-          "$RUNNER_TEMP/web-qa-venv/bin/python" tools/web_browser_smoke_test.py \
-            --directory build/web --timeout 90 \
+          "$RUNNER_TEMP/web-qa-venv/bin/python" AbyssLoop/tools/web_browser_smoke_test.py \
+            --directory AbyssLoop/build/web --timeout 90 \
             --screenshot "$RUNNER_TEMP/web-qa/abyssloop-web-smoke.png" \
             --report "$RUNNER_TEMP/web-qa/abyssloop-web-smoke.json"
 
       - name: Save deployable Web build
         uses: actions/upload-pages-artifact@v3
         with:
-          path: build/web
+          path: AbyssLoop/build/web
 
       - name: Preserve QA screenshots and reports
         if: always()
