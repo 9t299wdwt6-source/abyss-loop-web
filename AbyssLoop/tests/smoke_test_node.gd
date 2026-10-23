@@ -215,7 +215,7 @@ func _run_tests() -> void:
 	status_rng.seed = 222
 	var protected_hit: Dictionary = status_combat.perform_attack({"attack": 5.0, "crit": 0.0}, protected_defender, status_rng)
 	assert(int(protected_hit.get("absorbed", 0)) > 0 and int(protected_defender.hp) == 30, "the real shared CombatSystem attack path must honor barriers")
-	status_combat.free()
+	status_combat = null
 	var elite_factory = EnemySystemType.new()
 	var elite_rng := RandomNumberGenerator.new()
 	elite_rng.seed = 38039
@@ -246,7 +246,7 @@ func _run_tests() -> void:
 	assert(not final_phase_statuses.is_empty(), "phase entry must apply its configured defensive/healing state")
 	assert(SaveSystem._validate_boss_phase_state(boss_phase_manager.enemy), "phase snapshots must validate their thresholds, indexes, and special-attack state")
 	boss_phase_manager.free()
-	elite_factory.free()
+	elite_factory = null
 	var expiry_target := {"hp": 20, "status_effects": []}
 	status_system.apply_effect(expiry_target, "distortion", 0.2, 0.18, "smoke")
 	var expiry_events: Array[Dictionary] = status_system.tick_effects(expiry_target, 0.25)
@@ -255,7 +255,7 @@ func _run_tests() -> void:
 		if str(expiry_event.get("type", "")) == "expired":
 			status_expired = true
 	assert(expiry_target.status_effects.is_empty() and status_expired, "expired status must be removed and reported once")
-	status_system.free()
+	status_system = null
 	assert(ContentRegistry.BASE_RESEARCH.has("rare_survey") and ContentRegistry.BASE_RESEARCH.has("field_training") and ContentRegistry.BASE_RESEARCH.has("event_forecasting"), "research should offer multiple branches")
 	assert(ContentRegistry.EXPEDITION_OBJECTIVES.size() >= 5, "expedition goal catalogue must provide alternatives")
 	assert(GameState.settings.has("reduced_motion"), "reduced_motion preference must persist")
