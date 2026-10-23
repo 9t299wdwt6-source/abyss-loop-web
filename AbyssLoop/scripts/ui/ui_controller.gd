@@ -183,11 +183,11 @@ func _build_shell() -> void:
 	main_column.add_child(resource_row)
 	var scrap_panel := _make_panel(resource_row, C_PANEL, 9)
 	scrap_panel.custom_minimum_size.x = 190
-	scrap_label = _label("◆  Материалы 60", 13, C_GOLD, true)
+	scrap_label = _label("Материалы 60", 13, C_GOLD, true)
 	scrap_panel.add_child(scrap_label)
 	var crystal_panel := _make_panel(resource_row, C_PANEL, 9)
 	crystal_panel.custom_minimum_size.x = 190
-	crystal_label = _label("◇  Редкий ресурс 14", 13, Color("#8ec7ec"), true)
+	crystal_label = _label("Редкий ресурс 14", 13, Color("#8ec7ec"), true)
 	crystal_panel.add_child(crystal_label)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -337,8 +337,8 @@ func _set_phase(text_value: String) -> void:
 func _refresh_header() -> void:
 	if not is_instance_valid(scrap_label):
 		return
-	var next_scrap_text := "◆  Материалы %d" % int(GameState.scrap)
-	var next_crystal_text := "◇  Редкий ресурс %d" % int(GameState.crystals)
+	var next_scrap_text := "Материалы %d" % int(GameState.scrap)
+	var next_crystal_text := "Редкий ресурс %d" % int(GameState.crystals)
 	if scrap_label.text != next_scrap_text:
 		scrap_label.text = next_scrap_text
 	if crystal_label.text != next_crystal_text:
@@ -621,7 +621,7 @@ func _open_expedition_history(filter_id: String = "all") -> void:
 		var history_mode_name := str(entry.get("expedition_mode_name", "Обычная экспедиция"))
 		card_box.add_child(_label("Режим: %s%s" % [history_mode_name, " · ФИНАЛ ЭНДГЕЙМА" if endgame_completed else ""], 10, C_GOLD if endgame_completed else C_MUTED, endgame_completed))
 		card_box.add_child(_label("Победы %d · боссы %d · элиты %d · события %d" % [int(entry.get("victories", 0)), int(entry.get("bosses_defeated", 0)), int(entry.get("elites_defeated", 0)), int(entry.get("events_resolved", 0))], 11, C_TEXT))
-		card_box.add_child(_label("Добыча: заработано %d ◆ / %d ◇ · сохранено %d ◆ / %d ◇ · потеряно %d ◆ / %d ◇" % [int(entry.get("earned_scrap", 0)), int(entry.get("earned_crystals", 0)), int(entry.get("kept_scrap", 0)), int(entry.get("kept_crystals", 0)), int(entry.get("lost_scrap", 0)), int(entry.get("lost_crystals", 0))], 10, C_TEXT))
+		card_box.add_child(_label("Добыча: заработано %d мат. / %d ред. · сохранено %d мат. / %d ред. · потеряно %d мат. / %d ред." % [int(entry.get("earned_scrap", 0)), int(entry.get("earned_crystals", 0)), int(entry.get("kept_scrap", 0)), int(entry.get("kept_crystals", 0)), int(entry.get("lost_scrap", 0)), int(entry.get("lost_crystals", 0))], 10, C_TEXT))
 		var detail_parts: Array[String] = []
 		if not str(entry.get("objective_name", "")).is_empty():
 			detail_parts.append("Цель: %s (%s)" % [str(entry.get("objective_name", "")), "выполнена" if bool(entry.get("objective_completed", false)) else "не выполнена"])
@@ -660,7 +660,7 @@ func _build_building_card(parent: Node, building_id: String) -> void:
 	description.add_child(_label("Уровень %d / %d" % [level, int(def.max_level)], 11, C_ACCENT))
 	description.add_child(_label(str(def.effect), 11, C_MUTED))
 	var run_checkpoint_active: bool = GameState.has_saved_expedition()
-	var button_text := "ПОСЛЕ ЗАБЕГА" if run_checkpoint_active else ("МАКСИМУМ" if level >= int(def.max_level) else "Улучшить\n%d ◆ · %d ◇" % [int(cost.scrap), int(cost.crystals)])
+	var button_text := "ПОСЛЕ ЗАБЕГА" if run_checkpoint_active else ("МАКСИМУМ" if level >= int(def.max_level) else "Улучшить\n%d мат. · %d ред." % [int(cost.scrap), int(cost.crystals)])
 	var upgrade_button := _button(button_text, Callable(self, "_on_upgrade_pressed").bind(building_id), level < int(def.max_level) and not run_checkpoint_active)
 	upgrade_button.custom_minimum_size = Vector2(132, 58)
 	upgrade_button.disabled = level >= int(def.max_level) or run_checkpoint_active
@@ -769,7 +769,7 @@ func _open_research_tree(notice_text: String = "") -> void:
 			var card_box := VBoxContainer.new()
 			card_box.add_theme_constant_override("separation", 4)
 			card.add_child(card_box)
-			var title_text := ("✓  " if bool(status.get("unlocked", false)) else "◇  ") + str(definition.get("name", research_id))
+			var title_text := str(definition.get("name", research_id))
 			card_box.add_child(_label(title_text, 14, C_ACCENT if bool(status.get("unlocked", false)) else C_TEXT, true))
 			card_box.add_child(_label(str(definition.get("description", "")), 11, C_MUTED))
 			card_box.add_child(_label("ЭФФЕКТ: " + str(definition.get("effect_text", "—")), 11, C_GOLD, true))
@@ -784,7 +784,7 @@ func _open_research_tree(notice_text: String = "") -> void:
 				var missing_names: Array = status.get("missing", [])
 				requirement_text = "ЗАБЛОКИРОВАНО · не изучено: " + ", ".join(missing_names)
 			card_box.add_child(_label(requirement_text, 10, C_MUTED))
-			var cost_text := "%d ◆ · %d ◇" % [int(definition.get("scrap_cost", 0)), int(definition.get("crystal_cost", 0))]
+			var cost_text := "%d мат. · %d ред." % [int(definition.get("scrap_cost", 0)), int(definition.get("crystal_cost", 0))]
 			var run_checkpoint_active: bool = GameState.has_saved_expedition()
 			var action_text := "ПОСЛЕ ЗАБЕГА" if run_checkpoint_active else ("ИЗУЧЕНО" if bool(status.get("unlocked", false)) else ("ЗАБЛОКИРОВАНО" if not bool(status.get("prerequisites_met", false)) else "ИССЛЕДОВАТЬ · " + cost_text))
 			var action_button := _button(action_text, Callable(self, "_on_research_pressed").bind(research_id), bool(status.get("available", false)))
@@ -797,7 +797,7 @@ func _open_research_tree(notice_text: String = "") -> void:
 			card_box.add_child(action_button)
 		var next_preview: Dictionary = branch_status.get("next_preview", {})
 		if not next_preview.is_empty() and not bool(branch_status.get("complete", false)):
-			var preview_text := "Следующий открываемый узел: %s — %s · %d ◆ / %d ◇" % [str(next_preview.get("name", "")), str(next_preview.get("effect_text", "—")), int(next_preview.get("scrap_cost", 0)), int(next_preview.get("crystal_cost", 0))]
+			var preview_text := "Следующий открываемый узел: %s — %s · %d мат. / %d ред." % [str(next_preview.get("name", "")), str(next_preview.get("effect_text", "—")), int(next_preview.get("scrap_cost", 0)), int(next_preview.get("crystal_cost", 0))]
 			if not bool(next_preview.get("available", false)):
 				preview_text += " · пока недостаточно ресурсов"
 			branch_box.add_child(_label(preview_text, 10, C_MUTED))
@@ -1300,7 +1300,7 @@ func _sync_expedition_view(rebuild_tiles: bool) -> void:
 		var hp_text := "%d / %d" % [int(manager.hero.get("hp", 0)), int(manager.hero.get("max_hp", 0))]
 		var level_text := "Ур. %d · %d/%d XP" % [int(manager.hero.get("level", 1)), int(manager.hero.get("xp", 0)), int(manager.hero.get("xp_next", 16))]
 		var loop_text := "%d · узел %d/%d" % [int(manager.loop_count), int(manager.current_cell()) + 1, manager.route.size()]
-		var risk_text := "×%.1f · %d ◆" % [float(manager.danger), int(manager.run_ledger.get("scrap", 0))]
+		var risk_text := "x%.1f · %d мат." % [float(manager.danger), int(manager.run_ledger.get("scrap", 0))]
 		if exp_metrics.hp.text != hp_text: exp_metrics.hp.text = hp_text
 		if exp_metrics.level.text != level_text: exp_metrics.level.text = level_text
 		if exp_metrics.loop.text != loop_text: exp_metrics.loop.text = loop_text
