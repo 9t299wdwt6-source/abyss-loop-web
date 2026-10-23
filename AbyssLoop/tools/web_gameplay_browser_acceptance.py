@@ -98,6 +98,29 @@ def main() -> int:
                 expedition_hash = capture(page, "03-expedition-after-launch")
                 add("shelter launch action opens expedition UI", expedition_hash != shelter_hash,
                     {"shelter": shelter_hash, "expedition": expedition_hash})
+                # Exercise a real in-game control, card selection, and a legal road-cell
+                # placement through the rendered canvas. Pause first so route animation
+                # does not make the before/after screenshot comparison nondeterministic.
+                page.mouse.click(1095, 316)
+                page.wait_for_timeout(350)
+                pause_hash = capture(page, "04-expedition-paused")
+                add("expedition pause control responds to a real pointer click", pause_hash != expedition_hash,
+                    {"expedition": expedition_hash, "paused": pause_hash})
+
+                # On the verified 1280x800 layout the first card is centred near (1020, 540).
+                page.mouse.click(1020, 540)
+                page.wait_for_timeout(350)
+                selected_hash = capture(page, "05-road-tile-selected")
+                add("first road tile can be selected by pointer", selected_hash != pause_hash,
+                    {"paused": pause_hash, "selected": selected_hash})
+
+                # Route node 2 is a normal, free road node; node 1 at the loop origin is protected.
+                page.mouse.click(585, 343)
+                page.wait_for_timeout(450)
+                placed_hash = capture(page, "06-road-tile-placed")
+                add("selected tile is placed on a free road node by pointer", placed_hash != selected_hash,
+                    {"selected": selected_hash, "placed": placed_hash})
+
                 canvas_info = page.locator("canvas").first.evaluate(
                     "el => ({width: el.width, height: el.height, clientWidth: el.clientWidth, clientHeight: el.clientHeight, visible: !!(el.offsetWidth || el.offsetHeight)})"
                 )
@@ -123,7 +146,7 @@ def main() -> int:
         "checked_utc": datetime.now(timezone.utc).isoformat(),
         "url": url,
         "result": "FAIL" if failures else "PASS",
-        "scope": "real Chromium pointer interaction through tutorial dismiss and expedition launch; not full-playthrough or iPhone Safari acceptance",
+        "scope": "real Chromium pointer interaction through tutorial dismiss, expedition launch, pause, tile selection, and road placement; not full-playthrough or iPhone Safari acceptance",
         "runtime_assets": assets,
         "screenshots": screenshots,
         "javascript_errors": errors,
