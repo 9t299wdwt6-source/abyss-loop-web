@@ -36,7 +36,7 @@ checks = {
     "landscape click shows the same action lock before calling the manager": "var blocked_reason := _get_tile_placement_block_reason()" in block(ui, "func _on_world_cell_clicked(cell_id: String) -> void:", "func _toggle_pause()") and "manager.place_world_tile(selected_tile_hand_index, cell_id)" in block(ui, "func _on_world_cell_clicked(cell_id: String) -> void:", "func _toggle_pause()"),
     "localization identifies both road and landscape targets after hint relocation": "ДОРОГЕ" in localization.get("route.no_tiles", "") and "ЛАНДШАФТЕ" in localization.get("route.no_tiles", "") and "Стартовый узел закрыт" in localization.get("expedition.route_hint", "") and "ландшафта" in localization.get("expedition.tiles.preview_description", ""),
     "route view label no longer claims that cards cannot be placed on roads": "РАЗМЕЩАЮТСЯ НА ЛАНДШАФТЕ, НЕ НА ДОРОГЕ" not in localization.get("route.no_tiles", ""),
-    "Godot smoke includes road preview and both-target guidance assertions": "road preview must identify the selected tile before placement" in smoke and "tile placement guidance must mention both the road and separate landscape field" in smoke,
+    "Godot smoke includes road preview and relocated both-target guidance assertions": "road preview must identify the selected tile before placement" in smoke and "tile placement guidance must cover both road and landscape targets after hint relocation" in smoke,
     "existing road/landscape geometry contract remains covered": "road segments must never be treated as landscape placement cells" in smoke and "_find_world_cell(field_center) == world_cell_id" in smoke,
 }
 failed = [name for name, passed in checks.items() if not passed]
