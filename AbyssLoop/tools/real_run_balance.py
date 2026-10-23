@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Offline analysis of real Abyss Loop expedition history exported from the local save.
+"""Offline analysis of Abyss Loop expedition observations from labelled sources.
 
 This tool reads files only, writes a Markdown report, and never edits a save or sends data
-anywhere. It does not simulate combat and never labels a small sample as a balance verdict.
+anywhere. Scripted QA engine runs are kept separate from player history and never become
+a human-playtest claim or an automatic balance verdict.
 """
 from __future__ import annotations
 
@@ -29,6 +30,13 @@ OPTIONAL_INT_FIELDS = (
     "route_cells", "processed_steps", "telemetry_schema",
 )
 OPTIONAL_NUMBER_FIELDS = ("danger",)
+CAPTURE_KINDS = {"profile_history", "automated_engine_run", "manual_playtest", "unknown_source"}
+
+
+def _capture_kind(value: Any) -> str:
+    """Normalize the data source so scripted QA runs never merge with player history."""
+    candidate = str(value or "profile_history").strip()
+    return candidate if candidate in CAPTURE_KINDS else "unknown_source"
 
 
 def _is_int(value: Any) -> bool:
@@ -47,7 +55,19 @@ def load_input(path: Path) -> tuple[dict[str, Any], list[Any], str]:
     metadata_value = parsed.get("metadata", {})
     metadata = metadata_value if isinstance(metadata_value, dict) else {}
     if isinstance(parsed.get("runs"), list):
-        return metadata, parsed["runs"], "exported runs"
+        # Wrapper metadata can label the origin when individual rows have no override.
+        # A row-level capture_kind always wins; the export envelope is never treated as
+        # proof that an automated run was a human playtest.
+        default_kind = _capture_kind(metadata.get("capture_kind", "unknown_source"))
+        rows: list[Any] = []
+        for raw_row in parsed["runs"]:
+            if isinstance(raw_row, dict):
+                row = dict(raw_row)
+                row.setdefault("capture_kind", default_kind)
+                rows.append(row)
+            else:
+                rows.append(raw_row)
+        return metadata, rows, "exported runs"
     data_value = parsed.get("data")
     if isinstance(data_value, dict) and isinstance(data_value.get("expedition_history"), list):
         return metadata, data_value["expedition_history"], "Godot save envelope"
@@ -74,6 +94,7 @@ def normalize_runs(raw_rows: list[Any]) -> tuple[list[dict[str, Any]], list[str]
         difficulty = str(row.get("difficulty_id", "standard")).strip() or "standard"
         mode = str(row.get("expedition_mode_id", "standard")).strip() or "standard"
         modifier = str(row.get("modifier_id", row.get("modifier_name", "unknown"))).strip() or "unknown"
+        capture_kind = _capture_kind(row.get("capture_kind", "profile_history"))
         if not run_id or len(run_id) > 100 or outcome not in OUTCOMES:
             invalid_count += 1
             warnings.append(f"Строка {index + 1}: отсутствует run_id/неподдерживаемый outcome; запись исключена.")
@@ -106,6 +127,7 @@ def normalize_runs(raw_rows: list[Any]) -> tuple[list[dict[str, Any]], list[str]
         row["difficulty_id"] = difficulty
         row["expedition_mode_id"] = mode
         row["modifier_id"] = modifier
+        row["capture_kind"] = capture_kind
         for key in REQUIRED_INT_FIELDS + OPTIONAL_INT_FIELDS:
             row.setdefault(key, 1 if key == "hero_level" else 0)
         for key in OPTIONAL_NUMBER_FIELDS:
@@ -130,19 +152,22 @@ def _fmt(value: Any) -> str:
     return "—" if value is None else str(value)
 
 
-def _group_key(row: dict[str, Any]) -> tuple[str, str, str, str]:
-    return row["game_version"], row["difficulty_id"], row["modifier_id"], row["expedition_mode_id"]
+def _group_key(row: dict[str, Any]) -> tuple[str, str, str, str, str]:
+    return (
+        row["game_version"], row["difficulty_id"], row["modifier_id"],
+        row["expedition_mode_id"], row["capture_kind"],
+    )
 
 
 def _group_table(rows: list[dict[str, Any]], minimum_repeats: int) -> list[str]:
     if not rows:
         return ["Нет пригодных забегов.", ""]
-    grouped: dict[tuple[str, str, str, str], list[dict[str, Any]]] = defaultdict(list)
+    grouped: dict[tuple[str, str, str, str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         grouped[_group_key(row)].append(row)
     lines = [
-        "| Сборка | Сложность | Модификатор | Режим | N | Seed | Возврат | Медиана циклов | Медиана боссов | Материалы получены / сохранены | Кристаллы получены / сохранены | Медиана времени, сек. | Оценка выборки |",
-        "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+        "| Сборка | Сложность | Модификатор | Режим | Источник | N | Seed | Возврат | Медиана циклов | Медиана боссов | Материалы получены / сохранены | Кристаллы получены / сохранены | Медиана времени, сек. | Оценка выборки |",
+        "|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|",
     ]
     for key, group in sorted(grouped.items()):
         returned = sum(1 for row in group if row["outcome"] == "return")
@@ -160,8 +185,8 @@ def _group_table(rows: list[dict[str, Any]], minimum_repeats: int) -> list[str]:
         kept_crystals = _median(group, "kept_crystals")
         earned_crystals = _median(group, "earned_crystals")
         lines.append(
-            "| %s | %s | %s | %s | %d | %d | %d/%d (%.0f%%) | %s | %s | %s / %s | %s / %s | %s | %s |" % (
-                key[0], key[1], key[2], key[3], n, len(seeds), returned, n,
+            "| %s | %s | %s | %s | %s | %d | %d | %d/%d (%.0f%%) | %s | %s | %s / %s | %s / %s | %s | %s |" % (
+                key[0], key[1], key[2], key[3], key[4], n, len(seeds), returned, n,
                 (returned / n * 100.0), _fmt(_median(group, "loops")),
                 _fmt(_median(group, "bosses_defeated")), _fmt(earned_scrap), _fmt(kept_scrap),
                 _fmt(earned_crystals), _fmt(kept_crystals),
@@ -179,7 +204,7 @@ def build_report(metadata: dict[str, Any], rows: list[dict[str, Any]], warnings:
     legacy = sum(1 for row in rows if int(row.get("telemetry_schema", 0)) < 1)
     seeds = {row["seed"] for row in rows if row["seed"] > 0}
     lines = [
-        "# Abyss Loop — анализ реальных забегов (Stage64B)", "",
+        "# Abyss Loop — анализ игровых наблюдений (Stage64B)", "",
         "## Паспорт данных", "",
         f"- Источник: {input_shape} (локальный/offline анализ).",
         f"- Метка сборки: {label or str(metadata.get('build_label', 'не указана'))}.",
@@ -188,29 +213,35 @@ def build_report(metadata: dict[str, Any], rows: list[dict[str, Any]], warnings:
         f"- Версии игры в данных: {', '.join(versions) if versions else 'нет'}.",
         f"- Пригодных забегов: {len(rows)}; уникальных seed: {len(seeds)}; исключено невалидных: {invalid_count}; дубликатов run_id: {duplicate_count}.",
         f"- Записей без новой телеметрии Stage68B: {legacy}.",
+        "- Источники разделены и в сводке, и в таблице: profile_history (локальная история), automated_engine_run (скриптовые QA-прогоны), manual_playtest (явно помеченные ручные прогоны); неизвестные метки попадают в unknown_source.",
         "- Анализатор читает файлы локально, ничего не отправляет и не изменяет входное сохранение.",
         "",
         "## Сводка", "",
     ]
     if rows:
-        returns = sum(1 for row in rows if row["outcome"] == "return")
-        losses = len(rows) - returns
-        lines.extend([
-            f"- Возвращений: {returns}/{len(rows)} ({returns / len(rows) * 100:.1f}%). Поражений: {losses}/{len(rows)}.",
-            f"- Медиана циклов: {_fmt(_median(rows, 'loops'))}; медиана побед: {_fmt(_median(rows, 'victories'))}; медиана событий: {_fmt(_median(rows, 'events_resolved'))}.",
-            f"- Медиана потерянных материалов: {_fmt(_median(rows, 'lost_scrap'))}; кристаллов: {_fmt(_median(rows, 'lost_crystals'))}.",
-            f"- Медиана размещений: дорога {_fmt(_median(rows, 'road_placements'))}, ландшафт {_fmt(_median(rows, 'world_placements'))}.",
-            "",
-        ])
+        source_groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for row in rows:
+            source_groups[row["capture_kind"]].append(row)
+        for source_kind, source_rows in sorted(source_groups.items()):
+            returns = sum(1 for row in source_rows if row["outcome"] == "return")
+            losses = len(source_rows) - returns
+            lines.extend([
+                f"### Источник: {source_kind}",
+                f"- Забегов: {len(source_rows)}; возвращений: {returns}/{len(source_rows)} ({returns / len(source_rows) * 100:.1f}%). Поражений: {losses}/{len(source_rows)}.",
+                f"- Медиана циклов: {_fmt(_median(source_rows, 'loops'))}; медиана побед: {_fmt(_median(source_rows, 'victories'))}; медиана событий: {_fmt(_median(source_rows, 'events_resolved'))}.",
+                f"- Медиана потерянных материалов: {_fmt(_median(source_rows, 'lost_scrap'))}; кристаллов: {_fmt(_median(source_rows, 'lost_crystals'))}.",
+                f"- Медиана размещений: дорога {_fmt(_median(source_rows, 'road_placements'))}, ландшафт {_fmt(_median(source_rows, 'world_placements'))}.",
+                "",
+            ])
     else:
         lines.extend(["Нет строк для итоговой статистики.", ""])
     lines.extend(["## По сопоставимым группам", ""])
     lines.extend(_group_table(rows, minimum_repeats))
     lines.extend([
         "## Интерпретация и ограничения", "",
-        "- Это наблюдения реальных забегов из локальной истории профиля, но не автоматическое решение об изменении баланса.",
+        "- Это наблюдения из указанного источника. automated_engine_run — скриптовые прогоны движка с детерминированными решениями, а не человеческое прохождение; ни один источник сам по себе не даёт автоматического решения об изменении баланса.",
         f"- Группа считается достаточно заполненной только для первичного просмотра при N≥{minimum_repeats} и минимум 3 разных seed. Даже такая группа не доказывает статистическую значимость.",
-        "- Сравнивать следует одинаковую версию игры, сложность, модификатор и режим. Если эти условия различаются, строки намеренно разделены.",
+        "- Сравнивать следует одинаковую версию игры, сложность, модификатор, режим и источник. Если эти условия различаются, строки намеренно разделены; автоматизированные QA-забеги не объединяются с историей пользователя.",
         "- Время прохождения доступно только для телеметрии схемы 1. Старые записи не дополняются выдуманными значениями.",
         "- Баланс не оценён автоматически: решение требует гипотезы, повторов на одинаковых настройках и проверки соседнего диапазона сложности.",
         "",

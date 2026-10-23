@@ -17,8 +17,9 @@ spec.loader.exec_module(real_run_balance)
 
 def sample(run_id: str = "r1", *, outcome: str = "return", seed: int = 42,
            version: str = "0.61.0", loops: int = 2, mode: str = "standard",
-           modifier: str = "standard", schema: int = 1) -> dict:
-    return {
+           modifier: str = "standard", schema: int = 1,
+           capture_kind: str | None = None) -> dict:
+    row = {
         "run_id": run_id, "outcome": outcome, "seed": seed, "game_version": version,
         "difficulty_id": "standard", "modifier_id": modifier, "expedition_mode_id": mode,
         "loops": loops, "hero_level": 2, "victories": 4, "bosses_defeated": 1,
@@ -30,6 +31,9 @@ def sample(run_id: str = "r1", *, outcome: str = "return", seed: int = 42,
         "end_hp": 15, "end_max_hp": 40, "road_placements": 2,
         "world_placements": 1, "danger": 2.2,
     }
+    if capture_kind is not None:
+        row["capture_kind"] = capture_kind
+    return row
 
 
 checks: dict[str, bool] = {}
@@ -42,9 +46,13 @@ with tempfile.TemporaryDirectory(prefix="abyss_real_balance_test_") as temp_dir:
     checks["Godot save envelope exposes bounded expedition history"] = len(rows) == 1 and shape == "Godot save envelope"
 
     export_path = temp / "export.json"
-    export_path.write_text(json.dumps({"metadata": {"build_label": "QA"}, "runs": [sample()]}), encoding="utf-8")
+    export_path.write_text(json.dumps({
+        "metadata": {"build_label": "QA", "capture_kind": "automated_engine_run"},
+        "runs": [sample()],
+    }), encoding="utf-8")
     export_meta, export_rows, export_shape = real_run_balance.load_input(export_path)
     checks["standalone runs JSON export is accepted"] = len(export_rows) == 1 and export_meta.get("build_label") == "QA" and export_shape == "exported runs"
+    checks["export-level capture kind is propagated to rows without an override"] = export_rows[0].get("capture_kind") == "automated_engine_run"
 
     try:
         real_run_balance.load_input(temp / "does-not-exist.json")
@@ -66,9 +74,15 @@ mixed, mixed_warnings, _, _ = real_run_balance.normalize_runs([
     sample("a", version="0.61.0", mode="standard"),
     sample("b", version="0.61.0", mode="long_expedition", seed=43),
     sample("c", version="0.62.0", modifier="glass_cannon", seed=44),
+    sample("auto", capture_kind="automated_engine_run", seed=45),
 ])
 report = real_run_balance.build_report({}, mixed, mixed_warnings, 0, 0, "exported runs", "test label", "4.7.2.stable", "", 5)
-checks["comparison groups separate build, modifier, and expedition mode"] = report.count("| 0.61.0 | standard | standard | standard | 1 |") == 1 and "long_expedition" in report and "glass_cannon" in report
+checks["comparison groups separate build, modifier, mode, and capture source"] = (
+    report.count("| 0.61.0 | standard | standard | standard | profile_history | 1 |") == 1
+    and report.count("| 0.61.0 | standard | standard | standard | automated_engine_run | 1 |") == 1
+    and "long_expedition" in report and "glass_cannon" in report
+)
+checks["report explicitly distinguishes scripted engine QA from player history"] = "not human" in report.lower() or "а не человеческое прохождение" in report
 checks["small samples are explicitly marked insufficient"] = "Мало данных (<5)" in report
 checks["report does not invent automatic balance verdict"] = "Баланс не оценён автоматически" in report and "Баланс подтверждён" not in report and "дисбаланс обнаружен" not in report
 checks["legacy entries are counted and never assigned fabricated duration"] = "без новой телеметрии Stage68B: 0" in report
@@ -80,6 +94,7 @@ checks["new capture schema includes duration and baseline metrics"] = all(token 
 checks["run history normalization preserves telemetry but remains bounded"] = all(token in (ROOT / "scripts/core/game_state.gd").read_text(encoding="utf-8") for token in ['"run_elapsed_seconds": maxi(0, int(source.get', '"start_loadout_ids": start_loadout_ids', 'const MAX_EXPEDITION_HISTORY := 50'])
 checks["save validation caps supported telemetry schema and validates metrics"] = 'int(history_entry.get("telemetry_schema", 0)) > 1' in (ROOT / "scripts/core/save_system.gd").read_text(encoding="utf-8") and '"run_elapsed_seconds"' in (ROOT / "scripts/core/save_system.gd").read_text(encoding="utf-8")
 checks["tool explicitly documents local-only/no-network behavior"] = "never edits a save or sends data" in TOOL_PATH.read_text(encoding="utf-8")
+checks["capture source labels are normalized to a bounded allowlist"] = all(token in TOOL_PATH.read_text(encoding="utf-8") for token in ['"automated_engine_run"', '"manual_playtest"', '"unknown_source"'])
 
 failed = [name for name, passed in checks.items() if not passed]
 for name, passed in checks.items():

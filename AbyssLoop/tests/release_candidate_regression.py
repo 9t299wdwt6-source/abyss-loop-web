@@ -40,6 +40,8 @@ checks = {
     "independent preflight enforces Stage68A evidence": all(x in (ROOT / "tools" / "release_preflight.py").read_text(encoding="utf-8") for x in ["ROADMAP_STATUS_STAGE68A_RU.md", "tests/resource_graph_regression.py", "tests/reports/RESOURCE_GRAPH_AUDIT_STAGE68A_RU.md"]),
     "Stage68B local balance capture tool, tests and guide are mandatory package inputs": all(x in packager for x in ["ROADMAP_STATUS_STAGE68B_RU.md", "STAGE68B_BUILD_REPORT_RU.md", "REAL_RUN_BALANCE_CAPTURE_GUIDE_STAGE68B_RU.md", "REAL_RUN_BALANCE_RUNTIME_CHECKLIST_STAGE68B_RU.md", "tools/real_run_balance.py", "tests/real_run_balance_capture_regression.py", "tests/reports/REAL_RUN_BALANCE_CAPTURE_AUDIT_STAGE68B_RU.md", "tests/reports/STAGE68B_PREFLIGHT_REPORT_RU.txt"]),
     "independent preflight enforces Stage68B evidence": all(x in (ROOT / "tools" / "release_preflight.py").read_text(encoding="utf-8") for x in ["ROADMAP_STATUS_STAGE68B_RU.md", "tools/real_run_balance.py", "tests/reports/REAL_RUN_BALANCE_CAPTURE_AUDIT_STAGE68B_RU.md"]),
+    "RC7 package includes Stage64B automated engine capture with source labels": all(x in packager for x in ["tests/stage64b_engine_run_capture.gd", "tests/stage64b_engine_run_capture_runner.tscn", "tests/stage64b_engine_run_capture_regression.py", "tests/reports/STAGE64B_AUTOMATED_ENGINE_RUN_CAPTURE_GUIDE_RU.md"]),
+    "independent preflight enforces Stage64B automated capture evidence": all(x in (ROOT / "tools" / "release_preflight.py").read_text(encoding="utf-8") for x in ["tests/stage64b_engine_run_capture.gd", "tests/stage64b_engine_run_capture_regression.py", "STAGE64B_AUTOMATED_ENGINE_RUN_CAPTURE_GUIDE_RU.md"]),
 }
 failed = [name for name, passed in checks.items() if not passed]
 for name, passed in checks.items():

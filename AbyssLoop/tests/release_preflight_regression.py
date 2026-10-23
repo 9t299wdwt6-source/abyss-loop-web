@@ -35,6 +35,13 @@ STAGE68C_REQUIRED = {
     "tests/reports/WEB_EXPORT_READINESS_AUDIT_STAGE68C_RU.md", "tests/reports/WEB_EXPORT_PREFLIGHT_STAGE68C_RU.txt",
 }
 assert STAGE68C_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage68C Web export and browser QA pipeline evidence must be mandatory in independent preflight"
+STAGE64B_REQUIRED = {
+    "tests/stage64b_engine_run_capture.gd",
+    "tests/stage64b_engine_run_capture_runner.tscn",
+    "tests/stage64b_engine_run_capture_regression.py",
+    "tests/reports/STAGE64B_AUTOMATED_ENGINE_RUN_CAPTURE_GUIDE_RU.md",
+}
+assert STAGE64B_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage64B automated engine capture and evidence must be mandatory in independent preflight"
 
 
 def write_fixture(root: Path) -> None:
@@ -85,6 +92,10 @@ def write_fixture(root: Path) -> None:
             content = "17/17 PASS; Реальных профилей не получено\n"
         elif name == "tests/reports/STAGE68B_PREFLIGHT_REPORT_RU.txt":
             content = "Stage68B; Runtime: NOT RUN\n"
+        elif name == "tests/stage64b_engine_run_capture_regression.py":
+            content = "STAGE64B ENGINE CAPTURE REGRESSION PASSED; never forces player/enemy health\n"
+        elif name == "tests/reports/STAGE64B_AUTOMATED_ENGINE_RUN_CAPTURE_GUIDE_RU.md":
+            content = "automated_engine_run is not human playtest evidence\n"
         elif name == "ROADMAP_STATUS_STAGE68C_RU.md":
             content = "Stage68C Web export pipeline; browser URL not yet published\n"
         elif name == "STAGE68C_BUILD_REPORT_RU.md":
