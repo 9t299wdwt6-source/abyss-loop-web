@@ -108,15 +108,19 @@ def main() -> int:
                     {"expedition": expedition_hash, "paused": pause_hash})
 
                 # On the verified 1280x800 layout the first card is centred near (1020, 540).
-                page.mouse.click(1020, 540)
+                page.mouse.click(1020, 565)
                 page.wait_for_timeout(350)
+                page.mouse.move(900, 110)
+                page.wait_for_timeout(200)
                 selected_hash = capture(page, "05-road-tile-selected")
                 add("first road tile can be selected by pointer", selected_hash != pause_hash,
                     {"paused": pause_hash, "selected": selected_hash})
 
                 # Route node 2 is a normal, free road node; node 1 at the loop origin is protected.
-                page.mouse.click(585, 343)
-                page.wait_for_timeout(450)
+                page.mouse.click(585, 348)
+                page.wait_for_timeout(350)
+                page.mouse.move(900, 110)
+                page.wait_for_timeout(200)
                 placed_hash = capture(page, "06-road-tile-placed")
                 add("selected tile is placed on a free road node by pointer", placed_hash != selected_hash,
                     {"selected": selected_hash, "placed": placed_hash})
