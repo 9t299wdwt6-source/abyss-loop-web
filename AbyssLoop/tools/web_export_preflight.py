@@ -49,6 +49,17 @@ def source_checks(root: Path) -> list[Check]:
         "Godot 4 Web supports the Compatibility renderer; configure both renderer settings",
     ))
 
+    compression_imports_ok = (
+        'textures/vram_compression/import_s3tc_bptc=true' in project
+        and 'textures/vram_compression/import_etc2_astc=true' in project
+    )
+    checks.append(_check(
+        "Web texture compression variants are enabled",
+        compression_imports_ok,
+        "S3TC/BPTC and ETC2/ASTC variants are explicitly imported for the Web preset",
+        "the Web preset enables both desktop and mobile VRAM compression; enable rendering/textures/vram_compression/import_s3tc_bptc and import_etc2_astc in project.godot",
+    ))
+
     code_files = [p for p in root.rglob("*") if p.is_file() and ".godot" not in p.parts]
     csharp_files = [p.relative_to(root).as_posix() for p in code_files if p.suffix.lower() in {".cs", ".csproj", ".sln"}]
     checks.append(_check(
