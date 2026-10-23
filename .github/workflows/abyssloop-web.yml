@@ -168,6 +168,21 @@ jobs:
             --screenshots-dir "$RUNNER_TEMP/web-qa/gameplay" \
             --report "$RUNNER_TEMP/web-qa/abyssloop-web-gameplay.json"
 
+      - name: Package standalone Godot project ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="${RUNNER_TEMP}/AbyssLoop_Godot_Prototype_61_RC7.zip"
+          python3 AbyssLoop/tools/package_release.py --output "$archive" --release-candidate
+          test -s "$archive"
+
+      - name: Upload standalone Godot project ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: AbyssLoop-Godot-Prototype-61-RC7-${{ github.sha }}
+          path: ${{ runner.temp }}/AbyssLoop_Godot_Prototype_61_RC7.zip
+          if-no-files-found: error
+          retention-days: 14
       - name: Save deployable Web build
         uses: actions/upload-pages-artifact@v3
         with:
