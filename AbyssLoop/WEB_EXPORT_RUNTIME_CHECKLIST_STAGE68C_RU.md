@@ -6,7 +6,7 @@
 
 **Web-экспорт и публикация прошли успешно.** Опубликованный адрес: https://9t299wdwt6-source.github.io/abyss-loop-web/
 
-Проверка: [GitHub Actions — успешный build, Chromium smoke и deploy](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40016205413).
+Проверка: [GitHub Actions — успешный build, Chromium smoke и deploy](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40019051389).
 
 ## A. Создание и размещение
 
