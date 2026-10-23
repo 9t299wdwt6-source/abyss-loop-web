@@ -1,36 +1,56 @@
-# Публикация Abyss Loop Web через GitHub Pages
+# Abyss Loop Web — сборка, проверка и публикация
 
-## Статус
+## Текущий релиз
 
-В репозитории есть workflow `.github/workflows/abyssloop-web.yml`. Он подготовит Godot 4.7.2, выполнит Python-регрессии, проверит конфигурацию Web-экспорта, соберёт HTML5/WebAssembly, запустит Chromium smoke-test и опубликует сборку только после успешных проверок.
+**[Запустить опубликованную игру](https://9t299wdwt6-source.github.io/abyss-loop-web/)**
 
-Исходники пока не помещены в GitHub. Для однократного импорта требуется загрузить исходный ZIP в корень репозитория. Workflow затем распакует проект в `AbyssLoop/`, попробует сохранить обычные файлы исходников в репозитории, удалит временный ZIP и запустит сборку.
+- Релизный исходный коммит: `adcfd96c50cdb6e8571604ec308be8c994789641`.
+- GitHub Actions: [успешная сборка и публикация](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40016205413).
+- Godot 4.7.2: импорт проекта и Web-экспорт — PASS.
+- Static/regression suite: 81/81 PASS.
+- Chromium Web smoke-test: PASS.
+- GitHub Pages deployment: PASS.
 
-## Шаг 1. Включить GitHub Pages
+В preflight остаётся одно предупреждение о вызове буфера обмена в отладочной функции диагностики. Оно не блокировало экспорт; всё равно следует проверить, что отладочная функция не доступна в release Web-сборке.
 
-Сначала откройте **Settings → Pages** в репозитории и установите **Build and deployment → Source → GitHub Actions**. Это нужно сделать до загрузки архива, иначе первый запуск workflow может остановиться на неподготовленном Pages.
+## Что делает workflow
 
-## Шаг 2. Однократно загрузить проект
+Файл: `.github/workflows/abyssloop-web.yml`.
 
-1. Скачайте архив `AbyssLoop_Prototype61_Stage68C_Web_Export_Pipeline.zip`, приложенный к инструкции в чате.
-2. Откройте `https://github.com/9t299wdwt6-source/abyss-loop-web`.
-3. Выберите **Add file → Upload files**.
-4. Загрузите ZIP в корень репозитория, оставив точное имя: `AbyssLoop_Prototype61_Stage68C_Web_Export_Pipeline.zip`.
-5. Нажмите **Commit changes** в ветку `main`.
+При изменениях исходников, тестов или самого workflow он:
+1. Проверяет SHA-256 архивов Godot 4.7.2 и Web export templates.
+2. Проверяет Web-настройки проекта, включая варианты сжатия текстур ETC2/ASTC и S3TC/BPTC.
+3. Запускает Python static/regression suite.
+4. Импортирует ресурсы Godot в headless-режиме.
+5. Экспортирует `index.html`, `index.js`, `index.wasm` и `index.pck`.
+6. Проверяет размеры и структуру экспортированных файлов.
+7. Запускает Chromium smoke-test: HTTP, canvas, WebGL 2, runtime-файлы, MIME WASM, console и JavaScript errors.
+8. Публикует артефакт на GitHub Pages только после успешных проверок.
 
-Workflow запустится автоматически. Он проверит SHA-256 архива, распакует проект и попытается закоммитить папку `AbyssLoop/` в `main`. Если GitHub не разрешит этому workflow отправить такой коммит, он всё равно продолжит текущую сборку из распакованного рабочего каталога, если остальные шаги успешны. Не меняйте имя архива: оно зафиксировано в workflow.
+## Как вносить дальнейшие изменения
 
-## Что проверяется
+Исходники проекта расположены в папке `AbyssLoop/`.
 
-- SHA-256 архива исходников и официальных архивов Godot 4.7.2 / Web export templates;
-- наличие проекта и совместимость настроек экспорта;
-- Python static/regression suite;
-- импорт ресурсов Godot и экспорт `index.html` вместе с runtime-файлами;
-- запуск в Chromium, WebGL 2, создание canvas, загрузка JavaScript/WASM/PCK и ошибки браузера;
-- публикация только после успешного тестирования.
+1. Измени нужные GDScript/сцены/настройки или тесты.
+2. Отправь commit в ветку `main`.
+3. Открой [GitHub Actions](https://github.com/9t299wdwt6-source/abyss-loop-web/actions) и проверь, что этапы сборки, Chromium smoke-test и deploy завершились успешно.
+4. После успешного deploy проверь игру по опубликованной ссылке.
 
-## Ожидаемый адрес
+Изменения документации сами по себе не запускают сборку. Изменения `AbyssLoop/**/*.gd`, `*.tscn`, `*.tres`, `project.godot`, `export_presets.cfg`, `AbyssLoop/tools/web_*.py`, `AbyssLoop/tests/**` или `.github/workflows/**` запускают workflow.
 
-`https://9t299wdwt6-source.github.io/abyss-loop-web/`
+## Что не покрывает автоматический smoke-test
 
-Ссылка станет рабочей только после успешного завершения job сборки и деплоя. Chromium smoke-test проверяет начальную загрузку, но не заменяет полноценную ручную приёмку игрового цикла и проверку Safari на iPhone.
+Smoke-test подтверждает начальную загрузку настоящего Godot Web-экспорта в Chromium, но не полное прохождение. Вручную на опубликованном URL ещё нужно проверить:
+
+- главное меню, запуск экспедиции, размещение тайлов на маршруте и ландшафте;
+- обычный бой, эффекты состояний, события, элитного врага и босса;
+- корректность наград, выхода и возврата в деревню/меню;
+- сохранение после перезагрузки и восстановление прогресса;
+- сенсорное управление и изменение ориентации;
+- Safari на iPhone.
+
+## Настройка GitHub Pages
+
+Для текущего репозитория уже выбран источник **Settings → Pages → Build and deployment → Source → GitHub Actions**.
+
+Публичный адрес: `https://9t299wdwt6-source.github.io/abyss-loop-web/`.
