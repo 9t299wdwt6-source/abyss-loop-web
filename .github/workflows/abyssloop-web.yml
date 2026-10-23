@@ -26,6 +26,7 @@ on:
       - 'AbyssLoop/project.godot'
       - 'AbyssLoop/export_presets.cfg'
       - 'AbyssLoop/tools/web_*.py'
+      - 'AbyssLoop/tests/**'
       - 'AbyssLoop/tools/export_web.sh'
 
 permissions:
