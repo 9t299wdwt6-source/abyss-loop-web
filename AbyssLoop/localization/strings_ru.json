@@ -41,7 +41,7 @@
   "base.button.history": "ЖУРНАЛ КАМПАНИИ · %d / %d",
   "expedition.map.title": "КАРТА ЭКСПЕДИЦИИ",
   "expedition.hero_moving": "Герой движется по маршруту…",
-  "expedition.route_hint": "Выберите тайл справа, затем кликните по свободному дорожному узлу или клетке ландшафта. Стартовый узел менять нельзя.",
+  "expedition.route_hint": "Стартовый узел закрыт. Во время боя и выбора события размещение приостановлено.",
   "expedition.controls.title": "УПРАВЛЕНИЕ ЗАБЕГОМ",
   "expedition.controls.target_health": "Здоровье текущей цели",
   "expedition.controls.no_effects": "СОСТОЯНИЕ: нет активных эффектов",

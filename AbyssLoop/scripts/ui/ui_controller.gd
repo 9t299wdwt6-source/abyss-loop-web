@@ -495,19 +495,31 @@ func _render_base() -> void:
 		research_button.text = _t("base.button.research_after_run")
 	launch_box.add_child(research_button)
 	var reassurance := _make_panel(launch_box, Color("#132229"), 12)
-	reassurance.add_child(_label(_t("base.risk.title"), 12, C_GOLD, true))
-	reassurance.add_child(_label(_t("base.risk.description"), 12, C_MUTED))
+	var reassurance_box := VBoxContainer.new()
+	reassurance_box.add_theme_constant_override("separation", 4)
+	reassurance.add_child(reassurance_box)
+	reassurance_box.add_child(_label(_t("base.risk.title"), 12, C_GOLD, true))
+	var risk_description := _label(_t("base.risk.description"), 12, C_MUTED)
+	risk_description.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reassurance_box.add_child(risk_description)
 	if GameState.runs_completed == 0:
 		var first_session_panel := _make_panel(launch_box, Color("#20362f"), 12)
-		first_session_panel.add_child(_label(_t("base.first_session.title"), 12, C_GOLD, true))
+		var first_session_box := VBoxContainer.new()
+		first_session_box.add_theme_constant_override("separation", 5)
+		first_session_panel.add_child(first_session_box)
+		first_session_box.add_child(_label(_t("base.first_session.title"), 12, C_GOLD, true))
 		var first_session_status := _t("base.first_session.start")
 		if GameState.has_saved_expedition():
 			first_session_status = _t("base.first_session.saved")
 		elif GameState.runs_started > 0:
 			first_session_status = _t("base.first_session.return")
-		first_session_panel.add_child(_label(first_session_status, 12, C_TEXT))
-		first_session_panel.add_child(_label(_t("base.first_session.after_return"), 12, C_MUTED))
-		first_session_panel.add_child(_button(_t("base.first_session.help_button"), Callable(self, "_open_help_menu"), false))
+		var first_session_status_label := _label(first_session_status, 12, C_TEXT)
+		first_session_status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		first_session_box.add_child(first_session_status_label)
+		var after_return_label := _label(_t("base.first_session.after_return"), 12, C_MUTED)
+		after_return_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		first_session_box.add_child(after_return_label)
+		first_session_box.add_child(_button(_t("base.first_session.help_button"), Callable(self, "_open_help_menu"), false))
 	if not GameState.load_notice.is_empty():
 		var save_notice_panel := _make_panel(launch_box, Color("#3b2c20"), 10)
 		save_notice_panel.add_child(_label(_t("base.save_notice.title") + "\n" + GameState.load_notice, 12, C_GOLD, true))
@@ -1133,8 +1145,10 @@ func _render_expedition() -> void:
 	route_view.world_cell_clicked.connect(_on_world_cell_clicked)
 	route_view.world_cell_hovered.connect(_on_world_cell_hovered)
 	map_box.add_child(route_view)
-	route_hint_label = _label(_t("expedition.route_hint"), 12, C_MUTED)
-	map_box.add_child(route_hint_label)
+	# Keep the map canvas and its own route-footer prompt clear. The longer
+	# placement instruction lives in the tile panel, away from route-node hit areas.
+	route_hint_label = _label(_t("expedition.route_hint"), 10, C_MUTED)
+	route_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	notice_label = _label("", 11, C_GOLD)
 	map_box.add_child(notice_label)
 	first_hour_guide_panel = _make_panel(map_box, Color("#20362f"), 10)
@@ -1196,6 +1210,7 @@ func _render_expedition() -> void:
 	tile_panel.add_child(tile_box)
 	tile_box.add_child(_label(_t("expedition.tiles.title"), 12, C_MUTED, true))
 	tile_box.add_child(_label(_t("expedition.tiles.description"), 12, C_MUTED))
+	tile_box.add_child(route_hint_label)
 	tile_hand_grid = GridContainer.new()
 	tile_hand_grid.columns = 2
 	tile_hand_grid.add_theme_constant_override("h_separation", 6)
