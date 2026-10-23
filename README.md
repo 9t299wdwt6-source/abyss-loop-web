@@ -1,24 +1,30 @@
 # Abyss Loop — Web
 
-Репозиторий браузерной версии Abyss Loop на Godot 4.7.2.
+Браузерная версия Abyss Loop на Godot 4.7.2.
 
-## Состояние
+## Играть
 
-- Исходная база: **Prototype 61 RC7 / Stage68C Web Export Pipeline**.
-- GitHub Actions workflow добавлен: импорт исходников, Python-регрессии, Web-экспорт, Chromium smoke-test и публикация в GitHub Pages.
-- Исходники Prototype 61 RC7 теперь находятся в `AbyssLoop/`.
-- Первый запуск выявил две ошибки типизации в `scripts/ui/ui_controller.gd`; обе исправлены и отправлены в `main`. Повторная сборка проверяет экспорт и браузерный запуск.
+**[Запустить Abyss Loop в браузере](https://9t299wdwt6-source.github.io/abyss-loop-web/)**
 
-## Что нужно сделать один раз
+Публикация GitHub Pages успешно завершена. Сборка экспортирована и прошла автоматическую проверку загрузки в Chromium.
 
-1. Откройте **Settings → Pages** и выберите **Build and deployment → Source → GitHub Actions**.
-2. Загрузите `AbyssLoop_Prototype61_Stage68C_Web_Export_Pipeline.zip` в корень репозитория через **Add file → Upload files** и нажмите **Commit changes** в ветку `main`.
-3. Workflow проверит архив, распакует исходники в `AbyssLoop/`, запустит тесты, экспортирует игру и опубликует результат при успешных проверках.
+## Проверенная сборка
 
-Инструкция: [Публикация через GitHub Pages](WEB_DEPLOYMENT_GUIDE_RU.md). Workflow: [Abyss Loop Web Export and Browser QA](.github/workflows/abyssloop-web.yml).
+- База проекта: **Prototype 61 RC7 / Stage68C Web Export Pipeline**.
+- Godot 4.7.2: импорт ресурсов и Web-экспорт завершились успешно.
+- Python static/regression suite: **81/81 PASS**.
+- Chromium Web smoke-test: **PASS** — HTTP 200, canvas 1280×800, WebGL 2 доступен, JavaScript/WASM/PCK загружаются с HTTP 200, MIME WASM корректен, ошибок JavaScript/console и неудачных запросов нет.
+- Деплой GitHub Pages: **успешен**.
 
-## Ожидаемый адрес
+[Результаты последнего GitHub Actions](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40016205413)
 
-https://9t299wdwt6-source.github.io/abyss-loop-web/
+## Репозиторий и pipeline
 
-Адрес не считается рабочим до успешного завершения GitHub Actions и деплоя.
+Исходники Godot находятся в `AbyssLoop/`.
+
+- [Инструкция по сборке и публикации](WEB_DEPLOYMENT_GUIDE_RU.md)
+- [Workflow экспорта, тестирования и публикации](.github/workflows/abyssloop-web.yml)
+
+## Что ещё нужно проверить вручную
+
+Chromium smoke-test подтверждает начальную загрузку Web-сборки, но не заменяет полное игровое прохождение. Следующий этап приёмки — проверить ключевые игровые сценарии, сохранение/загрузку, сенсорное управление, поворот экрана и Safari на iPhone.
