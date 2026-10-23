@@ -1367,7 +1367,7 @@ func _sync_expedition_view(rebuild_tiles: bool) -> void:
 func _refresh_first_hour_guide() -> void:
 	if first_hour_guide_panel == null or not is_instance_valid(first_hour_guide_panel):
 		return
-	var should_show := manager != null and is_instance_valid(manager) and manager.active and GameState.runs_completed == 0
+	var should_show: bool = manager != null and is_instance_valid(manager) and manager.active and GameState.runs_completed == 0
 	first_hour_guide_panel.visible = should_show
 	if not should_show or first_hour_guide_label == null or not is_instance_valid(first_hour_guide_label):
 		_first_hour_guide_signature = ""
@@ -1395,7 +1395,7 @@ func _first_hour_guide_text() -> String:
 	var max_hp := maxi(1, int(manager.hero.get("max_hp", 1)))
 	if int(manager.hero.get("hp", max_hp)) * 3 <= max_hp:
 		return _t("onboarding.hint.low_health")
-	var placed_count := manager.placed_tiles.size() + manager.world_tiles.size()
+	var placed_count: int = manager.placed_tiles.size() + manager.world_tiles.size()
 	if placed_count == 0:
 		return _t("onboarding.hint.first_tile") if not manager.tile_hand.is_empty() else _t("onboarding.hint.wait_for_tile")
 	if placed_count == 1:
