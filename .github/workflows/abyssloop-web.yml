@@ -105,6 +105,77 @@ jobs:
           set -euo pipefail
           "$GODOT_BIN" --headless --editor --path AbyssLoop --import
 
+      - name: Run Godot gameplay acceptance in an isolated profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_root="${RUNNER_TEMP}/AbyssLoopRuntimeAcceptance"
+          mkdir -p "$test_root"
+          cp -a AbyssLoop/. "$test_root/"
+          rm -rf "$test_root/.godot"
+          sed -i 's/^config\/name="Abyss Loop"$/config\/name="Abyss Loop CI Acceptance"/' "$test_root/project.godot"
+          grep -q '^config/name="Abyss Loop CI Acceptance"      - name: Export Godot Web build
+        run: |
+          set -euo pipefail
+          mkdir -p AbyssLoop/build/web
+          "$GODOT_BIN" --headless --path AbyssLoop --export-release "Web" build/web/index.html
+          python3 AbyssLoop/tools/web_export_preflight.py --mode build --root AbyssLoop/build/web --report "$RUNNER_TEMP/web-build-preflight.md"
+
+      - name: Install Playwright Chromium
+        run: |
+          python3 -m venv "$RUNNER_TEMP/web-qa-venv"
+          "$RUNNER_TEMP/web-qa-venv/bin/python" -m pip install --disable-pip-version-check playwright
+          "$RUNNER_TEMP/web-qa-venv/bin/python" -m playwright install --with-deps chromium
+
+      - name: Run browser smoke test
+        run: |
+          mkdir -p "$RUNNER_TEMP/web-qa"
+          "$RUNNER_TEMP/web-qa-venv/bin/python" AbyssLoop/tools/web_browser_smoke_test.py \
+            --directory AbyssLoop/build/web --timeout 90 \
+            --screenshot "$RUNNER_TEMP/web-qa/abyssloop-web-smoke.png" \
+            --report "$RUNNER_TEMP/web-qa/abyssloop-web-smoke.json"
+
+      - name: Run browser gameplay acceptance
+        run: |
+          "$RUNNER_TEMP/web-qa-venv/bin/python" AbyssLoop/tools/web_gameplay_browser_acceptance.py \
+            --directory AbyssLoop/build/web --timeout 90 \
+            --screenshots-dir "$RUNNER_TEMP/web-qa/gameplay" \
+            --report "$RUNNER_TEMP/web-qa/abyssloop-web-gameplay.json"
+
+      - name: Save deployable Web build
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: AbyssLoop/build/web
+
+      - name: Preserve QA screenshots and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: abyssloop-web-qa-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/web-source-preflight.md
+            ${{ runner.temp }}/web-build-preflight.md
+            ${{ runner.temp }}/web-qa/
+          if-no-files-found: warn
+          retention-days: 14
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish tested Web build to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+ "$test_root/project.godot"
+          "$GODOT_BIN" --headless --editor --path "$test_root" --import
+          "$GODOT_BIN" --headless --path "$test_root" --script res://tests/smoke_test.gd
+          rm -rf "$HOME/.local/share/godot/app_userdata/Abyss Loop CI Acceptance"
+          "$GODOT_BIN" --headless --path "$test_root" --script res://tests/expedition_runtime_acceptance.gd
+
       - name: Export Godot Web build
         run: |
           set -euo pipefail
