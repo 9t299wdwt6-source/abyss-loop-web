@@ -109,7 +109,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p AbyssLoop/build/web
-          "$GODOT_BIN" --headless --path AbyssLoop --export-release "Web" AbyssLoop/build/web/index.html
+          "$GODOT_BIN" --headless --path AbyssLoop --export-release "Web" build/web/index.html
           python3 AbyssLoop/tools/web_export_preflight.py --mode build --root AbyssLoop/build/web --report "$RUNNER_TEMP/web-build-preflight.md"
 
       - name: Install Playwright Chromium
