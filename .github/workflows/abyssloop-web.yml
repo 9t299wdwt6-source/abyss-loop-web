@@ -1,0 +1,132 @@
+name: Abyss Loop Web Export and Browser QA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.gd'
+      - '**/*.tscn'
+      - '**/*.tres'
+      - '**/*.json'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+      - '**/*.webp'
+      - '**/*.svg'
+      - '**/*.ogg'
+      - '**/*.wav'
+      - '**/*.mp3'
+      - '**/*.ttf'
+      - '**/*.import'
+      - '**/*.gdshader'
+      - 'assets/**'
+      - 'localization/**'
+      - 'project.godot'
+      - 'export_presets.cfg'
+      - 'tools/web_*.py'
+      - 'tools/export_web.sh'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: abyssloop-web-pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Configure Pages metadata
+        uses: actions/configure-pages@v5
+
+      - name: Install and verify Godot 4.7.2 plus Web export templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="${RUNNER_TEMP}/godot-web-export"
+          mkdir -p "$work/bin" "$work/templates" "$HOME/.local/share/godot/export_templates/4.7.2.stable"
+          curl --fail --location --silent --show-error --retry 3 \
+            'https://downloads.godotengine.org/?version=4.7.2&flavor=stable&slug=linux.x86_64.zip' \
+            -o "$work/godot.zip"
+          echo 'cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4  '"$work/godot.zip" | sha256sum --check --status
+          unzip -q "$work/godot.zip" -d "$work/bin"
+          GODOT_BIN="$(find "$work/bin" -type f -name 'Godot_v4.7.2-stable_linux.x86_64' -print -quit)"
+          test -n "$GODOT_BIN"
+          chmod +x "$GODOT_BIN"
+          echo "GODOT_BIN=$GODOT_BIN" >> "$GITHUB_ENV"
+          "$GODOT_BIN" --version
+
+          curl --fail --location --silent --show-error --retry 3 \
+            'https://downloads.godotengine.org/?version=4.7.2&flavor=stable&slug=export_templates.tpz' \
+            -o "$work/templates.tpz"
+          echo 'f298490b8d44d934be425a5a65a51bf15f422428b229a06a6e11d9ffea248011  '"$work/templates.tpz" | sha256sum --check --status
+          unzip -q "$work/templates.tpz" -d "$work/templates"
+          template_source="$(find "$work/templates" -type f -name 'web_release.zip' -print -quit | xargs -r dirname)"
+          test -n "$template_source"
+          cp "$template_source"/* "$HOME/.local/share/godot/export_templates/4.7.2.stable/"
+
+      - name: Source Web export preflight
+        run: python3 tools/web_export_preflight.py --mode source --report "$RUNNER_TEMP/web-source-preflight.md"
+
+      - name: Import project resources
+        run: |
+          set -euo pipefail
+          "$GODOT_BIN" --headless --editor --path . --import
+
+      - name: Export Godot Web build
+        run: |
+          set -euo pipefail
+          mkdir -p build/web
+          "$GODOT_BIN" --headless --path . --export-release "Web" build/web/index.html
+          python3 tools/web_export_preflight.py --mode build --root build/web --report "$RUNNER_TEMP/web-build-preflight.md"
+
+      - name: Install Playwright Chromium
+        run: |
+          python3 -m venv "$RUNNER_TEMP/web-qa-venv"
+          "$RUNNER_TEMP/web-qa-venv/bin/python" -m pip install --disable-pip-version-check playwright
+          "$RUNNER_TEMP/web-qa-venv/bin/python" -m playwright install --with-deps chromium
+
+      - name: Run browser smoke test
+        run: |
+          mkdir -p "$RUNNER_TEMP/web-qa"
+          "$RUNNER_TEMP/web-qa-venv/bin/python" tools/web_browser_smoke_test.py \
+            --directory build/web --timeout 90 \
+            --screenshot "$RUNNER_TEMP/web-qa/abyssloop-web-smoke.png" \
+            --report "$RUNNER_TEMP/web-qa/abyssloop-web-smoke.json"
+
+      - name: Save deployable Web build
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      - name: Preserve QA screenshots and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: abyssloop-web-qa-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/web-source-preflight.md
+            ${{ runner.temp }}/web-build-preflight.md
+            ${{ runner.temp }}/web-qa/
+          if-no-files-found: warn
+          retention-days: 14
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish tested Web build to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
