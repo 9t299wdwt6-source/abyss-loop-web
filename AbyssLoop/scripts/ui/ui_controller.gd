@@ -1596,9 +1596,10 @@ func _build_tile_hand() -> void:
 			var copy_index := int(copy_index_by_tile_id.get(tile_id, 0)) + 1
 			copy_index_by_tile_id[tile_id] = copy_index
 			tile_short = "%s · %d/%d" % [tile_short, copy_index, int(copies_by_tile_id[tile_id])]
-		var placement_zone := str(tile.get("placement_zone", "any"))
+		var tile_definition: Dictionary = ContentRegistry.TILE_DEFS.get(tile_id, {})
+		var placement_zone := str(tile.get("placement_zone", tile_definition.get("placement_zone", "any")))
 		var zone_hint := " · ПОЛЕ" if placement_zone == "landscape" else (" · ДОРОГА" if placement_zone == "road" else "")
-		var tile_label := "%s%s\n%s" % [tile_short, zone_hint, str(tile.get("name", "Тайл"))]
+		var tile_label := "%s%s\n%s" % [tile_short, zone_hint, str(tile.get("name", tile_definition.get("name", "Тайл")))]
 		var button := _button(tile_label, Callable(self, "_on_tile_selected").bind(i), selected)
 		button.custom_minimum_size = Vector2(148, 64)
 		button.tooltip_text = ("Размещение: только ландшафт. " if placement_zone == "landscape" else ("Размещение: только дорога. " if placement_zone == "road" else "")) + str(tile.get("description", ""))
