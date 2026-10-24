@@ -50,4 +50,6 @@ print(f"PASS: runtime-gate timeout terminates the process tree without hanging (
 runner_source = (ROOT / "tools" / "run_runtime_gate.py").read_text(encoding="utf-8")
 assert "from test_process_runner import run_command" in runner_source
 assert "timed_out" in runner_source and "process group" in runner_source
+assert 'res://tests/save_system_regression_runner.tscn' in runner_source, "save regression must run as a scene so project autoload singletons are initialized"
+assert '--script", "res://tests/save_system_regression.gd' not in runner_source, "save regression must not bypass project autoload initialization"
 print("RUNTIME GATE PROCESS CLEANUP REGRESSION PASSED: 3 functional checks and shared cleanup guard")

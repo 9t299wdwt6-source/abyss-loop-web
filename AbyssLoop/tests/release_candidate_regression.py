@@ -45,7 +45,8 @@ checks = {
     "RC7 package includes browser reload/resume acceptance": all(x in packager for x in ["tools/web_gameplay_browser_acceptance.py", "tests/web_gameplay_browser_acceptance_regression.py"]),
     "RC7 package includes road/landscape touch placement regression": "tests/dual_placement_regression.py" in packager,
     "RC7 package includes the autoload-aware save-system regression scene": '"tests/save_system_regression_runner.tscn"' in packager,
-    "Web CI runs the save-system regression with autoloads initialized": 'res://tests/save_system_regression_runner.tscn' in (ROOT / ".github" / "workflows" / "abyssloop-web.yml").read_text(encoding="utf-8"),
+    "Web CI runs the save-system regression with autoloads initialized": 'res://tests/save_system_regression_runner.tscn' in (ROOT.parent / ".github" / "workflows" / "abyssloop-web.yml").read_text(encoding="utf-8"),
+    "Desktop runtime gate runs save regression through the autoload-aware scene": 'res://tests/save_system_regression_runner.tscn' in runtime_gate and '--script", "res://tests/save_system_regression.gd' not in runtime_gate,
     "independent preflight enforces road/landscape touch placement regression": '"tests/dual_placement_regression.py"' in (ROOT / "tools" / "release_preflight.py").read_text(encoding="utf-8"),
     "independent preflight enforces browser reload/resume acceptance": all(x in (ROOT / "tools" / "release_preflight.py").read_text(encoding="utf-8") for x in ["tools/web_gameplay_browser_acceptance.py", "tests/web_gameplay_browser_acceptance_regression.py"]),
 }

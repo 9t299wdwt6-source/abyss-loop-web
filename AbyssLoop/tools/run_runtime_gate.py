@@ -148,7 +148,7 @@ def main() -> int:
                 if steps and all(step["status"] == "PASS" for step in steps):
                     steps.append(run_step("Gameplay smoke", [args.godot, "--headless", "--path", str(sandbox), "--script", "res://tests/smoke_test.gd"], sandbox, env))
                 if steps and all(step["status"] == "PASS" for step in steps):
-                    steps.append(run_step("Save-system regression", [args.godot, "--headless", "--path", str(sandbox), "--script", "res://tests/save_system_regression.gd"], sandbox, env))
+                    steps.append(run_step("Save-system regression", [args.godot, "--headless", "--path", str(sandbox), "res://tests/save_system_regression_runner.tscn"], sandbox, env))
                 if steps and all(step["status"] == "PASS" for step in steps):
                     steps.append(run_step("Expedition integration audit", [args.godot, "--headless", "--path", str(sandbox), "--script", "res://tests/expedition_integration_audit.gd"], sandbox, env))
                 success = bool(steps) and all(step["status"] == "PASS" for step in steps) and len(steps) == 7
