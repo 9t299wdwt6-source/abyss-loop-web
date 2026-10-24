@@ -167,5 +167,25 @@
     "echo_chart_core",
     "riftwalker_edge",
     "snare_hunter_core"
+  ],
+  "Модификаторы экипировки": [
+    "after_event_patch",
+    "barbed_edge",
+    "bleeding_grooves",
+    "cartographer_stitch",
+    "deep_mark",
+    "hungry_steel",
+    "impulse_overload",
+    "keen_edge",
+    "moss_lining",
+    "pathfinder_calibration",
+    "phase_guard",
+    "quiet_march",
+    "reaping_echo",
+    "reinforced_plate",
+    "resonant_coil",
+    "route_echo",
+    "steady_heart",
+    "volatile_cell"
   ]
 }

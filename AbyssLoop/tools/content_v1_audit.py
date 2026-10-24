@@ -16,7 +16,7 @@ REGISTRY_CONSTANTS = [
     "PERKS", "EXPEDITION_EVENTS", "EXPEDITION_OBJECTIVES", "EXPEDITION_CONTRACTS",
     "ROUTE_CELL_TYPES", "LANDSCAPE_SECRET_RECIPES",
 ]
-INVENTORY_CONSTANTS = ["ARCHETYPES", "SET_DEFS", "SYNERGY_DEFS", "SECRET_RELIC_TEMPLATES"]
+INVENTORY_CONSTANTS = ["ARCHETYPES", "SET_DEFS", "SYNERGY_DEFS", "SECRET_RELIC_TEMPLATES", "ITEM_AFFIXES"]
 
 
 def parse_literal_constants(path: Path, names: list[str]) -> dict[str, Any]:
@@ -100,6 +100,7 @@ def read_catalogs(root: Path) -> dict[str, Any]:
     add("Синергии ландшафта", "scripts/core/content_registry.gd:TILE_SYNERGIES", {str(item.get("id", f"entry_{i}")): item for i, item in enumerate(registry["TILE_SYNERGIES"])})
     add("Сеты экипировки", "scripts/systems/inventory_system.gd:SET_DEFS", inventory["SET_DEFS"])
     add("Секретные реликвии", "scripts/systems/inventory_system.gd:SECRET_RELIC_TEMPLATES", inventory["SECRET_RELIC_TEMPLATES"])
+    add("Модификаторы экипировки", "scripts/systems/inventory_system.gd:ITEM_AFFIXES", inventory["ITEM_AFFIXES"])
     add("Синергии экипировки", "scripts/systems/inventory_system.gd:SYNERGY_DEFS", inventory["SYNERGY_DEFS"])
     archetypes: dict[str, Any] = {}
     for slot, definitions in inventory["ARCHETYPES"].items():
@@ -293,6 +294,19 @@ def validate_catalogs(catalogs: dict[str, Any]) -> list[str]:
         if _nonempty(set_def, ["name", "description", "threshold", "effects"]): issues.append(f"equipment set:{sid} missing required metadata")
         if int(set_def.get("threshold", 0)) < 2 or not isinstance(set_def.get("effects"), dict) or not set_def.get("effects"): issues.append(f"equipment set:{sid} invalid threshold/effects")
     archetype_ids = {slot: {str(item["id"]) for item in items} for slot, items in inv["ARCHETYPES"].items()}
+    affix_stat_keys = {"attack", "defense", "hp", "speed", "crit", "kill_heal", "tile_scrap", "event_heal", "reward_bonus", "tile_spawn_bonus", "bleed_chance", "bleed_damage", "barrier_on_encounter"}
+    for affix_id, affix in inv["ITEM_AFFIXES"].items():
+        if not ID_RE.fullmatch(str(affix_id)): issues.append(f"equipment affix:{affix_id} has invalid stable ID")
+        if _nonempty(affix, ["name", "description", "slot", "position", "stats"]): issues.append(f"equipment affix:{affix_id} missing metadata")
+        if affix.get("slot") not in {"weapon", "armor", "core"} or affix.get("position") not in {"prefix", "suffix"}:
+            issues.append(f"equipment affix:{affix_id} has invalid slot/position")
+        stats = affix.get("stats", {})
+        if not isinstance(stats, dict) or not stats:
+            issues.append(f"equipment affix:{affix_id} has no stats")
+        else:
+            for stat_key, delta in stats.items():
+                if stat_key not in affix_stat_keys: issues.append(f"equipment affix:{affix_id} has unsupported stat {stat_key}")
+                if not isinstance(delta, (int, float)) or isinstance(delta, bool): issues.append(f"equipment affix:{affix_id} has nonnumeric stat delta {stat_key}")
     for synergy_id, synergy in inv["SYNERGY_DEFS"].items():
         if _nonempty(synergy, ["name", "description", "requirements", "effects"]): issues.append(f"equipment synergy:{synergy_id} missing metadata")
         requirements = synergy.get("requirements", {})
