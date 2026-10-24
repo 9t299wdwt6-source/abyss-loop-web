@@ -25,7 +25,7 @@ Godot-исходники расположены в `AbyssLoop/`.
 
 - [Инструкция сборки и Web QA](WEB_DEPLOYMENT_GUIDE_RU.md)
 - [Workflow экспорта, тестирования и публикации](.github/workflows/abyssloop-web.yml)
-- [Актуальная дорожная карта runtime/Web](AbyssLoop/ROADMAP_STATUS_STAGE68C_RU.md)
+- [Актуальная дорожная карта разработки](AbyssLoop/ROADMAP_STATUS_STAGE69_RU.md)
 
 ## Оставшиеся проверки
 

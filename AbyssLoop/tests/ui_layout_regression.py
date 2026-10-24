@@ -9,7 +9,7 @@ catalog = json.loads((ROOT / "localization/strings_ru.json").read_text(encoding=
 required = {
     "fullscreen shell expands in both dimensions": "shell.size_flags_horizontal = Control.SIZE_EXPAND_FILL\n\tshell.size_flags_vertical = Control.SIZE_EXPAND_FILL",
     "main column expands in both dimensions": "main_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL\n\tmain_column.size_flags_vertical = Control.SIZE_EXPAND_FILL",
-    "brand has a minimum readable width": "brand.custom_minimum_size.x = 285",
+    "brand has a minimum readable width on desktop and releases width for compact layouts": "_brand_box.custom_minimum_size.x = 0 if compact_layout else 285",
     "phase badge has a minimum width": "phase_panel.custom_minimum_size.x = 122",
     "settings button has a minimum width": "settings_button.custom_minimum_size.x = 112",
     "short labels do not autowrap": "label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if text_value.length() > 42 else TextServer.AUTOWRAP_OFF",

@@ -43,6 +43,12 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	mouse_exited.connect(_on_mouse_exited)
 
+func configure_compact_layout(compact: bool) -> void:
+	# The desktop layout needs a wide route canvas; phone layouts are stacked
+	# vertically, so a narrower map keeps the interaction targets inside the viewport.
+	custom_minimum_size = Vector2(300, 350) if compact else Vector2(620, 420)
+	queue_redraw()
+
 func configure_accessibility(use_reduced_motion: bool, use_reduce_flashes: bool, use_high_contrast: bool = false, use_animation_speed: float = 1.0) -> void:
 	var next_animation_speed := clampf(use_animation_speed, 0.5, 1.5)
 	if reduced_motion == use_reduced_motion and reduce_flashes == use_reduce_flashes and high_contrast == use_high_contrast and is_equal_approx(animation_speed, next_animation_speed):
