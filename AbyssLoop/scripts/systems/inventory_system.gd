@@ -228,7 +228,7 @@ func apply_random_affixes(item: Dictionary, rng: RandomNumberGenerator) -> Dicti
 			selected.append(suffix)
 	var affix_ids: Array[String] = []
 	var affix_names: Array[String] = []
-	var affix_descriptions: Array[String] = []
+	var affix_descriptions := PackedStringArray()
 	for affix in selected:
 		var affix_id := str(affix.get("id", ""))
 		if affix_id.is_empty():
@@ -253,7 +253,7 @@ func apply_random_affixes(item: Dictionary, rng: RandomNumberGenerator) -> Dicti
 	result["affix_names"] = affix_names
 	result["affix_description"] = " ".join(affix_descriptions).strip_edges()
 	if not selected.is_empty():
-		var name_parts: Array[String] = [str(SLOT_NAMES.get(slot, slot))]
+		var name_parts := PackedStringArray([str(SLOT_NAMES.get(slot, slot))])
 		if not prefix.is_empty():
 			name_parts.append(str(prefix.get("name", "")))
 		name_parts.append(str(result.get("archetype_name", "Стандарт")))
