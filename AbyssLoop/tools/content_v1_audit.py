@@ -14,7 +14,7 @@ REGISTRY_CONSTANTS = [
     "TILE_DEFS", "TILE_SYNERGIES", "ENEMIES", "ELITE_ROLE_ABILITIES", "BOSSES",
     "BUILDINGS", "RESEARCH_BRANCHES", "BASE_RESEARCH_ID_ALIASES", "BASE_RESEARCH",
     "PERKS", "EXPEDITION_EVENTS", "EXPEDITION_OBJECTIVES", "EXPEDITION_CONTRACTS",
-    "ROUTE_CELL_TYPES",
+    "ROUTE_CELL_TYPES", "LANDSCAPE_SECRET_RECIPES",
 ]
 INVENTORY_CONSTANTS = ["ARCHETYPES", "SET_DEFS", "SYNERGY_DEFS", "SECRET_RELIC_TEMPLATES"]
 
@@ -135,9 +135,10 @@ def validate_catalogs(catalogs: dict[str, Any]) -> list[str]:
             issues.append(f"{category['category']}: duplicate display name '{duplicate}'")
 
     for tile_id, tile in r["TILE_DEFS"].items():
-        for f in ["name", "short", "kind", "color", "description"]:
+        for f in ["name", "short", "kind", "color", "description", "placement_zone"]:
             if not str(tile.get(f, "")).strip(): issues.append(f"tile:{tile_id} missing {f}")
         if not re.fullmatch(r"#[0-9a-fA-F]{6}", str(tile.get("color", ""))): issues.append(f"tile:{tile_id} invalid color")
+        if tile.get("placement_zone") not in {"any", "road", "landscape"}: issues.append(f"tile:{tile_id} invalid placement zone")
     tile_effects = {"scrap", "heal", "reward_bonus", "spawn_bonus", "enemy_bonus"}
     seen_synergies: set[str] = set()
     for synergy in r["TILE_SYNERGIES"]:
@@ -301,9 +302,23 @@ def validate_catalogs(catalogs: dict[str, Any]) -> list[str]:
                 if slot not in archetype_ids or not isinstance(allowed, list) or any(value not in archetype_ids.get(slot, set()) for value in allowed): issues.append(f"equipment synergy:{synergy_id} has unknown archetype requirement for {slot}")
         if not isinstance(synergy.get("effects"), dict) or not synergy.get("effects"): issues.append(f"equipment synergy:{synergy_id} has no effects")
 
-    # Flag relationships: each event's required/excluded flags should be known to be created by content.
+    # Event choices create flags directly; landscape-secret recipes create their
+    # discovery flag when the matching neighboring tiles share a route sector.
     produced_flags: set[str] = set()
     referenced_flags: set[str] = set()
+    secret_recipes = r.get("LANDSCAPE_SECRET_RECIPES", [])
+    if not isinstance(secret_recipes, list):
+        issues.append("landscape secret recipes must be a list")
+        secret_recipes = []
+    for recipe in secret_recipes:
+        if not isinstance(recipe, dict):
+            issues.append("landscape secret recipe is malformed")
+            continue
+        flag = str(recipe.get("flag", ""))
+        if not flag or recipe.get("first_tile") not in r["TILE_DEFS"] or recipe.get("second_tile") not in r["TILE_DEFS"]:
+            issues.append("landscape secret recipe has an empty flag or unknown tile")
+        else:
+            produced_flags.add(flag)
     for event in r["EXPEDITION_EVENTS"].values():
         for choice in event.get("choices", []):
             effects = choice.get("effects", {}) if isinstance(choice, dict) else {}

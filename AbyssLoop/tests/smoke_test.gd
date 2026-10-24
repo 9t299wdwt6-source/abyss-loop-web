@@ -299,6 +299,16 @@ func _run_tests() -> void:
 	assert(not bool(tile_system.can_place(route, {}, 0).ok), "start node must reject tiles")
 	assert(bool(tile_system.can_place(route, {}, 1).ok), "empty node must accept tiles")
 	assert(not bool(tile_system.can_place(route, {"1": {"id": "cache"}}, 1).ok), "occupied node must reject tiles")
+	assert(not bool(tile_system.can_place(route, {}, 1, {"id": "archive"}).ok), "archive is landscape-only and must not be placeable on the road")
+	assert(not bool(tile_system.can_place(route, {}, 1, {"id": "nursery"}).ok), "nursery is landscape-only and must not be placeable on the road")
+	assert(bool(tile_system.can_place(route, {}, 1, {"id": "cache"}).ok), "flexible cards must remain placeable on road")
+	assert(not bool(tile_system.can_place_world(route, {}, "2:0", {"id": "road_test", "placement_zone": "road"}).ok), "road-only cards must be rejected by the field validator")
+	assert(bool(tile_system.can_place_world(route, {}, "2:0", {"id": "archive"}).ok), "archive must be placeable on a valid landscape cell")
+	assert(bool(tile_system.can_place_world(route, {}, "2:0", {"id": "nursery"}).ok), "nursery must be placeable on a valid landscape cell")
+	var archive_road_preview: Dictionary = tile_system.get_placement_preview(route, {}, 1, {"id": "archive"})
+	assert(not bool(archive_road_preview.get("ok", true)), "road placement preview must reject the archive")
+	var archive_field_preview: Dictionary = tile_system.get_world_placement_preview(route, {}, "2:0", {"id": "archive"})
+	assert(bool(archive_field_preview.get("ok", false)), "landscape placement preview must accept the archive")
 	var tile_draw_rng := RandomNumberGenerator.new()
 	tile_draw_rng.seed = 23019
 	# The saved profile can retain upgrades from prior sessions. Pin this first
