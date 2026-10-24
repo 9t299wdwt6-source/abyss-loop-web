@@ -131,7 +131,7 @@ jobs:
           test -d "$test_root"
           timeout 90s "$GODOT_BIN" --headless --path "$test_root" res://tests/long_expedition_runtime_acceptance_runner.tscn
 
-      - name: Capture five automated engine runs for Stage64B
+      - name: Capture Stage71 difficulty/mode balance matrix and contract coverage
         shell: bash
         run: |
           set -euo pipefail
@@ -139,14 +139,14 @@ jobs:
           mkdir -p "$RUNNER_TEMP/web-qa"
           profile_data="$HOME/.local/share/godot/app_userdata/Abyss Loop CI Acceptance"
           rm -f "$profile_data/STAGE64B_AUTOMATED_ENGINE_RUNS.json"
-          timeout 360s "$GODOT_BIN" --headless --path "$test_root" res://tests/stage64b_engine_run_capture_runner.tscn
+          timeout 900s "$GODOT_BIN" --headless --path "$test_root" res://tests/stage64b_engine_run_capture_runner.tscn
           capture="$profile_data/STAGE64B_AUTOMATED_ENGINE_RUNS.json"
           test -s "$capture"
           cp "$capture" "$RUNNER_TEMP/web-qa/STAGE64B_AUTOMATED_ENGINE_RUNS.json"
           python3 AbyssLoop/tools/real_run_balance.py \
             --input "$RUNNER_TEMP/web-qa/STAGE64B_AUTOMATED_ENGINE_RUNS.json" \
             --output "$RUNNER_TEMP/web-qa/STAGE64B_AUTOMATED_ENGINE_RUNS_ANALYSIS.md" \
-            --label "Automated engine QA (not human playtest)" \
+            --label "Stage71 automated engine QA matrix (not human playtest)" \
             --godot-version "4.7.2.stable" --minimum-repeats 5
 
       - name: Capture Stage71 real-engine balance matrix
