@@ -22,7 +22,7 @@ checks = {
     "Web JSON integer-to-float conversion is normalized before version/schema checks": "var parsed: Dictionary = _normalize_numeric_types(parsed_value)" in save and "func _normalize_numeric_types(value: Variant) -> Variant:" in save and "canonical JSON must normalize whole numbers" in runtime,
     "checksum is verified before migration and data validation": save.index('if parsed.has("integrity"):') < save.index('var data: Dictionary = data_value.duplicate(true)') < save.index('if not _validate_save_data(data):'),
     "unknown checksum algorithm is rejected": 'str(algorithm_value) != SAVE_INTEGRITY_ALGORITHM' in save,
-    "invalid checksum length and mismatch are rejected": 'str(checksum_value).length() != 64' in save and '!= _payload_checksum(checksum_data)' in save,
+    "invalid checksum length and mismatch are rejected": 'str(checksum_value).length() != 64' in save and 'var actual_checksum: String = _payload_checksum(checksum_data)' in save and 'integrity_checksum_mismatch_expected_%s_actual_%s' in save,
     "save decode reports stable rejection reasons with expected/actual digest prefixes": '_reject_decoded_save("integrity_checksum_mismatch_expected_%s_actual_%s"' in save and 'expedition_snapshot_invalid_v%d_status%d_telemetry%d' in save,
     "payload checksum uses the JSON roundtrip representation actually persisted": 'var encoded_payload := JSON.stringify(payload)' in save and 'var normalized_payload: Dictionary = _normalize_numeric_types(parsed_payload)' in save,
     "legacy envelopes without checksum remain readable": 'if parsed.has("integrity")' in save and "Version 1 stores permanent progress only" in save and "version < 3" in save,
