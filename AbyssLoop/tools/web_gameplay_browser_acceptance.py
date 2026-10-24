@@ -236,6 +236,40 @@ def main() -> int:
                         False, f"{type(touch_exc).__name__}: {touch_exc}")
                 finally:
                     touch_context.close()
+
+                # Probe the actual phone-sized portrait viewport, not just a desktop
+                # canvas resized by CSS. Capture both first launch and the first touch
+                # transition so the CI artifact can be inspected for layout clipping.
+                phone_context = browser.new_context(
+                    viewport={"width": 390, "height": 844},
+                    device_scale_factor=1,
+                    has_touch=True,
+                )
+                try:
+                    phone_page = phone_context.new_page()
+                    phone_page.on("pageerror", lambda exc: errors.append("phone context: " + str(exc)))
+                    phone_page.on("console", lambda msg: console_errors.append("phone context: " + msg.text) if msg.type == "error" else None)
+                    phone_response = phone_page.goto(url, wait_until="domcontentloaded", timeout=args.timeout * 1000)
+                    phone_page.wait_for_selector("canvas", state="visible", timeout=min(20000, args.timeout * 1000))
+                    phone_page.wait_for_timeout(1400)
+                    phone_canvas = phone_page.locator("canvas").first.evaluate(
+                        "el => ({width: el.width, height: el.height, clientWidth: el.clientWidth, clientHeight: el.clientHeight, visible: !!(el.offsetWidth || el.offsetHeight)})"
+                    )
+                    phone_tutorial = capture(phone_page, "15-phone-portrait-first-launch")
+                    phone_page.touchscreen.tap(195, 422)
+                    phone_page.wait_for_timeout(500)
+                    phone_shelter = capture(phone_page, "16-phone-portrait-after-tutorial")
+                    add("390x844 phone portrait canvas fills the viewport and remains visible",
+                        phone_response is not None and bool(phone_canvas.get("visible")) and phone_canvas.get("clientWidth", 0) == 390 and phone_canvas.get("clientHeight", 0) == 844,
+                        phone_canvas)
+                    add("phone portrait touch dismisses first-launch tutorial",
+                        phone_shelter != phone_tutorial,
+                        {"tutorial": phone_tutorial, "shelter": phone_shelter})
+                except Exception as phone_exc:
+                    add("phone portrait acceptance completes",
+                        False, f"{type(phone_exc).__name__}: {phone_exc}")
+                finally:
+                    phone_context.close()
             except Exception as exc:
                 add("browser gameplay flow completes", False, f"{type(exc).__name__}: {exc}")
             finally:
@@ -255,7 +289,7 @@ def main() -> int:
         "checked_utc": datetime.now(timezone.utc).isoformat(),
         "url": url,
         "result": "FAIL" if failures else "PASS",
-        "scope": "real Chromium mouse and touchscreen interaction, road placement, browser reload and saved-run resume; responsive phone layout and full-playthrough remain separate acceptance items",
+        "scope": "real Chromium mouse/touch gameplay, browser reload/resume, and a 390x844 phone-portrait boot/tutorial check; full mobile layout and complete playthrough remain separate acceptance items",
         "runtime_assets": assets,
         "screenshots": screenshots,
         "javascript_errors": errors,
