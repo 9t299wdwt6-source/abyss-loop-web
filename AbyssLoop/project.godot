@@ -25,6 +25,7 @@ window/size/min_width=1180
 window/size/min_height=720
 window/size/resizable=true
 window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 
 [rendering]
 

@@ -256,7 +256,7 @@ def main() -> int:
                         "el => ({width: el.width, height: el.height, clientWidth: el.clientWidth, clientHeight: el.clientHeight, visible: !!(el.offsetWidth || el.offsetHeight)})"
                     )
                     phone_tutorial = capture(phone_page, "15-phone-portrait-first-launch")
-                    phone_page.touchscreen.tap(195, 422)
+                    phone_page.touchscreen.tap(195, 610)
                     phone_page.wait_for_timeout(500)
                     phone_shelter = capture(phone_page, "16-phone-portrait-after-tutorial")
                     add("390x844 phone portrait canvas fills the viewport and remains visible",

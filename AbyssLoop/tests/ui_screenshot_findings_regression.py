@@ -3,6 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 ui = (ROOT / "scripts/ui/ui_controller.gd").read_text(encoding="utf-8")
 route = (ROOT / "scripts/ui/route_view.gd").read_text(encoding="utf-8")
+project = (ROOT / "project.godot").read_text(encoding="utf-8")
 checks = {
     "shelter content has a vertical scroll area instead of clipping below the viewport": "var base_scroll := ScrollContainer.new()" in ui and "base_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO" in ui and "base_scroll.add_child(base_content)" in ui,
     "shelter cards size to content so the scroll can reach the statistics/footer": "top_row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN" in ui and "launch_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN" in ui and "_make_panel(base_content, C_PANEL, 16)" in ui,
@@ -17,6 +18,15 @@ checks = {
     "route marker labels use a fitted backing plate and adaptive font for dense routes": "label_font_size := 8 if count >= 19 else (9 if not placed.is_empty() else 10)" in route and "var label_rect := Rect2" in route and 'draw_rect(label_rect, Color("#f4f8ee") if high_contrast else Color("#09191d", 0.84), true)' in route,
     "event and tutorial modal body font is increased": 'box.add_child(_label(body_text, 14, C_MUTED))' in ui,
     "right-hand expedition panel remains scrollable without horizontal overflow": "var right_scroll := ScrollContainer.new()" in ui and "right_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED" in ui,
+    "mobile viewport resize switches the shelter and expedition into compact layouts": "get_viewport().size_changed.connect(_on_viewport_size_changed)" in ui and "func _is_compact_layout() -> bool:" in ui and "if compact_layout == _compact_layout_active:" in ui,
+    "Web stretch aspect expands to avoid portrait letterboxing": 'window/stretch/aspect="expand"' in project,
+    "compact view uses the actual browser window as its virtual content size": "func _update_content_scale() -> void:" in ui and "root_window.content_scale_size = target_scale_size" in ui and "Vector2i(1440, 900)" in ui and "Window.CONTENT_SCALE_ASPECT_EXPAND" in ui,
+    "viewport resize updates virtual content scale before breakpoint layout": "_update_content_scale()\n\t_apply_responsive_shell()" in ui and "get_viewport().size_changed.connect(_on_viewport_size_changed)" in ui,
+
+    "compact shell hides overflow-prone desktop header and resource controls": "_brand_subtitle.visible = not compact_layout" in ui and "help_button.visible = not compact_layout" in ui and "_run_panel.visible = not compact_layout" in ui,
+    "narrow shelter stacks preparation and buildings and grids statistics": "var top_row: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()" in ui and "var stats: Container = GridContainer.new() if compact_layout else HBoxContainer.new()" in ui,
+    "narrow expedition uses a single vertical scroll container and stacked map/controls": "var expedition_scroll := ScrollContainer.new()" in ui and "var body: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()" in ui and "body.add_child(right_column)" in ui,
+    "map hit targets use a smaller minimum canvas in compact mode": "configure_compact_layout(compact_layout)" in ui and "func configure_compact_layout(compact: bool) -> void:" in route and "Vector2(300, 350) if compact else Vector2(620, 420)" in route,
 }
 failed = [name for name, ok in checks.items() if not ok]
 for name, ok in checks.items():

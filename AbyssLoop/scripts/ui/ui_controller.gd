@@ -86,9 +86,22 @@ var developer_report_label: Label
 var developer_status_label: Label
 var _focus_before_overlay: Control
 var _base_primary_action: Control
+var _brand_box: VBoxContainer
+var _brand_title: Label
+var _brand_subtitle: Label
+var _phase_panel: PanelContainer
+var _header_spacer: Control
+var _scrap_panel: PanelContainer
+var _crystal_panel: PanelContainer
+var _resource_spacer: Control
+var _run_panel: PanelContainer
+var _developer_button: Button
+var _compact_layout_active: bool = false
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_update_content_scale()
+	_compact_layout_active = _is_compact_layout()
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_ensure_audio_buses()
 	_apply_audio_settings()
@@ -102,6 +115,11 @@ func _ready() -> void:
 	manager.changed.connect(_on_manager_changed)
 	manager.run_finished.connect(_on_run_finished)
 	GameState.changed.connect(_on_game_state_changed)
+	# Connect only after the shell and game-state nodes exist; the first Web
+	# viewport resize can happen immediately after the initial HTML canvas boot.
+	get_viewport().size_changed.connect(_on_viewport_size_changed)
+	_compact_layout_active = _is_compact_layout()
+	_apply_responsive_shell()
 	_render_base()
 	_refresh_header()
 	if not GameState.tutorial_completed and not GameState.has_saved_expedition():
@@ -147,30 +165,31 @@ func _build_shell() -> void:
 	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_theme_constant_override("separation", 14)
 	main_column.add_child(header)
-	var brand := VBoxContainer.new()
-	brand.custom_minimum_size.x = 285
-	brand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	brand.add_theme_constant_override("separation", 1)
-	header.add_child(brand)
-	var title := _label("ABYSS LOOP", 21, C_TEXT, true)
-	brand.add_child(title)
-	brand.add_child(_label(_t("header.brand.subtitle"), 11, C_MUTED, true))
-	var header_spacer := Control.new()
-	header_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(header_spacer)
-	var phase_panel := _make_panel(header, C_PANEL_ALT, 12)
-	phase_panel.custom_minimum_size.x = 122
+	_brand_box = VBoxContainer.new()
+	_brand_box.custom_minimum_size.x = 285
+	_brand_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_brand_box.add_theme_constant_override("separation", 1)
+	header.add_child(_brand_box)
+	_brand_title = _label("ABYSS LOOP", 21, C_TEXT, true)
+	_brand_box.add_child(_brand_title)
+	_brand_subtitle = _label(_t("header.brand.subtitle"), 11, C_MUTED, true)
+	_brand_box.add_child(_brand_subtitle)
+	_header_spacer = Control.new()
+	_header_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(_header_spacer)
+	_phase_panel = _make_panel(header, C_PANEL_ALT, 12)
+	_phase_panel.custom_minimum_size.x = 122
 	phase_label = _label(_t("header.phase.shelter"), 12, C_ACCENT, true)
 	phase_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	phase_panel.add_child(phase_label)
+	_phase_panel.add_child(phase_label)
 	help_button = _button(_t("header.button.help"), Callable(self, "_open_help_menu"), false)
 	help_button.custom_minimum_size.x = 88
 	header.add_child(help_button)
 	if OS.is_debug_build():
-		var developer_button := _button(_t("header.button.diagnostics"), Callable(self, "_open_developer_tools"), false)
-		developer_button.custom_minimum_size.x = 142
-		developer_button.tooltip_text = "Отладочная панель разработчика; доступна только в debug-сборке."
-		header.add_child(developer_button)
+		_developer_button = _button(_t("header.button.diagnostics"), Callable(self, "_open_developer_tools"), false)
+		_developer_button.custom_minimum_size.x = 142
+		_developer_button.tooltip_text = "Отладочная панель разработчика; доступна только в debug-сборке."
+		header.add_child(_developer_button)
 	settings_button = _button(_t("header.button.settings"), Callable(self, "_open_settings"), false)
 	settings_button.custom_minimum_size.x = 112
 	header.add_child(settings_button)
@@ -181,22 +200,24 @@ func _build_shell() -> void:
 	resource_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	resource_row.add_theme_constant_override("separation", 8)
 	main_column.add_child(resource_row)
-	var scrap_panel := _make_panel(resource_row, C_PANEL, 9)
-	scrap_panel.custom_minimum_size.x = 190
+	_scrap_panel = _make_panel(resource_row, C_PANEL, 9)
+	_scrap_panel.custom_minimum_size.x = 190
+	_scrap_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scrap_label = _label("Материалы 60", 13, C_GOLD, true)
-	scrap_panel.add_child(scrap_label)
-	var crystal_panel := _make_panel(resource_row, C_PANEL, 9)
-	crystal_panel.custom_minimum_size.x = 190
+	_scrap_panel.add_child(scrap_label)
+	_crystal_panel = _make_panel(resource_row, C_PANEL, 9)
+	_crystal_panel.custom_minimum_size.x = 190
+	_crystal_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	crystal_label = _label("Редкий ресурс 14", 13, Color("#8ec7ec"), true)
-	crystal_panel.add_child(crystal_label)
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	resource_row.add_child(spacer)
-	var run_panel := _make_panel(resource_row, C_PANEL, 9)
-	run_panel.custom_minimum_size.x = 310
-	run_panel.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_crystal_panel.add_child(crystal_label)
+	_resource_spacer = Control.new()
+	_resource_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	resource_row.add_child(_resource_spacer)
+	_run_panel = _make_panel(resource_row, C_PANEL, 9)
+	_run_panel.custom_minimum_size.x = 310
+	_run_panel.size_flags_horizontal = Control.SIZE_SHRINK_END
 	run_loot_label = _label("Добыча экспедиции: —", 12, C_MUTED)
-	run_panel.add_child(run_loot_label)
+	_run_panel.add_child(run_loot_label)
 	content_root = VBoxContainer.new()
 	content_root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content_root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -207,6 +228,83 @@ func _build_shell() -> void:
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay.visible = false
 	add_child(overlay)
+	_apply_responsive_shell()
+
+func _update_content_scale() -> void:
+	var root_window := get_window()
+	if root_window == null:
+		return
+	var window_size: Vector2i = root_window.size
+	if window_size.x <= 0 or window_size.y <= 0:
+		return
+	# The desktop design canvas is 1440x900. Keeping that virtual size on a
+	# 390x844 browser canvas shrinks all text and controls to a fraction of a
+	# CSS pixel and letterboxes the game. On compact screens use the actual
+	# browser window size as the virtual size, then reflow the UI into columns.
+	# Desktop retains the existing layout scale.
+	var target_scale_size := window_size if window_size.x < 900 or window_size.y < 560 else Vector2i(1440, 900)
+	if root_window.content_scale_size != target_scale_size:
+		root_window.content_scale_size = target_scale_size
+	if root_window.content_scale_aspect != Window.CONTENT_SCALE_ASPECT_EXPAND:
+		root_window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
+
+func _is_compact_layout() -> bool:
+	return get_viewport_rect().size.x < 900.0
+
+func _apply_responsive_shell() -> void:
+	var compact_layout := _is_compact_layout()
+	if is_instance_valid(shell):
+		shell.add_theme_constant_override("margin_left", 8 if compact_layout else 24)
+		shell.add_theme_constant_override("margin_right", 8 if compact_layout else 24)
+		shell.add_theme_constant_override("margin_top", 8 if compact_layout else 18)
+		shell.add_theme_constant_override("margin_bottom", 8 if compact_layout else 18)
+	if is_instance_valid(main_column):
+		main_column.add_theme_constant_override("separation", 6 if compact_layout else 10)
+	if is_instance_valid(_brand_box):
+		_brand_box.custom_minimum_size.x = 0 if compact_layout else 285
+	if is_instance_valid(_brand_title):
+		_brand_title.add_theme_font_size_override("font_size", 17 if compact_layout else 21)
+	if is_instance_valid(_brand_subtitle):
+		_brand_subtitle.visible = not compact_layout
+	if is_instance_valid(_phase_panel):
+		_phase_panel.custom_minimum_size.x = 92 if compact_layout else 122
+	if is_instance_valid(phase_label):
+		phase_label.add_theme_font_size_override("font_size", 10 if compact_layout else 12)
+	if is_instance_valid(_header_spacer):
+		_header_spacer.visible = true
+	if is_instance_valid(help_button):
+		help_button.visible = not compact_layout
+	if is_instance_valid(_developer_button):
+		_developer_button.visible = not compact_layout
+	if is_instance_valid(settings_button):
+		settings_button.text = "Настройки" if compact_layout else _t("header.button.settings")
+		settings_button.custom_minimum_size.x = 96 if compact_layout else 112
+	if is_instance_valid(_scrap_panel):
+		_scrap_panel.custom_minimum_size.x = 120 if compact_layout else 190
+	if is_instance_valid(_crystal_panel):
+		_crystal_panel.custom_minimum_size.x = 146 if compact_layout else 190
+	if is_instance_valid(_resource_spacer):
+		_resource_spacer.visible = not compact_layout
+	if is_instance_valid(_run_panel):
+		_run_panel.visible = not compact_layout
+	if is_instance_valid(scrap_label):
+		scrap_label.add_theme_font_size_override("font_size", 11 if compact_layout else 13)
+	if is_instance_valid(crystal_label):
+		crystal_label.add_theme_font_size_override("font_size", 11 if compact_layout else 13)
+
+func _on_viewport_size_changed() -> void:
+	_update_content_scale()
+	_apply_responsive_shell()
+	var compact_layout := _is_compact_layout()
+	if compact_layout == _compact_layout_active:
+		return
+	_compact_layout_active = compact_layout
+	# Rebuild only the content tree at a breakpoint transition. GameState and the
+	# expedition manager remain alive, so resizing or rotating never resets a run.
+	if screen_mode == "expedition":
+		_render_expedition()
+	else:
+		_render_base()
 
 func _t(key: String) -> String:
 	return Localization.text(key)
@@ -355,6 +453,7 @@ func _on_game_state_changed() -> void:
 	_refresh_header()
 
 func _render_base() -> void:
+	var compact_layout := _is_compact_layout()
 	if is_instance_valid(overlay) and overlay.visible:
 		_close_overlay(false)
 	_focus_before_overlay = null
@@ -373,10 +472,10 @@ func _render_base() -> void:
 	base_content.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	base_content.add_theme_constant_override("separation", 12)
 	base_scroll.add_child(base_content)
-	var top_row := HBoxContainer.new()
+	var top_row: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()
 	top_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top_row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	top_row.add_theme_constant_override("separation", 12)
+	top_row.add_theme_constant_override("separation", 12 if not compact_layout else 8)
 	base_content.add_child(top_row)
 	var launch_panel := _make_panel(top_row, Color("#182b31"), 22)
 	launch_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -395,11 +494,14 @@ func _render_base() -> void:
 	feature_row.add_theme_constant_override("separation", 8)
 	launch_box.add_child(feature_row)
 	for feature in [_t("base.feature.autobattle"), _t("base.feature.nodes"), _t("base.feature.tiles")]:
-		var feature_panel := _make_panel(feature_row, Color("#20373c"), 10)
+		var feature_panel := _make_panel(feature_row, Color("#20373c"), 8 if compact_layout else 10)
 		feature_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		feature_panel.add_child(_label(feature, 12, Color("#b7d3cd"), true))
+		var feature_label := _label(feature, 10 if compact_layout else 12, Color("#b7d3cd"), true)
+		feature_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if compact_layout else TextServer.AUTOWRAP_OFF
+		feature_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		feature_panel.add_child(feature_label)
 	if not GameState.has_saved_expedition():
-		var mode_row := HBoxContainer.new()
+		var mode_row: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()
 		mode_row.add_theme_constant_override("separation", 8)
 		launch_box.add_child(mode_row)
 		mode_row.add_child(_label(_t("base.mode.label"), 12, C_ACCENT, true))
@@ -415,7 +517,7 @@ func _render_base() -> void:
 				expedition_mode_option.select(expedition_mode_option.item_count - 1)
 		expedition_mode_option.item_selected.connect(_on_expedition_mode_selected)
 		mode_row.add_child(expedition_mode_option)
-		var preparation_row := HBoxContainer.new()
+		var preparation_row: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()
 		preparation_row.add_theme_constant_override("separation", 8)
 		launch_box.add_child(preparation_row)
 		difficulty_option = OptionButton.new()
@@ -433,7 +535,7 @@ func _render_base() -> void:
 		modifier_option = OptionButton.new()
 		_apply_keyboard_focus_outline(modifier_option)
 		modifier_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		modifier_option.custom_minimum_size.x = 180
+		modifier_option.custom_minimum_size.x = 180 if not compact_layout else 0
 		for modifier_key in ContentRegistry.RUN_MODIFIERS.keys():
 			var modifier_definition: Dictionary = ContentRegistry.RUN_MODIFIERS[modifier_key]
 			modifier_option.add_item(str(modifier_definition.get("name", modifier_key)))
@@ -448,11 +550,11 @@ func _render_base() -> void:
 		pending_preview_seed = _make_preview_seed()
 		seed_input.placeholder_text = "Seed (0 = случайный)"
 		seed_input.tooltip_text = "Введите целое число, чтобы воспроизвести генерацию и последовательность случайных решений."
-		seed_input.custom_minimum_size.x = 180
+		seed_input.custom_minimum_size.x = 180 if not compact_layout else 0
 		seed_input.text = "0"
 		seed_input.text_changed.connect(_on_seed_input_changed)
 		preparation_row.add_child(seed_input)
-		var contract_row := HBoxContainer.new()
+		var contract_row: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()
 		contract_row.add_theme_constant_override("separation", 8)
 		launch_box.add_child(contract_row)
 		contract_row.add_child(_label(_t("base.contract.label"), 12, C_ACCENT, true))
@@ -524,7 +626,8 @@ func _render_base() -> void:
 		var save_notice_panel := _make_panel(launch_box, Color("#3b2c20"), 10)
 		save_notice_panel.add_child(_label(_t("base.save_notice.title") + "\n" + GameState.load_notice, 12, C_GOLD, true))
 	var facility_column := VBoxContainer.new()
-	facility_column.custom_minimum_size.x = 410
+	facility_column.custom_minimum_size.x = 410 if not compact_layout else 0
+	facility_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	facility_column.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	facility_column.add_theme_constant_override("separation", 8)
 	top_row.add_child(facility_column)
@@ -536,8 +639,14 @@ func _render_base() -> void:
 	bottom_box.add_theme_constant_override("separation", 8)
 	bottom_panel.add_child(bottom_box)
 	bottom_box.add_child(_label(_t("base.statistics.title"), 12, C_MUTED, true))
-	var stats := HBoxContainer.new()
-	stats.add_theme_constant_override("separation", 20)
+	var stats: Container = GridContainer.new() if compact_layout else HBoxContainer.new()
+	if stats is GridContainer:
+		var stats_grid := stats as GridContainer
+		stats_grid.columns = 2
+		stats_grid.add_theme_constant_override("h_separation", 8)
+		stats_grid.add_theme_constant_override("v_separation", 6)
+	else:
+		stats.add_theme_constant_override("separation", 20)
 	bottom_box.add_child(stats)
 	stats.add_child(_label(_t("base.statistics.expeditions") % GameState.runs_completed, 13, C_TEXT, true))
 	stats.add_child(_label(_t("base.statistics.victories") % GameState.total_victories, 13, C_TEXT, true))
@@ -1092,6 +1201,7 @@ func _start_expedition() -> void:
 	_render_expedition()
 
 func _render_expedition() -> void:
+	var compact_layout := _is_compact_layout()
 	_first_hour_guide_signature = ""
 	if is_instance_valid(overlay) and overlay.visible:
 		_close_overlay(false)
@@ -1099,31 +1209,51 @@ func _render_expedition() -> void:
 	screen_mode = "expedition"
 	_set_phase("ЭКСПЕДИЦИЯ")
 	_clear_screen()
-	var metrics_row := HBoxContainer.new()
+	var expedition_root: VBoxContainer = content_root
+	if compact_layout:
+		var expedition_scroll := ScrollContainer.new()
+		expedition_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		expedition_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		expedition_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		expedition_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		content_root.add_child(expedition_scroll)
+		expedition_root = VBoxContainer.new()
+		expedition_root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		expedition_root.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		expedition_root.add_theme_constant_override("separation", 8)
+		expedition_scroll.add_child(expedition_root)
+	var metrics_row: Container = GridContainer.new() if compact_layout else HBoxContainer.new()
 	metrics_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	metrics_row.add_theme_constant_override("separation", 8)
-	content_root.add_child(metrics_row)
+	if metrics_row is GridContainer:
+		var metrics_grid := metrics_row as GridContainer
+		metrics_grid.columns = 2
+		metrics_grid.add_theme_constant_override("h_separation", 6)
+		metrics_grid.add_theme_constant_override("v_separation", 6)
+	else:
+		metrics_row.add_theme_constant_override("separation", 8)
+	expedition_root.add_child(metrics_row)
 	_add_metric(metrics_row, "ЗДОРОВЬЕ", "—", "hp")
 	_add_metric(metrics_row, "УРОВЕНЬ / ОПЫТ", "—", "level")
 	_add_metric(metrics_row, "ЦИКЛ / УЗЕЛ", "—", "loop")
 	_add_metric(metrics_row, "УГРОЗА / ДОБЫЧА", "—", "risk")
 	objective_label = _label("ЦЕЛЬ ЭКСПЕДИЦИИ", 12, C_GOLD, true)
-	content_root.add_child(objective_label)
+	expedition_root.add_child(objective_label)
 	challenge_label = _label("", 12, C_ACCENT, true)
 	challenge_label.visible = false
-	content_root.add_child(challenge_label)
+	expedition_root.add_child(challenge_label)
 	contract_label = _label("", 12, C_GOLD, true)
 	contract_label.visible = false
-	content_root.add_child(contract_label)
-	var body := HBoxContainer.new()
+	expedition_root.add_child(contract_label)
+	var body: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_theme_constant_override("separation", 12)
-	content_root.add_child(body)
+	body.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact_layout else Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 8 if compact_layout else 12)
+	expedition_root.add_child(body)
 	var map_panel := _make_panel(body, Color("#132127"), 14)
 	map_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	map_panel.size_flags_stretch_ratio = 1.65
-	map_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	map_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact_layout else Control.SIZE_EXPAND_FILL
+	map_panel.custom_minimum_size.y = 350 if compact_layout else 0
 	var map_box := VBoxContainer.new()
 	map_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	map_box.add_theme_constant_override("separation", 8)
@@ -1136,6 +1266,7 @@ func _render_expedition() -> void:
 	map_title_box.add_child(_label(_t("expedition.map.title"), 13, C_ACCENT, true))
 	map_title_box.add_child(_label("Seed: %d · %s · %s · %s · замкнутый маршрут." % [int(manager.run_seed), str(ContentRegistry.EXPEDITION_MODES.get(manager.expedition_mode_id, {}).get("name", "Обычная экспедиция")), str(ContentRegistry.DIFFICULTY_PRESETS.get(manager.difficulty_id, {}).get("name", "Стандарт")), str(manager.get_run_modifier().get("name", "Обычная экспедиция"))], 11, C_MUTED))
 	fight_status_label = _label(_t("expedition.hero_moving"), 13, C_TEXT, true)
+	fight_status_label.visible = not compact_layout
 	map_header.add_child(fight_status_label)
 	route_view = RouteViewScript.new()
 	route_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1145,6 +1276,7 @@ func _render_expedition() -> void:
 	route_view.world_cell_clicked.connect(_on_world_cell_clicked)
 	route_view.world_cell_hovered.connect(_on_world_cell_hovered)
 	map_box.add_child(route_view)
+	route_view.call("configure_compact_layout", compact_layout)
 	# Keep the map canvas and its own route-footer prompt clear. The longer
 	# placement instruction lives in the tile panel, away from route-node hit areas.
 	route_hint_label = _label(_t("expedition.route_hint"), 10, C_MUTED)
@@ -1161,18 +1293,22 @@ func _render_expedition() -> void:
 	first_hour_guide_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	first_hour_guide_box.add_child(first_hour_guide_label)
 	first_hour_guide_panel.visible = false
-	var right_scroll := ScrollContainer.new()
-	right_scroll.custom_minimum_size.x = 354
-	right_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	right_scroll.size_flags_horizontal = Control.SIZE_SHRINK_END
-	right_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	body.add_child(right_scroll)
 	var right_column := VBoxContainer.new()
-	right_column.custom_minimum_size.x = 334
+	right_column.custom_minimum_size.x = 334 if not compact_layout else 0
 	right_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right_column.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	right_column.add_theme_constant_override("separation", 8)
-	right_scroll.add_child(right_column)
+	if compact_layout:
+		# The outer expedition scroll owns vertical movement on phone-sized displays.
+		body.add_child(right_column)
+	else:
+		var right_scroll := ScrollContainer.new()
+		right_scroll.custom_minimum_size.x = 354
+		right_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		right_scroll.size_flags_horizontal = Control.SIZE_SHRINK_END
+		right_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		body.add_child(right_scroll)
+		right_scroll.add_child(right_column)
 	var control_panel := _make_panel(right_column, C_PANEL, 14)
 	var controls := VBoxContainer.new()
 	controls.add_theme_constant_override("separation", 8)
@@ -1219,7 +1355,7 @@ func _render_expedition() -> void:
 	tile_preview_label = _label(_t("expedition.tiles.preview_title") + "\n" + _t("expedition.tiles.preview_description"), 12, C_MUTED)
 	tile_preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tile_preview_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tile_preview_label.custom_minimum_size.x = 285
+	tile_preview_label.custom_minimum_size.x = 285 if not compact_layout else 0
 	tile_box.add_child(tile_preview_label)
 	var gear_panel := _make_panel(right_column, C_PANEL, 12)
 	var gear_box := VBoxContainer.new()
@@ -1244,7 +1380,7 @@ func _render_expedition() -> void:
 	log_label = _label("", 11, C_MUTED)
 	log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	log_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	log_label.custom_minimum_size.x = 285
+	log_label.custom_minimum_size.x = 285 if not compact_layout else 0
 	log_scroll.add_child(log_label)
 	_sync_expedition_view(true)
 	if pause_button != null:
