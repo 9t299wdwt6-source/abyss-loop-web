@@ -260,7 +260,7 @@ func apply_random_affixes(item: Dictionary, rng: RandomNumberGenerator) -> Dicti
 		if not suffix.is_empty():
 			name_parts.append(str(suffix.get("name", "")))
 		name_parts.append(rarity)
-		result["name"] = " · ".join(name_parts.filter(func(part: String) -> bool: return not part.is_empty()))
+		result["name"] = " · ".join(name_parts)
 	_apply_build_stat_caps(result)
 	result["power"] = item_power(result)
 	return result

@@ -530,6 +530,8 @@ func _run_tests() -> void:
 	assert(not str(rolled_item.get("set_id", "")).is_empty(), "rolled equipment must define a set")
 	assert(float(rolled_item.get("power", 0.0)) >= 0.0, "equipment comparison score must be non-negative")
 	assert(int(rolled_item.get("upgrade_level", -1)) == 0, "new gear must start at upgrade level zero")
+	var expected_roll_affixes := 0 if str(rolled_item.get("rarity", "")) == "Обычный" else (2 if str(rolled_item.get("rarity", "")) == "Эпический" else 1)
+	assert(rolled_item.get("affix_ids", []).size() == expected_roll_affixes, "ordinary, rare and epic loot must produce zero, one and two affixes respectively")
 	var weapon_fixture := {"id": "smoke_wpn", "slot": "weapon", "rarity": "Обычный", "rank": 2, "upgrade_level": 0, "archetype": "wound", "archetype_name": "Резец глубин", "archetype_description": "Кровотечение", "set_id": "vanguard", "set_name": "Авангард", "attack": 3, "defense": 0, "hp": 0, "speed": 0.0, "crit": 0.0, "bleed_chance": 0.2, "bleed_damage": 2, "power": 0.0}
 	weapon_fixture["power"] = inventory_system.item_power(weapon_fixture)
 	var weapon_upgrade_cost: Dictionary = inventory_system.get_upgrade_cost(weapon_fixture)
@@ -555,6 +557,48 @@ func _run_tests() -> void:
 	var upgraded_armor: Dictionary = inventory_system.preview_upgrade_item(armor_fixture)
 	assert(int(upgraded_armor.get("defense", 0)) > 1 and int(upgraded_armor.get("hp", 0)) > 6, "armor upgrades must improve both defence and health")
 	var core_fixture := {"id": "smoke_core", "slot": "core", "rarity": "Обычный", "rank": 1, "upgrade_level": 0, "attack": 0, "speed": 0.04, "crit": 0.025, "power": 0.0}
+	var rare_affix_rng := RandomNumberGenerator.new()
+	rare_affix_rng.seed = 1827
+	var rare_affix_base: Dictionary = weapon_fixture.duplicate(true)
+	rare_affix_base["rarity"] = "Редкий"
+	var rare_affixed: Dictionary = inventory_system.apply_random_affixes(rare_affix_base, rare_affix_rng)
+	var rare_affix_ids: Array = rare_affixed.get("affix_ids", [])
+	assert(rare_affix_ids.size() == 1 and not str(rare_affixed.get("affix_description", "")).is_empty(), "rare gear must roll exactly one readable prefix affix")
+	assert(float(rare_affixed.get("power", 0.0)) > float(weapon_fixture.get("power", 0.0)), "a weapon affix must change the real item comparison score")
+	assert(not weapon_fixture.has("affix_ids"), "affix rolls must not mutate the source item fixture")
+	var epic_affix_rng := RandomNumberGenerator.new()
+	epic_affix_rng.seed = 7319
+	var epic_affix_base: Dictionary = weapon_fixture.duplicate(true)
+	epic_affix_base["rarity"] = "Эпический"
+	var epic_affixed: Dictionary = inventory_system.apply_random_affixes(epic_affix_base, epic_affix_rng)
+	var epic_affix_ids: Array = epic_affixed.get("affix_ids", [])
+	var epic_prefix_count := 0
+	var epic_suffix_count := 0
+	for affix_id_value in epic_affix_ids:
+		var affix_definition: Dictionary = InventorySystemType.ITEM_AFFIXES.get(str(affix_id_value), {})
+		assert(str(affix_definition.get("slot", "")) == "weapon", "weapon affixes must never come from armor or core pools")
+		if str(affix_definition.get("position", "")) == "prefix":
+			epic_prefix_count += 1
+		elif str(affix_definition.get("position", "")) == "suffix":
+			epic_suffix_count += 1
+	assert(epic_affix_ids.size() == 2 and epic_prefix_count == 1 and epic_suffix_count == 1 and epic_affixed.get("affix_names", []).size() == 2, "epic gear must roll one slot-matched prefix and one suffix")
+	var common_affix_base: Dictionary = weapon_fixture.duplicate(true)
+	common_affix_base["rarity"] = "Обычный"
+	var common_affixed: Dictionary = inventory_system.apply_random_affixes(common_affix_base, epic_affix_rng)
+	assert(common_affixed.get("affix_ids", []).is_empty(), "ordinary gear must not roll rarity affixes")
+	var armor_affix_base: Dictionary = armor_fixture.duplicate(true)
+	armor_affix_base["rarity"] = "Эпический"
+	var armor_affixed: Dictionary = inventory_system.apply_random_affixes(armor_affix_base, epic_affix_rng)
+	var core_affix_base: Dictionary = core_fixture.duplicate(true)
+	core_affix_base["rarity"] = "Эпический"
+	var core_affixed: Dictionary = inventory_system.apply_random_affixes(core_affix_base, epic_affix_rng)
+	for slot_fixture in [{"item": armor_affixed, "slot": "armor"}, {"item": core_affixed, "slot": "core"}]:
+		var slot_item: Dictionary = slot_fixture.get("item", {})
+		assert(slot_item.get("affix_ids", []).size() == 2, "epic armor and core must also receive two affixes")
+		for affix_id_value in slot_item.get("affix_ids", []):
+			var affix_definition: Dictionary = InventorySystemType.ITEM_AFFIXES.get(str(affix_id_value), {})
+			assert(str(affix_definition.get("slot", "")) == str(slot_fixture.get("slot", "")), "each affix pool must remain slot-specific")
+	assert(float(armor_affixed.get("power", 0.0)) >= 0.0 and float(core_affixed.get("power", 0.0)) >= 0.0, "affixed armor/core must retain valid comparison scores")
 	var upgraded_core: Dictionary = inventory_system.preview_upgrade_item(core_fixture)
 	assert(float(upgraded_core.get("speed", 0.0)) > 0.04 and float(upgraded_core.get("crit", 0.0)) > 0.025, "core upgrade must improve speed and critical chance")
 	var maxed_item: Dictionary = weapon_fixture.duplicate(true)
