@@ -341,6 +341,12 @@ func get_world_placement_preview(route: Array, world_tiles: Dictionary, cell_id:
 
     return {"ok": true, "reason": "Ландшафт доступен для размещения.", "text": "\n".join(lines), "route_index": int(placement.get("route_index", -1)), "synergies": synergy_names, "new_synergy_matches": new_matches, "synergy_effects": preview_effects, "synergy_sector_deltas": effect_delta.get("sectors", []), "synergy_caps_applied": effect_delta.get("caps_applied", []), "forecast": baseline}
 
+func _get_tile_draw_weight(tile_id: String) -> float:
+    var weight := maxf(0.01, float(TILE_DRAW_WEIGHTS.get(tile_id, 1.0)))
+    if tile_id in ["rift", "signal", "archive", "nursery"]:
+        weight *= GameState.get_rare_tile_weight_multiplier()
+    return weight
+
 func draw_tile(rng: RandomNumberGenerator, unlock_rift: bool) -> Dictionary:
     var choices := ["cache", "hunt", "ward", "snare"]
     if unlock_rift:
@@ -350,12 +356,12 @@ func draw_tile(rng: RandomNumberGenerator, unlock_rift: bool) -> Dictionary:
         choices.append("nursery")
     var total_weight := 0.0
     for choice_value in choices:
-        total_weight += maxf(0.01, float(TILE_DRAW_WEIGHTS.get(str(choice_value), 1.0)))
+        total_weight += _get_tile_draw_weight(str(choice_value))
     var roll := rng.randf() * total_weight
     var tile_id := str(choices.back())
     for choice_value in choices:
         var choice_id := str(choice_value)
-        roll -= maxf(0.01, float(TILE_DRAW_WEIGHTS.get(choice_id, 1.0)))
+        roll -= _get_tile_draw_weight(choice_id)
         if roll < 0.0:
             tile_id = choice_id
             break

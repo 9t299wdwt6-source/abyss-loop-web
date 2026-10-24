@@ -313,6 +313,24 @@ func _run_tests() -> void:
 			unlocked_rare_tiles += 1
 	assert(locked_rare_tiles == 0, "rare rift/signal/archive/nursery cards must remain locked until unlock conditions")
 	assert(unlocked_rare_tiles >= 140 and unlocked_rare_tiles <= 270, "unlocked rare cards should be discoveries, not one third of the card pool")
+	var base_rare_rng := RandomNumberGenerator.new()
+	base_rare_rng.seed = 7741
+	GameState.buildings["cartographer"] = 0
+	var base_rare_count := 0
+	for _base_draw in range(1800):
+		var base_draw: Dictionary = tile_system.draw_tile(base_rare_rng, true)
+		if str(base_draw.get("id", "")) in ["rift", "signal", "archive", "nursery"]:
+			base_rare_count += 1
+	var observatory_rng := RandomNumberGenerator.new()
+	observatory_rng.seed = 7741
+	GameState.buildings["cartographer"] = 5
+	var observatory_rare_count := 0
+	for _observatory_draw in range(1800):
+		var observatory_draw: Dictionary = tile_system.draw_tile(observatory_rng, true)
+		if str(observatory_draw.get("id", "")) in ["rift", "signal", "archive", "nursery"]:
+			observatory_rare_count += 1
+	GameState.buildings["cartographer"] = 0
+	assert(observatory_rare_count > base_rare_count, "cartographer building upgrades must measurably improve rare card discovery without editing the pool")
 	var structure_ledger := {"scrap": 0, "crystals": 0}
 	var structure_hero := {"hp": 15, "max_hp": 30}
 	var archive_result: Dictionary = tile_system.apply_tile_visit({"id": "archive"}, structure_ledger, structure_hero, 2)

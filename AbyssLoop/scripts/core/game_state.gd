@@ -7,7 +7,7 @@ const InventorySystemScript = preload("res://scripts/systems/inventory_system.gd
 const RESEARCH_RESET_REFUND_PERCENT := 80
 const MAX_EXPEDITION_HISTORY := 50
 
-const DEFAULT_BUILDINGS := {"forge": 0, "infirmary": 0, "salvage": 0}
+const DEFAULT_BUILDINGS := {"forge": 0, "infirmary": 0, "salvage": 0, "cartographer": 0}
 var scrap: int = 60
 var crystals: int = 14
 var buildings: Dictionary = DEFAULT_BUILDINGS.duplicate(true)
@@ -192,6 +192,13 @@ func get_effective_loop_scrap_bonus() -> int:
 	var research_bonus := int(get_unlock_effect("loop_scrap_bonus")) + int(get_unlock_effect("route_reward_bonus"))
 	var cap := maxi(0, int(ContentRegistry.BALANCE.get("shelter_loop_scrap_bonus_cap", 6)))
 	return clampi(building_bonus + research_bonus, 0, cap)
+
+func get_rare_tile_weight_multiplier() -> float:
+	# The observatory increases discovery chance without letting rare cards dominate
+	# the hand. The 1.50 ceiling is shared by both route and landscape tile draws.
+	var level := clampi(int(buildings.get("cartographer", 0)), 0, int(ContentRegistry.BUILDINGS.get("cartographer", {}).get("max_level", 5)))
+	var per_level := 0.10
+	return 1.0 + minf(0.50, float(level) * per_level)
 
 func has_research(research_id: String) -> bool:
 	return unlocked_nodes.has(research_id)

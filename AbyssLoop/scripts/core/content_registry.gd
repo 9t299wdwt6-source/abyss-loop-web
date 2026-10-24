@@ -290,6 +290,12 @@ const BUILDINGS := {
 		"base_scrap": 28, "base_crystal": 7, "scrap_step": 17, "crystal_step": 4,
 		"max_level": 5, "effect": "+1 материал за цикл за уровень", "attack_per_level": 0,
 		"hp_per_level": 0, "defense_per_level": 0, "loop_scrap_per_level": 1
+	},
+	"cartographer": {
+		"name": "Обсерватория картографов", "description": "Помогает находить редкие структуры и стратегические карты в потоке тайлов.",
+		"base_scrap": 32, "base_crystal": 4, "scrap_step": 18, "crystal_step": 3,
+		"max_level": 5, "effect": "+10% к весу редких карт за уровень (до +50%)", "attack_per_level": 0,
+		"hp_per_level": 0, "defense_per_level": 0, "loop_scrap_per_level": 0
 	}
 }
 
