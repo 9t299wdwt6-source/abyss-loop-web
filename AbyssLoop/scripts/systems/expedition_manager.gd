@@ -1025,7 +1025,7 @@ func resolve_event_choice(choice_id: String) -> Dictionary:
 	return {"ok": true, "reason": "Решение применено."}
 
 func _grant_secret_event_item(relic_id: String) -> Dictionary:
-	var item: Dictionary = inventory_system.make_secret_relic(relic_id, loop_count, int(hero.get("level", 1)), run_seed)
+	var item: Dictionary = inventory_system.make_secret_relic(relic_id, loop_count, int(hero.get("level", 1)), run_seed, GameState.runs_started)
 	if item.is_empty():
 		_log("Секретная награда не распознана: %s. Остальные последствия выбора сохранены." % relic_id)
 		return {}

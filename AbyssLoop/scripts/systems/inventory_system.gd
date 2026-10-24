@@ -236,7 +236,7 @@ func roll_boss_item(enemy: Dictionary, rng: RandomNumberGenerator, loop_count: i
 	item["power"] = item_power(item)
 	return item
 
-func make_secret_relic(relic_id: String, loop_count: int, hero_level: int, run_seed: int = 0) -> Dictionary:
+func make_secret_relic(relic_id: String, loop_count: int, hero_level: int, run_seed: int = 0, run_nonce: int = 0) -> Dictionary:
 	var template_value: Variant = SECRET_RELIC_TEMPLATES.get(relic_id, {})
 	if typeof(template_value) != TYPE_DICTIONARY:
 		return {}
@@ -248,7 +248,7 @@ func make_secret_relic(relic_id: String, loop_count: int, hero_level: int, run_s
 	var set_definition: Dictionary = SET_DEFS.get(set_id, {})
 	var rank := 1 + int(floor(float(maxi(0, loop_count)) / 2.0)) + int(floor(float(maxi(1, hero_level)) / 3.0))
 	var item := {
-		"id": "secret_%s_%d_%d" % [relic_id, run_seed, loop_count],
+		"id": "secret_%s_%d_%d_%d" % [relic_id, run_seed, run_nonce, loop_count],
 		"unique_id": relic_id,
 		"slot": slot,
 		"name": str(template.get("name", "Тайная реликвия")),
