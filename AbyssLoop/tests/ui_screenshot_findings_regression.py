@@ -26,7 +26,10 @@ checks = {
     "compact shell hides overflow-prone desktop header and resource controls": "_brand_subtitle.visible = not compact_layout" in ui and "help_button.visible = not compact_layout" in ui and "_run_panel.visible = not compact_layout" in ui,
     "narrow shelter stacks preparation and buildings and grids statistics": "var top_row: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()" in ui and "var stats: Container = GridContainer.new() if compact_layout else HBoxContainer.new()" in ui,
     "narrow expedition uses a single vertical scroll container and stacked map/controls": "var expedition_scroll := ScrollContainer.new()" in ui and "var body: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()" in ui and "body.add_child(right_column)" in ui,
-    "map hit targets use a smaller minimum canvas in compact mode": "configure_compact_layout(compact_layout)" in ui and "func configure_compact_layout(compact: bool) -> void:" in route and "Vector2(300, 350) if compact else Vector2(620, 420)" in route,
+    "map hit targets use a smaller minimum canvas in compact mode": (
+        "configure_compact_layout(compact_layout)" in ui
+        or 'route_view.call("configure_compact_layout", compact_layout)' in ui
+    ) and "func configure_compact_layout(compact: bool) -> void:" in route and "Vector2(300, 350) if compact else Vector2(620, 420)" in route,
 }
 failed = [name for name, ok in checks.items() if not ok]
 for name, ok in checks.items():
