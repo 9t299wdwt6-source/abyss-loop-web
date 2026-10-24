@@ -980,10 +980,17 @@ func _open_armory() -> void:
 		var comparison := _format_item_comparison(item)
 		var upgrade_level := int(item.get("upgrade_level", 0))
 		var level_suffix := " · +%d" % upgrade_level if upgrade_level > 0 else ""
+		var affix_detail := str(item.get("affix_description", ""))
 		if i >= maxi(first_item, GameState.armory.size() - 3):
-			comparison_lines.append("%s%s — %s; набор %s." % [str(item.get("name", "Предмет")), level_suffix, _format_item_bonus(item), str(item.get("set_name", "без набора"))])
+			var recent_item_line := "%s%s — %s; набор %s." % [str(item.get("name", "Предмет")), level_suffix, _format_item_bonus(item), str(item.get("set_name", "без набора"))]
+			if not affix_detail.is_empty():
+				recent_item_line += " Модификаторы: " + affix_detail
+			comparison_lines.append(recent_item_line)
 		var text_value := "Управлять: %s%s · %s" % [str(item.get("name", "Предмет")), level_suffix, comparison]
-		buttons.append({"text": text_value, "callback": Callable(self, "_open_armory_item").bind(str(item.get("id", ""))), "accent": false})
+		var item_tooltip := str(item.get("archetype_description", ""))
+		if not affix_detail.is_empty():
+			item_tooltip = (item_tooltip + "\n" if not item_tooltip.is_empty() else "") + affix_detail
+		buttons.append({"text": text_value, "callback": Callable(self, "_open_armory_item").bind(str(item.get("id", ""))), "accent": false, "tooltip": item_tooltip})
 	if not comparison_lines.is_empty():
 		body_text += "\n\nПоследние предметы и эффекты:\n" + "\n".join(comparison_lines)
 	body_text += "\n\nНаборы экипировки (активные отмечены ✓):\n" + "\n".join(inventory_system.set_summary(GameState.loadout))
