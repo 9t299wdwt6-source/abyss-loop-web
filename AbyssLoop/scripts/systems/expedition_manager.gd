@@ -1270,8 +1270,12 @@ func _on_victory() -> void:
 	if is_elite:
 		item_chance = maxf(item_chance, float(ContentRegistry.BALANCE.get("elite_item_chance", 0.45)))
 	if drop_rng.randf() < item_chance:
-		var item: Dictionary = inventory_system.roll_item(drop_rng, loop_count, int(hero.level))
-		if is_boss:
+		var item: Dictionary = inventory_system.roll_boss_item(defeated_enemy, drop_rng, loop_count, int(hero.level)) if is_boss else {}
+		if item.is_empty():
+			item = inventory_system.roll_item(drop_rng, loop_count, int(hero.level))
+		# Unknown boss profiles retain generic boss gear; registered bosses use
+		# named relics with signature stats and a linked two-piece set.
+		if is_boss and not bool(item.get("is_boss_relic", false)):
 			item["rarity"] = "Боссовая"
 			item["name"] = "%s · Награда за босса" % str(item.get("name", "Предмет"))
 			for stat_key in ["attack", "defense", "hp"]:
@@ -1297,10 +1301,10 @@ func _on_victory() -> void:
 			GameState.loadout[slot] = item.duplicate(true)
 			GameState.save_now()
 			_sync_hero_stats()
-			_log("Найден предмет: %s. Он автоматически экипирован." % item.name)
+			_log(("ИМЕННАЯ РЕЛИКВИЯ БОССА: %s. Она автоматически экипирована." if bool(item.get("is_boss_relic", false)) else "Найден предмет: %s. Он автоматически экипирован.") % str(item.get("name", "Предмет")))
 			_request_feedback("loot", str(item.get("name", "Предмет найден")))
 		else:
-			_log("Найден предмет: %s. Текущая экипировка лучше." % item.name)
+			_log(("ИМЕННАЯ РЕЛИКВИЯ БОССА: %s. Предмет сохранён в арсенале — текущая экипировка сильнее." if bool(item.get("is_boss_relic", false)) else "Найден предмет: %s. Текущая экипировка лучше.") % str(item.get("name", "Предмет")))
 			_request_feedback("loot", str(item.get("name", "Предмет найден")))
 	# Remove only the focused target. Remaining members keep their attack timers
 	# and continue the same battle; no extra rewards are granted for the target swap.

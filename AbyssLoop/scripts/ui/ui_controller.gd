@@ -1011,6 +1011,8 @@ func _open_armory_item(item_id: String) -> void:
 	var preview_text := _format_item_bonus(preview_item) if not preview_item.is_empty() else "улучшение недоступно"
 	var build_preview := _format_loadout_synergy_preview(item)
 	var body_text := "%s · %s\nСлот: %s · ранг добычи: %d · улучшение: +%d/%d\nСила предмета: %.1f\n\nСейчас: %s\nПосле улучшения: %s\n\nСвойство: %s\nНабор: %s\n\n%s\n\nСостояние: %s\nРесурсы: %d материалов, %d кристаллов." % [str(item.get("name", "Предмет")), str(item.get("rarity", "Обычный")), str(slot_names.get(str(item.get("slot", "")), "Неизвестный слот")), int(item.get("rank", 1)), upgrade_level, InventorySystemScript.MAX_UPGRADE_LEVEL, inventory_system.item_power(item), _format_item_bonus(item), preview_text, str(item.get("archetype_description", "Базовые характеристики")), str(item.get("set_name", "без набора")), build_preview, "Экипирован — разбор заблокирован" if equipped else "В арсенале", GameState.scrap, GameState.crystals]
+	if bool(item.get("is_boss_relic", false)):
+		body_text += "\n\nРеликвия босса: %s. Именная экипировка масштабируется от достигнутого цикла и относится к набору «%s»." % [str(item.get("source_enemy_name", "неизвестный босс")), str(item.get("set_name", "без набора"))]
 	var buttons: Array = []
 	buttons.append({"text": "Надеть предмет", "callback": Callable(self, "_equip_armory_item").bind(item_id), "accent": true, "disabled": equipped})
 	if bool(upgrade_cost.get("available", false)):

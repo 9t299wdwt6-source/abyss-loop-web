@@ -31,6 +31,12 @@ static func format_item_bonus(item: Dictionary) -> String:
 		bonuses.append("добыча +%d%%" % int(round(float(item.get("reward_bonus", 0.0)) * 100.0)))
 	if float(item.get("tile_spawn_bonus", 0.0)) < 0.0:
 		bonuses.append("шанс боя %d%%" % int(round(float(item.get("tile_spawn_bonus", 0.0)) * 100.0)))
+	if float(item.get("bleed_chance", 0.0)) > 0.0:
+		bonuses.append("шанс кровотечения %d%%" % int(round(float(item.get("bleed_chance", 0.0)) * 100.0)))
+	if int(item.get("bleed_damage", 0)) > 0:
+		bonuses.append("урон кровотечения +%d" % int(item.get("bleed_damage", 0)))
+	if int(item.get("barrier_on_encounter", 0)) > 0:
+		bonuses.append("барьер в начале боя +%d" % int(item.get("barrier_on_encounter", 0)))
 	return ", ".join(bonuses) if not bonuses.is_empty() else "без бонусов"
 
 static func format_item_comparison(has_current_item: bool, delta: float) -> String:

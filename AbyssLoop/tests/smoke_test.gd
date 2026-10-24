@@ -434,6 +434,16 @@ func _run_tests() -> void:
 	var rare_fixture: Dictionary = weapon_fixture.duplicate(true)
 	rare_fixture["rarity"] = "Редкий"
 	assert(int(inventory_system.get_upgrade_cost(rare_fixture).get("scrap", 0)) > int(weapon_upgrade_cost.get("scrap", 0)), "rarer equipment should cost more to upgrade")
+	var elite_fixture: Dictionary = weapon_fixture.duplicate(true)
+	elite_fixture["rarity"] = "Элитная"
+	var boss_fixture: Dictionary = weapon_fixture.duplicate(true)
+	boss_fixture["rarity"] = "Боссовая"
+	assert(int(inventory_system.get_upgrade_cost(elite_fixture).get("scrap", 0)) > int(weapon_upgrade_cost.get("scrap", 0)) and int(inventory_system.get_upgrade_cost(boss_fixture).get("scrap", 0)) > int(inventory_system.get_upgrade_cost(rare_fixture).get("scrap", 0)), "elite and boss relic upgrades must cost more than ordinary and rare gear")
+	var warden_relic: Dictionary = inventory_system.roll_boss_item({"id": "warden", "name": "Страж древнего узла"}, item_rng, 3, 1)
+	var harvester_relic: Dictionary = inventory_system.roll_boss_item({"id": "harvester", "name": "Светожор — сборщик импульсов"}, item_rng, 6, 2)
+	assert(bool(warden_relic.get("is_boss_relic", false)) and str(warden_relic.get("rarity", "")) == "Боссовая" and str(warden_relic.get("set_id", "")) == "vanguard", "Warden must drop a named relic from its signature set")
+	assert(bool(harvester_relic.get("is_boss_relic", false)) and str(harvester_relic.get("rarity", "")) == "Боссовая" and str(harvester_relic.get("set_id", "")) == "resonance", "Harvester must drop a named relic from its signature set")
+	assert(not str(warden_relic.get("unique_id", "")).is_empty() and float(warden_relic.get("power", 0.0)) > 0.0 and int(warden_relic.get("rank", 0)) >= 1, "boss relic rolls must produce named, ranked and comparable items")
 	var armor_fixture := {"id": "smoke_arm", "slot": "armor", "rarity": "Обычный", "rank": 1, "upgrade_level": 0, "defense": 1, "hp": 6, "power": 0.0}
 	var upgraded_armor: Dictionary = inventory_system.preview_upgrade_item(armor_fixture)
 	assert(int(upgraded_armor.get("defense", 0)) > 1 and int(upgraded_armor.get("hp", 0)) > 6, "armor upgrades must improve both defence and health")
@@ -448,6 +458,9 @@ func _run_tests() -> void:
 	epic_fixture["rarity"] = "Эпический"
 	var epic_salvage: Dictionary = inventory_system.get_salvage_reward(epic_fixture)
 	assert(int(common_salvage.get("scrap", 0)) > 0 and int(epic_salvage.get("scrap", 0)) > int(common_salvage.get("scrap", 0)) and int(epic_salvage.get("crystals", 0)) > int(common_salvage.get("crystals", 0)), "salvage returns must be deterministic and scale by rarity")
+	var elite_salvage: Dictionary = inventory_system.get_salvage_reward(elite_fixture)
+	var boss_salvage: Dictionary = inventory_system.get_salvage_reward(boss_fixture)
+	assert(int(boss_salvage.get("scrap", 0)) > int(epic_salvage.get("scrap", 0)) and int(boss_salvage.get("crystals", 0)) > int(elite_salvage.get("crystals", 0)), "recycling boss relics must return the highest rarity materials")
 	var set_stats: Dictionary = inventory_system.total_equipment_stats({"weapon": {"slot": "weapon", "set_id": "vanguard", "attack": 1}, "armor": {"slot": "armor", "set_id": "vanguard", "defense": 1}})
 	assert(int(set_stats.get("defense", 0)) == 3 and int(set_stats.get("hp", 0)) == 8, "two-piece vanguard set must apply actual stats")
 	assert(set_stats.get("active_sets", []).has("Авангард"), "active set should be reported to the UI")

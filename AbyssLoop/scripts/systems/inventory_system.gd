@@ -33,6 +33,19 @@ const SET_DEFS := {
 
 # Archetype synergies are intentionally small, mutually exclusive bonuses.
 # They reward a deliberate loadout without making raw item rank irrelevant.
+# Named relic drops make boss victories different from ordinary random equipment.
+# Each boss can drop either piece of a signature two-piece set.
+const BOSS_RELIC_TABLES := {
+	"warden": [
+		{"id": "warden_edge", "name": "Кромка нулевого узла", "slot": "weapon", "archetype": "assault", "archetype_name": "Штурм", "archetype_description": "Реликвия Стража: агрессивный клинок, настроенный на пробой защиты.", "set_id": "vanguard", "stats": {"attack": 4, "crit": 0.04}},
+		{"id": "warden_shell", "name": "Панцирь древнего узла", "slot": "armor", "archetype": "bastion", "archetype_name": "Бастион", "archetype_description": "Реликвия Стража: тяжёлая броня и барьер в начале столкновения.", "set_id": "vanguard", "stats": {"defense": 2, "hp": 12, "barrier_on_encounter": 10}}
+	],
+	"harvester": [
+		{"id": "harvester_needle", "name": "Игла Светожора", "slot": "weapon", "archetype": "wound", "archetype_name": "Резец глубин", "archetype_description": "Реликвия Светожора: импульсный клинок, вызывающий глубокие раны.", "set_id": "resonance", "stats": {"attack": 3, "crit": 0.025, "bleed_chance": 0.18, "bleed_damage": 3}},
+		{"id": "harvester_heart", "name": "Сердце импульсов", "slot": "core", "archetype": "resonance", "archetype_name": "Резонанс", "archetype_description": "Реликвия Светожора: усиливает импульс героя, добычу и восстановление после побед.", "set_id": "resonance", "stats": {"hp": 8, "speed": 0.06, "reward_bonus": 0.15, "kill_heal": 1}}
+	]
+}
+
 const SYNERGY_DEFS := {
 	"overclock_assault": {
 		"name": "Контур перегрузки",
@@ -140,6 +153,72 @@ func roll_item(rng: RandomNumberGenerator, loop_count: int, hero_level: int) -> 
 	item["power"] = item_power(item)
 	return item
 
+func roll_boss_item(enemy: Dictionary, rng: RandomNumberGenerator, loop_count: int, hero_level: int) -> Dictionary:
+	var boss_id := str(enemy.get("id", ""))
+	var templates_value: Variant = BOSS_RELIC_TABLES.get(boss_id, [])
+	if typeof(templates_value) != TYPE_ARRAY:
+		return {}
+	var templates: Array = templates_value
+	if templates.is_empty():
+		return {}
+	var template_value: Variant = templates[rng.randi_range(0, templates.size() - 1)]
+	if typeof(template_value) != TYPE_DICTIONARY:
+		return {}
+	var template: Dictionary = template_value
+	var slot := str(template.get("slot", ""))
+	if not SLOT_NAMES.has(slot):
+		return {}
+	var set_id := str(template.get("set_id", ""))
+	var set_definition: Dictionary = SET_DEFS.get(set_id, {})
+	var rank := 1 + int(floor(float(maxi(0, loop_count)) / 2.0)) + int(floor(float(maxi(1, hero_level)) / 3.0))
+	var item := {
+		"id": "boss_%s_%d_%d" % [str(template.get("id", boss_id)), loop_count, rng.randi()],
+		"unique_id": str(template.get("id", boss_id)), "slot": slot,
+		"name": str(template.get("name", "Реликвия бездны")), "rarity": "Боссовая",
+		"rank": rank, "upgrade_level": 0,
+		"archetype": str(template.get("archetype", "standard")),
+		"archetype_name": str(template.get("archetype_name", "Реликвия")),
+		"archetype_description": str(template.get("archetype_description", "Именная экипировка босса.")),
+		"set_id": set_id, "set_name": str(set_definition.get("name", set_id)),
+		"is_boss_relic": true, "source_enemy_id": boss_id,
+		"source_enemy_name": str(enemy.get("name", boss_id)),
+		"attack": 0, "defense": 0, "hp": 0, "speed": 0.0, "crit": 0.0,
+		"kill_heal": 0, "tile_scrap": 0, "event_heal": 0, "reward_bonus": 0.0,
+		"tile_spawn_bonus": 0.0, "bleed_chance": 0.0, "bleed_damage": 0,
+		"barrier_on_encounter": 0
+	}
+	var template_stats_value: Variant = template.get("stats", {})
+	if typeof(template_stats_value) == TYPE_DICTIONARY:
+		var template_stats: Dictionary = template_stats_value
+		for stat_key_value in template_stats.keys():
+			var stat_key := str(stat_key_value)
+			if item.has(stat_key):
+				item[stat_key] = template_stats[stat_key_value]
+	# Signature items gain rank with the expedition while keeping a bounded profile.
+	var rank_bonus := mini(5, maxi(0, rank - 2))
+	if int(item.get("attack", 0)) > 0:
+		item["attack"] = int(item.get("attack", 0)) + rank_bonus
+	if int(item.get("defense", 0)) > 0:
+		item["defense"] = int(item.get("defense", 0)) + floori(float(rank_bonus) / 2.0)
+	if int(item.get("hp", 0)) > 0:
+		item["hp"] = int(item.get("hp", 0)) + rank_bonus * 2
+	if float(item.get("speed", 0.0)) > 0.0:
+		item["speed"] = minf(0.20, float(item.get("speed", 0.0)) + minf(0.04, float(rank_bonus) * 0.005))
+	if float(item.get("crit", 0.0)) > 0.0:
+		item["crit"] = minf(0.20, float(item.get("crit", 0.0)) + minf(0.035, float(rank_bonus) * 0.005))
+	if int(item.get("kill_heal", 0)) > 0:
+		item["kill_heal"] = int(item.get("kill_heal", 0)) + floori(float(rank_bonus) / 2.0)
+	if int(item.get("bleed_damage", 0)) > 0:
+		item["bleed_damage"] = int(item.get("bleed_damage", 0)) + floori(float(rank_bonus) / 3.0)
+	if float(item.get("bleed_chance", 0.0)) > 0.0:
+		item["bleed_chance"] = minf(0.5, float(item.get("bleed_chance", 0.0)) + float(rank_bonus) * 0.01)
+	if int(item.get("barrier_on_encounter", 0)) > 0:
+		item["barrier_on_encounter"] = int(item.get("barrier_on_encounter", 0)) + rank_bonus * 2
+	if float(item.get("reward_bonus", 0.0)) > 0.0:
+		item["reward_bonus"] = minf(1.5, float(item.get("reward_bonus", 0.0)) + minf(0.08, float(rank_bonus) * 0.01))
+	item["power"] = item_power(item)
+	return item
+
 func item_power(item: Dictionary) -> float:
 	var score := float(item.get("attack", 0)) * 2.0
 	score += float(item.get("defense", 0)) * 2.5
@@ -169,9 +248,15 @@ func get_upgrade_cost(item: Dictionary) -> Dictionary:
 		"Редкий":
 			rarity_multiplier = 1.25
 			rarity_crystals = 1
+		"Элитная":
+			rarity_multiplier = 1.45
+			rarity_crystals = 1
 		"Эпический":
 			rarity_multiplier = 1.6
 			rarity_crystals = 2
+		"Боссовая":
+			rarity_multiplier = 2.0
+			rarity_crystals = 3
 	var power_tier := maxi(1, int(item.get("rank", 1))) + upgrade_level
 	var scrap_cost := int(ceil(float(18 + power_tier * 7 + upgrade_level * 10) * rarity_multiplier))
 	var crystal_cost := 1 + floori(float(power_tier) / 3.0) + rarity_crystals
@@ -213,9 +298,15 @@ func get_salvage_reward(item: Dictionary) -> Dictionary:
 		"Редкий":
 			rarity_scrap = 4
 			crystals = 1
+		"Элитная":
+			rarity_scrap = 7
+			crystals = 1
 		"Эпический":
 			rarity_scrap = 10
 			crystals = 2
+		"Боссовая":
+			rarity_scrap = 14
+			crystals = 3
 	var rank := maxi(1, int(item.get("rank", 1)))
 	var upgrade_level := clampi(int(item.get("upgrade_level", 0)), 0, MAX_UPGRADE_LEVEL)
 	return {"scrap": 8 + rank * 5 + upgrade_level * 7 + rarity_scrap, "crystals": crystals + floori(float(upgrade_level) / 3.0)}
