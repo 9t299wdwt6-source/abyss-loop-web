@@ -506,6 +506,24 @@ const EXPEDITION_EVENTS := {
 			{"id": "hide_signal", "title": "Замаскировать след", "description": "Потратить 7 материалов, снизить опасность и убрать долг сигнала", "effects": {"cost_scrap": 7, "danger_delta": -0.18, "clear_flags": ["signal_debt"], "set_flags": ["signal_pursuit_resolved"]}},
 			{"id": "bait_pursuers", "title": "Увести преследователей", "description": "+7 материалов и +15% к награде, но бой станет вероятнее", "effects": {"scrap": 7, "spawn_bonus": 0.15, "reward_bonus": 0.15, "clear_flags": ["signal_debt"], "set_flags": ["signal_pursuit_resolved", "route_pulse"]}}
 		]
+	},
+	"archive_rift_echo": {
+		"name": "Эхо за закрытой картой",
+		"narrative": "Когда архив и разлом оказались рядом, на старой карте проступили координаты комнаты, которой нет на плане. За стеной слышно сердцебиение глубины.",
+		"weight": 1.0, "min_loop": 1, "requires_flag": "secret_archive_rift_found", "excludes_flag": "secret_archive_rift_claimed", "resolved_flag": "secret_archive_rift_claimed", "guaranteed_when_flag": true,
+		"choices": [
+			{"id": "seal_echo", "title": "Запечатать эхо", "description": "+2 редких ресурса и восстановить до 8 здоровья", "effects": {"crystals": 2, "heal": 8, "set_flags": ["secret_echo_sealed"]}},
+			{"id": "follow_echo", "title": "Проследить за пульсом", "description": "+5 редких ресурсов, но −18 здоровья; опасность и награда за бой вырастут", "effects": {"crystals": 5, "damage": 18, "danger_delta": 0.15, "reward_bonus": 0.20, "set_flags": ["secret_echo_followed"]}}
+		]
+	},
+	"sealed_brood": {
+		"name": "Гнездо за сетью",
+		"narrative": "Сеть резонанса удерживала не обычную угрозу, а целое гнездо. Питомник бездны реагирует на ловушку, и теперь можно решить судьбу выводка.",
+		"weight": 1.0, "min_loop": 1, "requires_flag": "secret_nursery_snare_found", "excludes_flag": "secret_nursery_snare_claimed", "resolved_flag": "secret_nursery_snare_claimed", "guaranteed_when_flag": true,
+		"choices": [
+			{"id": "spare_brood", "title": "Усыпить выводок", "description": "+3 редких ресурса, +4 материала и восстановить до 12 здоровья", "effects": {"crystals": 3, "scrap": 4, "heal": 12, "set_flags": ["secret_brood_spared"]}},
+			{"id": "hunt_brood", "title": "Использовать гнездо как приманку", "description": "+7 материалов и +2 редких ресурса, но −10 здоровья и повышенный шанс боя", "effects": {"scrap": 7, "crystals": 2, "damage": 10, "spawn_bonus": 0.16, "reward_bonus": 0.20, "set_flags": ["secret_brood_hunted"]}}
+		]
 	}
 }
 

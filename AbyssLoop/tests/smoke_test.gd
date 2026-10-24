@@ -465,6 +465,28 @@ func _run_tests() -> void:
 	var second_event: Dictionary = event_system.draw_event(event_rng, 0, str(first_event.get("id", "")))
 	assert(not second_event.is_empty(), "event system must always have a fallback event")
 	assert(str(second_event.get("id", "")) != str(first_event.get("id", "")), "immediate event repetition should be avoided")
+	var secret_rng := RandomNumberGenerator.new()
+	secret_rng.seed = 55661
+	var archive_secret_event: Dictionary = event_system.draw_event(secret_rng, 1, "", {"secret_archive_rift_found": true})
+	assert(str(archive_secret_event.get("id", "")) == "archive_rift_echo", "a discovered archive/rift secret must be the next event offered")
+	var brood_secret_event: Dictionary = event_system.draw_event(secret_rng, 1, "", {"secret_nursery_snare_found": true})
+	assert(str(brood_secret_event.get("id", "")) == "sealed_brood", "a discovered nursery/snare secret must be the next event offered")
+	var secret_unseen_event: Dictionary = event_system.draw_event(secret_rng, 1, "", {})
+	assert(not str(secret_unseen_event.get("id", "")).begins_with("archive_rift_echo") and str(secret_unseen_event.get("id", "")) != "sealed_brood", "secret events must not leak into ordinary random event pools")
+	assert(ContentRegistry.EXPEDITION_EVENTS.archive_rift_echo.choices.size() == 2 and ContentRegistry.EXPEDITION_EVENTS.sealed_brood.choices.size() == 2, "each secret discovery must offer a meaningful choice")
+	var secret_manager := ExpeditionManagerType.new()
+	secret_manager.world_tiles = {"4:3": {"id": "archive", "route_index": 7}, "5:3": {"id": "rift", "route_index": 7}}
+	secret_manager.run_ledger = {"event_flags": {}}
+	var secret_messages: Array = []
+	secret_manager._discover_landscape_secrets(7, secret_messages)
+	assert(bool(secret_manager.run_ledger.get("event_flags", {}).get("secret_archive_rift_found", false)) and secret_messages.size() == 1 and str(secret_messages[0]).contains("ТАЙНА ОБНАРУЖЕНА"), "adjacent archive/rift tiles in one visited sector must reveal exactly one secret")
+	secret_manager._discover_landscape_secrets(7, secret_messages)
+	assert(secret_messages.size() == 1, "the same landscape secret must not announce itself again after discovery")
+	secret_manager.world_tiles = {"4:3": {"id": "nursery", "route_index": 8}, "5:3": {"id": "snare", "route_index": 8}}
+	secret_manager.run_ledger = {"event_flags": {}}
+	var brood_messages: Array = []
+	secret_manager._discover_landscape_secrets(8, brood_messages)
+	assert(bool(secret_manager.run_ledger.get("event_flags", {}).get("secret_nursery_snare_found", false)) and brood_messages.size() == 1, "adjacent nursery/snare tiles in one sector must reveal the hidden nest")
 	var progression_system = ProgressionSystemType.new()
 	var perk_rng := RandomNumberGenerator.new()
 	perk_rng.seed = 101

@@ -75,10 +75,12 @@
     "vitality"
   ],
   "События экспедиции": [
+    "archive_rift_echo",
     "beacon_echo",
     "cache_echo",
     "damaged_beacon",
     "lost_trader",
+    "sealed_brood",
     "sealed_cache",
     "signal_pursuit",
     "unstable_anomaly"

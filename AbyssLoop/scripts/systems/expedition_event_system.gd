@@ -5,6 +5,7 @@ class_name ExpeditionEventSystem
 # valid event. Choosing an option and applying its effects belongs to the manager.
 func draw_event(rng: RandomNumberGenerator, loop_count: int, previous_event_id: String = "", flags: Dictionary = {}) -> Dictionary:
 	var candidates: Array = []
+	var guaranteed_candidates: Array = []
 	var total_weight: float = 0.0
 	for event_id_value in ContentRegistry.EXPEDITION_EVENTS.keys():
 		var event_id: String = str(event_id_value)
@@ -22,8 +23,18 @@ func draw_event(rng: RandomNumberGenerator, loop_count: int, previous_event_id: 
 		var weight: float = maxf(0.01, float(definition.get("weight", 1.0)))
 		if not required_flag.is_empty():
 			weight *= maxf(1.0, float(definition.get("chain_weight_multiplier", 2.0)))
-		candidates.append({"id": event_id, "weight": weight, "definition": definition})
+		var candidate := {"id": event_id, "weight": weight, "definition": definition}
+		candidates.append(candidate)
+		if bool(definition.get("guaranteed_when_flag", false)) and not required_flag.is_empty():
+			guaranteed_candidates.append(candidate)
 		total_weight += weight
+	# Once a secret flag is discovered, the next event node reveals that secret
+	# before ordinary random events. It remains single-use through excludes_flag.
+	if not guaranteed_candidates.is_empty():
+		candidates = guaranteed_candidates
+		total_weight = 0.0
+		for candidate_value in candidates:
+			total_weight += float(candidate_value.get("weight", 1.0))
 	if candidates.is_empty():
 		return {}
 	var roll: float = rng.randf() * total_weight

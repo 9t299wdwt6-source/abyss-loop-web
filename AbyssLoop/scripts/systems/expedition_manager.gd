@@ -17,6 +17,10 @@ const ProceduralGenerationScript = preload("res://scripts/systems/procedural_gen
 const ExpeditionEventSystemScript = preload("res://scripts/systems/expedition_event_system.gd")
 const StatusEffectSystemScript = preload("res://scripts/systems/status_effect_system.gd")
 const EQUIPMENT_SLOT_NAMES := {"weapon": "Оружие", "armor": "Броня", "core": "Ядро"}
+const LANDSCAPE_SECRET_RECIPES := [
+	{"first_tile": "archive", "second_tile": "rift", "flag": "secret_archive_rift_found", "title": "Архив и разлом", "clue": "Архивная карта сошлась с глубинным разломом."},
+	{"first_tile": "nursery", "second_tile": "snare", "flag": "secret_nursery_snare_found", "title": "Питомник и сеть", "clue": "Сеть резонанса удерживает скрытое гнездо в питомнике."}
+]
 
 var route_system = RouteSystemScript.new()
 var tile_system = TileSystemScript.new()
@@ -806,6 +810,7 @@ func _visit_cell(index: int) -> void:
 	if typeof(synergy_messages_value) == TYPE_ARRAY:
 		for synergy_message in synergy_messages_value:
 			messages.append(str(synergy_message))
+	_discover_landscape_secrets(index, messages)
 	# Final stage of the pipeline: apply limits once after base node, local,
 	# equipment/perk, and neighbour modifiers have all been accumulated.
 	var capped_visit: Dictionary = tile_system.clamp_visit_modifiers({"spawn_bonus": spawn_bonus, "enemy_bonus": strength_bonus, "reward_bonus": reward_bonus})
@@ -830,6 +835,62 @@ func _visit_cell(index: int) -> void:
 	else:
 		if messages.is_empty():
 			_log("Узел %d: маршрут свободен." % (index + 1))
+
+func _discover_landscape_secrets(route_index: int, messages: Array) -> void:
+	if world_tiles.is_empty() or route_index < 0:
+		return
+	var flags_value: Variant = run_ledger.get("event_flags", {})
+	var flags: Dictionary = flags_value.duplicate(true) if typeof(flags_value) == TYPE_DICTIONARY else {}
+	var changed_flags := false
+	for recipe_value in LANDSCAPE_SECRET_RECIPES:
+		if typeof(recipe_value) != TYPE_DICTIONARY:
+			continue
+		var recipe: Dictionary = recipe_value
+		var flag_id := str(recipe.get("flag", ""))
+		if flag_id.is_empty() or bool(flags.get(flag_id, false)):
+			continue
+		var first_id := str(recipe.get("first_tile", ""))
+		var second_id := str(recipe.get("second_tile", ""))
+		var discovered := false
+		for cell_value in world_tiles.keys():
+			var cell_id := str(cell_value)
+			var cell_value_data: Variant = world_tiles[cell_value]
+			if typeof(cell_value_data) != TYPE_DICTIONARY:
+				continue
+			var current_tile: Dictionary = cell_value_data
+			if int(current_tile.get("route_index", -1)) != route_index:
+				continue
+			var coordinates := cell_id.split(":")
+			if coordinates.size() != 2 or not coordinates[0].is_valid_int() or not coordinates[1].is_valid_int():
+				continue
+			var col := int(coordinates[0])
+			var row := int(coordinates[1])
+			var current_id := str(current_tile.get("id", ""))
+			# Scan only right/down neighbours to visit each physical pair once.
+			for position in [Vector2i(col + 1, row), Vector2i(col, row + 1)]:
+				var neighbor_id := TileSystemScript.world_cell_id(position.x, position.y)
+				if not TileSystemScript.is_world_cell_valid(neighbor_id) or not world_tiles.has(neighbor_id):
+					continue
+				var neighbor_value: Variant = world_tiles[neighbor_id]
+				if typeof(neighbor_value) != TYPE_DICTIONARY:
+					continue
+				var neighbor_tile: Dictionary = neighbor_value
+				if int(neighbor_tile.get("route_index", -1)) != route_index:
+					continue
+				var neighbor_tile_id := str(neighbor_tile.get("id", ""))
+				var direct_match := current_id == first_id and neighbor_tile_id == second_id
+				var reverse_match := current_id == second_id and neighbor_tile_id == first_id
+				if direct_match or reverse_match:
+					discovered = true
+					break
+			if discovered:
+				break
+		if discovered:
+			flags[flag_id] = true
+			changed_flags = true
+			messages.append("ТАЙНА ОБНАРУЖЕНА — %s. %s На ближайшем узле события появится особый выбор." % [str(recipe.get("title", "Скрытый след")), str(recipe.get("clue", ""))])
+	if changed_flags:
+		run_ledger["event_flags"] = flags
 
 func _begin_expedition_event(index: int, spawn_bonus: float, strength_bonus: float, reward_bonus: float) -> void:
 	pending_event = expedition_event_system.draw_event(run_rng, loop_count, last_event_id, run_ledger.get("event_flags", {}))
