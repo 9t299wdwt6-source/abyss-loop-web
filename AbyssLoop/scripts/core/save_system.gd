@@ -15,6 +15,7 @@ const BACKUP_FILE_NAME := "loop_roguelite_save.backup.json"
 const LEGACY_PROFILE_PREFIXES := ["abyss loop", "looproguelite"]
 const MAX_SNAPSHOT_ROUTE_CELLS := 128
 const TileSystemScript = preload("res://scripts/systems/tile_system.gd")
+const InventorySystemScript = preload("res://scripts/systems/inventory_system.gd")
 const MAX_SNAPSHOT_LOG_LINES := 300
 
 var last_load_status: String = "not_loaded"
@@ -529,6 +530,8 @@ func _validate_item(item: Dictionary, expected_slot: String = "") -> bool:
 			return false
 	if item.has("upgrade_level") and int(item.get("upgrade_level", 0)) > 10:
 		return false
+	if not _validate_item_affixes(item, slot):
+		return false
 	for stat_key in ["speed", "crit", "reward_bonus", "tile_spawn_bonus", "power", "bleed_chance"]:
 		if not item.has(stat_key):
 			continue
@@ -556,6 +559,54 @@ func _validate_item(item: Dictionary, expected_slot: String = "") -> bool:
 			"power":
 				if numeric_value < 0.0 or numeric_value > 1000000.0:
 					return false
+	return true
+
+func _validate_item_affixes(item: Dictionary, slot: String) -> bool:
+	# Legacy gear predating affixes remains valid when no affix metadata exists.
+	var has_affix_ids := item.has("affix_ids")
+	var has_affix_names := item.has("affix_names")
+	var has_affix_description := item.has("affix_description")
+	if not has_affix_ids and not has_affix_names and not has_affix_description:
+		return true
+	if not has_affix_ids or not has_affix_names or not has_affix_description:
+		return false
+	var ids_value: Variant = item.get("affix_ids", null)
+	var names_value: Variant = item.get("affix_names", null)
+	var description_value: Variant = item.get("affix_description", null)
+	if typeof(ids_value) != TYPE_ARRAY or typeof(names_value) != TYPE_ARRAY or typeof(description_value) != TYPE_STRING:
+		return false
+	var affix_ids: Array = ids_value
+	var affix_names: Array = names_value
+	if affix_ids.size() > 2 or affix_names.size() != affix_ids.size() or str(description_value).length() > 1000:
+		return false
+	var seen_ids: Dictionary = {}
+	var seen_positions: Dictionary = {}
+	for index in range(affix_ids.size()):
+		var affix_id_value: Variant = affix_ids[index]
+		var affix_name_value: Variant = affix_names[index]
+		if typeof(affix_id_value) != TYPE_STRING or typeof(affix_name_value) != TYPE_STRING or str(affix_name_value).strip_edges().is_empty():
+			return false
+		var affix_id := str(affix_id_value)
+		if seen_ids.has(affix_id):
+			return false
+		seen_ids[affix_id] = true
+		var definition_value: Variant = InventorySystemScript.ITEM_AFFIXES.get(affix_id, {})
+		if typeof(definition_value) != TYPE_DICTIONARY:
+			return false
+		var definition: Dictionary = definition_value
+		if str(definition.get("slot", "")) != slot:
+			return false
+		var position := str(definition.get("position", ""))
+		if position not in ["prefix", "suffix"] or seen_positions.has(position):
+			return false
+		seen_positions[position] = true
+	var rarity := str(item.get("rarity", ""))
+	if rarity == "Редкий" and (affix_ids.size() != 1 or not seen_positions.has("prefix")):
+		return false
+	if rarity == "Эпический" and (affix_ids.size() != 2 or not seen_positions.has("prefix") or not seen_positions.has("suffix")):
+		return false
+	if rarity not in ["Редкий", "Эпический"] and not affix_ids.is_empty():
+		return false
 	return true
 
 func migrate_expedition_snapshot(snapshot: Dictionary) -> Dictionary:

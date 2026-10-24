@@ -30,6 +30,8 @@ checks = {
     "corrupt primary is quarantined and repaired from validated backup": 'recovered_backup_primary_restore_failed' in save and 'recovered_backup_quarantine_failed' in save and '_write_atomic_text(SAVE_PATH, SAVE_TEMP_PATH, recovered_text)' in save,
     "save, export and profile migration use common envelope encoder": 'var encoded := _encode_save(payload)' in save and '_encode_save(candidate_data)' in save,
     "runtime regression checks tamper detection and backup fallback": 'tampered_envelope["data"]["scrap"] = 999' in runtime and 'checksum mismatch should trigger validated backup recovery' in runtime and 'successful backup recovery should rewrite a valid primary envelope' in runtime,
+    "save schema cross-checks affix slot and prefix/suffix metadata": all(token in save for token in ("func _validate_item_affixes", "InventorySystemScript.ITEM_AFFIXES", "seen_positions.has(position)")) and all(token in runtime for token in ("wrong_slot_affix", "duplicate_position_affixes", "legacy gear without affix metadata")),
+    "affix metadata survives a real checksum-protected save/load": '"affix_ids": ["keen_edge"]' in runtime and "affix IDs and names must survive checksum-protected save/load" in runtime,
     "runtime regression checks checksum key-order invariance": 'canonical checksum must ignore dictionary key insertion order' in runtime,
 }
 failed = [name for name, ok in checks.items() if not ok]
