@@ -127,6 +127,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test_root="${RUNNER_TEMP}/AbyssLoopRuntimeAcceptance"
+          test -d "$test_root"
           timeout 90s "$GODOT_BIN" --headless --path "$test_root" res://tests/long_expedition_runtime_acceptance_runner.tscn
 
       - name: Capture five automated engine runs for Stage64B
