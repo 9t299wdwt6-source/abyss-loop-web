@@ -299,9 +299,32 @@ func _run_tests() -> void:
 	assert(not bool(tile_system.can_place(route, {}, 0).ok), "start node must reject tiles")
 	assert(bool(tile_system.can_place(route, {}, 1).ok), "empty node must accept tiles")
 	assert(not bool(tile_system.can_place(route, {"1": {"id": "cache"}}, 1).ok), "occupied node must reject tiles")
+	var tile_draw_rng := RandomNumberGenerator.new()
+	tile_draw_rng.seed = 23019
+	var locked_rare_tiles := 0
+	var unlocked_rare_tiles := 0
+	var unlocked_draw_count := 1200
+	for _draw_index in range(unlocked_draw_count):
+		var common_draw: Dictionary = tile_system.draw_tile(tile_draw_rng, false)
+		if str(common_draw.get("id", "")) in ["rift", "signal"]:
+			locked_rare_tiles += 1
+		var unlocked_draw: Dictionary = tile_system.draw_tile(tile_draw_rng, true)
+		if str(unlocked_draw.get("id", "")) in ["rift", "signal"]:
+			unlocked_rare_tiles += 1
+	assert(locked_rare_tiles == 0, "rare rift/signal cards must remain locked until unlock conditions")
+	assert(unlocked_rare_tiles >= 35 and unlocked_rare_tiles <= 220, "unlocked rare cards should be discoveries, not one third of the card pool")
 	var cache_ward_tiles := {"2": {"id": "cache"}, "3": {"id": "ward"}}
 	var supply_synergy: Dictionary = tile_system.get_synergy_bonus(cache_ward_tiles, 2, route.size())
 	assert(int(supply_synergy.get("scrap", 0)) == 4, "cache next to ward must grant the configured synergy materials")
+	var cache_hunt_pair := {"1": {"id": "cache"}, "2": {"id": "hunt"}}
+	var cache_hunt_synergy: Dictionary = tile_system.get_synergy_bonus(cache_hunt_pair, 1, route.size())
+	assert(int(cache_hunt_synergy.get("scrap", 0)) == 2 and is_equal_approx(float(cache_hunt_synergy.get("reward", 0.0)), 0.08), "cache next to hunt must give the trophy-cache resource/reward recipe")
+	var snare_hunt_pair := {"1": {"id": "snare"}, "2": {"id": "hunt"}}
+	var snare_hunt_synergy: Dictionary = tile_system.get_synergy_bonus(snare_hunt_pair, 1, route.size())
+	assert(is_equal_approx(float(snare_hunt_synergy.get("spawn_bonus", 0.0)), -0.06) and is_equal_approx(float(snare_hunt_synergy.get("reward", 0.0)), 0.12), "snare/hunt recipe must trade fewer encounters for improved rewards")
+	var rift_signal_pair := {"1": {"id": "rift"}, "2": {"id": "signal"}}
+	var rift_signal_synergy: Dictionary = tile_system.get_synergy_bonus(rift_signal_pair, 1, route.size())
+	assert(is_equal_approx(float(rift_signal_synergy.get("enemy_bonus", 0.0)), 0.08) and is_equal_approx(float(rift_signal_synergy.get("reward", 0.0)), 0.20), "rift/signal recipe must increase both risk and reward")
 	var ward_hunt_tiles := {"4": {"id": "ward"}, "5": {"id": "hunt"}}
 	var healing_synergy: Dictionary = tile_system.get_synergy_bonus(ward_hunt_tiles, 4, route.size())
 	assert(int(healing_synergy.get("heal", 0)) == 4, "ward next to hunt must grant the configured synergy heal")

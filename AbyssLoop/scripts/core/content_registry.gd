@@ -165,7 +165,11 @@ const TILE_SYNERGIES := [
 	{"id": "ward_hunt", "name": "Безопасная охота", "trigger_tile": "ward", "neighbor_tile": "hunt", "effects": {"heal": 4}, "description": "Защитный маяк рядом с зоной охоты дополнительно лечит на 4 здоровья."},
 	{"id": "ward_pair", "name": "Защитный контур", "trigger_tile": "ward", "neighbor_tile": "ward", "effects": {"spawn_bonus": -0.10}, "description": "Соседний защитный маяк снижает вероятность столкновения на 10 процентных пунктов."},
 	{"id": "hunt_rift", "name": "Охота на разломе", "trigger_tile": "hunt", "neighbor_tile": "rift", "effects": {"reward_bonus": 0.25, "enemy_bonus": 0.05}, "description": "Зона охоты рядом с разломом повышает награду на 25%, но усиливает врага."},
-	{"id": "signal_cache", "name": "Резонанс снабжения", "trigger_tile": "signal", "neighbor_tile": "cache", "effects": {"scrap": 3, "reward_bonus": 0.10}, "description": "Резонатор рядом с узлом снабжения даёт +3 материала и повышает награду за бой на 10%."}
+	{"id": "signal_cache", "name": "Резонанс снабжения", "trigger_tile": "signal", "neighbor_tile": "cache", "effects": {"scrap": 3, "reward_bonus": 0.10}, "description": "Резонатор рядом с узлом снабжения даёт +3 материала и повышает награду за бой на 10%."},
+	{"id": "cache_hunt", "name": "Трофейный тайник", "trigger_tile": "cache", "neighbor_tile": "hunt", "effects": {"scrap": 2, "reward_bonus": 0.08}, "description": "Тайник у зоны охоты даёт +2 материала и повышает награду за победу на 8%."},
+	{"id": "snare_hunt", "name": "Подготовленная засада", "trigger_tile": "snare", "neighbor_tile": "hunt", "effects": {"reward_bonus": 0.12, "spawn_bonus": -0.06}, "description": "Сеть помогает выбрать цель: шанс столкновения снижен, но награда за победу выше."},
+	{"id": "signal_ward", "name": "Безопасный резонатор", "trigger_tile": "signal", "neighbor_tile": "ward", "effects": {"heal": 5, "reward_bonus": 0.05}, "description": "Оберег стабилизирует резонатор: +5 здоровья и +5% к награде следующего боя."},
+	{"id": "rift_signal", "name": "Питание разлома", "trigger_tile": "rift", "neighbor_tile": "signal", "effects": {"reward_bonus": 0.20, "enemy_bonus": 0.08}, "description": "Резонатор усиливает разлом: награда выше на 20%, но противники сильнее на 8%."},
 ]
 
 const ENEMIES := {

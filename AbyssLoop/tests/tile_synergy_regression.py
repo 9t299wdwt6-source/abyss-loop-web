@@ -11,6 +11,7 @@ ui = (ROOT / "scripts/ui/ui_controller.gd").read_text(encoding="utf-8")
 smoke = (ROOT / "tests/smoke_test.gd").read_text(encoding="utf-8")
 checks = {
     "control and rare tile definitions exist": '"snare": {' in registry and '"signal": {' in registry,
+    "new recipes add resource, safety and risk/reward choices": all(token in registry for token in ('"cache_hunt"', '"snare_hunt"', '"signal_ward"', '"rift_signal"')) and "cache_hunt_pair" in smoke and "rift_signal_pair" in smoke,
     "synergies have stable ids and effect maps": '"id": "supply_ward"' in registry and '"effects": {"scrap": 4}' in registry,
     "adjacency supports circular route wrapping": "posmod(index - 1, route_size)" in tile_system and "posmod(index + 1, route_size)" in tile_system,
     "neighbor effect types are aggregated": all(key in tile_system for key in ('"scrap"', '"heal"', '"reward_bonus"', '"spawn_bonus"', '"enemy_bonus"')),

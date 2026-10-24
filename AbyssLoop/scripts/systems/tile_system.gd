@@ -10,6 +10,16 @@ const WORLD_FIELD_KEYS := [
     "3:5", "4:5", "5:5", "6:5", "0:6", "9:6", "0:7", "1:7", "2:7", "7:7", "8:7", "9:7"
 ]
 const MAX_WORLD_TILES_PER_ROUTE_SECTOR := 2
+# Common route cards should shape a build; rare high-risk cards remain discoveries,
+# not one third of every late-run hand.
+const TILE_DRAW_WEIGHTS := {
+    "cache": 2.2,
+    "hunt": 1.4,
+    "ward": 2.0,
+    "snare": 1.8,
+    "rift": 0.35,
+    "signal": 0.45
+}
 # Caps are applied to all synergies triggered during one route-sector visit.
 # Keep the caps data-driven and shared by preview and actual expedition visits.
 const WORLD_SYNERGY_LIMITS := {
@@ -334,7 +344,17 @@ func draw_tile(rng: RandomNumberGenerator, unlock_rift: bool) -> Dictionary:
     if unlock_rift:
         choices.append("rift")
         choices.append("signal")
-    var tile_id: String = choices[rng.randi_range(0, choices.size() - 1)]
+    var total_weight := 0.0
+    for choice_value in choices:
+        total_weight += maxf(0.01, float(TILE_DRAW_WEIGHTS.get(str(choice_value), 1.0)))
+    var roll := rng.randf() * total_weight
+    var tile_id := str(choices.back())
+    for choice_value in choices:
+        var choice_id := str(choice_value)
+        roll -= maxf(0.01, float(TILE_DRAW_WEIGHTS.get(choice_id, 1.0)))
+        if roll < 0.0:
+            tile_id = choice_id
+            break
     var def: Dictionary = ContentRegistry.TILE_DEFS[tile_id]
     return {"id": tile_id, "name": def.name, "short": def.short, "kind": def.kind, "color": def.color, "description": def.description, "uid": str(rng.randi())}
 
