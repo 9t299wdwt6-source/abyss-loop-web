@@ -18,7 +18,9 @@ const TILE_DRAW_WEIGHTS := {
     "ward": 2.0,
     "snare": 1.8,
     "rift": 0.35,
-    "signal": 0.45
+    "signal": 0.45,
+    "archive": 0.35,
+    "nursery": 0.30
 }
 # Caps are applied to all synergies triggered during one route-sector visit.
 # Keep the caps data-driven and shared by preview and actual expedition visits.
@@ -344,6 +346,8 @@ func draw_tile(rng: RandomNumberGenerator, unlock_rift: bool) -> Dictionary:
     if unlock_rift:
         choices.append("rift")
         choices.append("signal")
+        choices.append("archive")
+        choices.append("nursery")
     var total_weight := 0.0
     for choice_value in choices:
         total_weight += maxf(0.01, float(TILE_DRAW_WEIGHTS.get(str(choice_value), 1.0)))
@@ -396,6 +400,16 @@ func apply_tile_visit(tile: Dictionary, ledger: Dictionary, hero: Dictionary, lo
             result.spawn_bonus = 0.15
             result.reward_bonus = 0.30
             result.messages.append("Резонатор: +2 материала; риск и потенциальная награда повышены.")
+        "archive":
+            resource_system.add(ledger, "scrap", 2)
+            resource_system.add(ledger, "crystals", 1)
+            result.reward_bonus = 0.08
+            result.messages.append("Архив старой экспедиции: +2 материала, +1 кристалл и +8% к награде за бой.")
+        "nursery":
+            result.spawn_bonus = 0.28
+            result.enemy_bonus = 0.12
+            result.reward_bonus = 0.25
+            result.messages.append("Питомник бездны выводит угрозу: вероятность встречи и сила врагов выше, но награда увеличена на 25%.")
     return result
 
 func get_synergy_bonus(placed_tiles: Dictionary, index: int, route_size: int = 0) -> Dictionary:
@@ -495,4 +509,8 @@ func _get_base_forecast(tile_id: String) -> Dictionary:
             return {"spawn": "−12 п.п.", "enemy": "−10%", "reward": Localization.text("tile.forecast.no_change")}
         "signal":
             return {"spawn": "+15 п.п.", "enemy": Localization.text("tile.forecast.no_change"), "reward": "+30%"}
+        "archive":
+            return {"spawn": Localization.text("tile.forecast.no_change"), "enemy": Localization.text("tile.forecast.no_change"), "reward": "+8%", "scrap": 2, "crystals": 1}
+        "nursery":
+            return {"spawn": "+28 п.п.", "enemy": "+12%", "reward": "+25%"}
     return {"spawn": Localization.text("tile.forecast.no_change"), "enemy": Localization.text("tile.forecast.no_change"), "reward": Localization.text("tile.forecast.no_change")}

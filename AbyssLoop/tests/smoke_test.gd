@@ -306,13 +306,19 @@ func _run_tests() -> void:
 	var unlocked_draw_count := 1200
 	for _draw_index in range(unlocked_draw_count):
 		var common_draw: Dictionary = tile_system.draw_tile(tile_draw_rng, false)
-		if str(common_draw.get("id", "")) in ["rift", "signal"]:
+		if str(common_draw.get("id", "")) in ["rift", "signal", "archive", "nursery"]:
 			locked_rare_tiles += 1
 		var unlocked_draw: Dictionary = tile_system.draw_tile(tile_draw_rng, true)
-		if str(unlocked_draw.get("id", "")) in ["rift", "signal"]:
+		if str(unlocked_draw.get("id", "")) in ["rift", "signal", "archive", "nursery"]:
 			unlocked_rare_tiles += 1
-	assert(locked_rare_tiles == 0, "rare rift/signal cards must remain locked until unlock conditions")
-	assert(unlocked_rare_tiles >= 35 and unlocked_rare_tiles <= 220, "unlocked rare cards should be discoveries, not one third of the card pool")
+	assert(locked_rare_tiles == 0, "rare rift/signal/archive/nursery cards must remain locked until unlock conditions")
+	assert(unlocked_rare_tiles >= 140 and unlocked_rare_tiles <= 270, "unlocked rare cards should be discoveries, not one third of the card pool")
+	var structure_ledger := {"scrap": 0, "crystals": 0}
+	var structure_hero := {"hp": 15, "max_hp": 30}
+	var archive_result: Dictionary = tile_system.apply_tile_visit({"id": "archive"}, structure_ledger, structure_hero, 2)
+	assert(int(structure_ledger.get("scrap", 0)) == 2 and int(structure_ledger.get("crystals", 0)) == 1 and is_equal_approx(float(archive_result.get("reward_bonus", 0.0)), 0.08), "archive structure must pay its crystal/scrap reward through real tile visit")
+	var nursery_result: Dictionary = tile_system.apply_tile_visit({"id": "nursery"}, structure_ledger, structure_hero, 2)
+	assert(is_equal_approx(float(nursery_result.get("spawn_bonus", 0.0)), 0.28) and is_equal_approx(float(nursery_result.get("enemy_bonus", 0.0)), 0.12) and is_equal_approx(float(nursery_result.get("reward_bonus", 0.0)), 0.25), "abyss nursery must create a deliberate risk/reward sector")
 	var cache_ward_tiles := {"2": {"id": "cache"}, "3": {"id": "ward"}}
 	var supply_synergy: Dictionary = tile_system.get_synergy_bonus(cache_ward_tiles, 2, route.size())
 	assert(int(supply_synergy.get("scrap", 0)) == 4, "cache next to ward must grant the configured synergy materials")
@@ -325,6 +331,12 @@ func _run_tests() -> void:
 	var rift_signal_pair := {"1": {"id": "rift"}, "2": {"id": "signal"}}
 	var rift_signal_synergy: Dictionary = tile_system.get_synergy_bonus(rift_signal_pair, 1, route.size())
 	assert(is_equal_approx(float(rift_signal_synergy.get("enemy_bonus", 0.0)), 0.08) and is_equal_approx(float(rift_signal_synergy.get("reward", 0.0)), 0.20), "rift/signal recipe must increase both risk and reward")
+	var archive_cache_pair := {"1": {"id": "archive"}, "2": {"id": "cache"}}
+	var archive_cache_synergy: Dictionary = tile_system.get_synergy_bonus(archive_cache_pair, 1, route.size())
+	assert(int(archive_cache_synergy.get("scrap", 0)) == 4 and is_equal_approx(float(archive_cache_synergy.get("reward", 0.0)), 0.08), "archive/cache recipe must convert location planning into supplies")
+	var nursery_rift_pair := {"1": {"id": "nursery"}, "2": {"id": "rift"}}
+	var nursery_rift_synergy: Dictionary = tile_system.get_synergy_bonus(nursery_rift_pair, 1, route.size())
+	assert(is_equal_approx(float(nursery_rift_synergy.get("enemy_bonus", 0.0)), 0.10) and is_equal_approx(float(nursery_rift_synergy.get("reward", 0.0)), 0.25), "nursery/rift recipe must amplify risk for extra payout")
 	var ward_hunt_tiles := {"4": {"id": "ward"}, "5": {"id": "hunt"}}
 	var healing_synergy: Dictionary = tile_system.get_synergy_bonus(ward_hunt_tiles, 4, route.size())
 	assert(int(healing_synergy.get("heal", 0)) == 4, "ward next to hunt must grant the configured synergy heal")

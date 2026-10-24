@@ -153,6 +153,14 @@ const TILE_DEFS := {
 	"signal": {
 		"name": "Кристалл-резонатор", "short": "КРИСТАЛЛ", "kind": "rare",
 		"color": "#d8b4ee", "description": "Редкий рискованный тайл: увеличивает награду и немного повышает вероятность столкновения."
+	},
+	"archive": {
+		"name": "Архив старой экспедиции", "short": "АРХИВ", "kind": "knowledge",
+		"color": "#76a8da", "description": "Редкая постройка в стороне от дороги: на каждом проходе приносит кристалл и повышает боевую награду."
+	},
+	"nursery": {
+		"name": "Питомник бездны", "short": "ПИТОМНИК", "kind": "danger",
+		"color": "#a7c96b", "description": "Редкая постройка, где опасность растёт вместе с добычей: враги сильнее, но награда заметно выше."
 	}
 }
 
@@ -170,6 +178,10 @@ const TILE_SYNERGIES := [
 	{"id": "snare_hunt", "name": "Подготовленная засада", "trigger_tile": "snare", "neighbor_tile": "hunt", "effects": {"reward_bonus": 0.12, "spawn_bonus": -0.06}, "description": "Сеть помогает выбрать цель: шанс столкновения снижен, но награда за победу выше."},
 	{"id": "signal_ward", "name": "Безопасный резонатор", "trigger_tile": "signal", "neighbor_tile": "ward", "effects": {"heal": 5, "reward_bonus": 0.05}, "description": "Оберег стабилизирует резонатор: +5 здоровья и +5% к награде следующего боя."},
 	{"id": "rift_signal", "name": "Питание разлома", "trigger_tile": "rift", "neighbor_tile": "signal", "effects": {"reward_bonus": 0.20, "enemy_bonus": 0.08}, "description": "Резонатор усиливает разлом: награда выше на 20%, но противники сильнее на 8%."},
+	{"id": "archive_cache", "name": "Каталог находок", "trigger_tile": "archive", "neighbor_tile": "cache", "effects": {"scrap": 4, "reward_bonus": 0.08}, "description": "Архив сортирует находки тайника: +4 материала и +8% к боевой награде."},
+	{"id": "archive_ward", "name": "Тихий читальный зал", "trigger_tile": "archive", "neighbor_tile": "ward", "effects": {"heal": 3, "spawn_bonus": -0.05}, "description": "Оберег стабилизирует архив: +3 здоровья и ниже шанс столкновения."},
+	{"id": "nursery_rift", "name": "Инкубатор разлома", "trigger_tile": "nursery", "neighbor_tile": "rift", "effects": {"reward_bonus": 0.25, "enemy_bonus": 0.10}, "description": "Разлом подпитывает питомник: сильные враги несут на 25% больше награды."},
+	{"id": "nursery_snare", "name": "Сдержанный выводок", "trigger_tile": "nursery", "neighbor_tile": "snare", "effects": {"spawn_bonus": -0.10, "enemy_bonus": -0.05}, "description": "Сеть перехвата удерживает выводок: вероятность боя и сила врагов снижены."},
 ]
 
 const ENEMIES := {
