@@ -63,6 +63,29 @@ const SECRET_RELIC_TEMPLATES := {
 	"snare_hunter_core": {"name": "Ядро приманивающего импульса", "slot": "core", "archetype": "resonance", "archetype_name": "Резонанс", "archetype_description": "Тайная реликвия Сети: увеличивает награду и слегка повышает шанс новой встречи.", "set_id": "resonance", "stats": {"speed": 0.07, "crit": 0.03, "reward_bonus": 0.18, "tile_spawn_bonus": 0.06}}
 }
 
+# Prefix/suffix affixes make rare drops differ beyond a single rarity multiplier.
+# Affix effects use the same stat keys as equipment archetypes and are applied centrally.
+const ITEM_AFFIXES := {
+	"keen_edge": {"name": "Точная грань", "description": "+1 атака и +1,5% к критическому шансу.", "slot": "weapon", "position": "prefix", "stats": {"attack": 1, "crit": 0.015}},
+	"barbed_edge": {"name": "Зубчатая кромка", "description": "+7% к шансу кровотечения и +1 к его урону.", "slot": "weapon", "position": "prefix", "stats": {"bleed_chance": 0.07, "bleed_damage": 1}},
+	"hungry_steel": {"name": "Голодная сталь", "description": "+1 атака и +1 лечение после победы.", "slot": "weapon", "position": "prefix", "stats": {"attack": 1, "kill_heal": 1}},
+	"deep_mark": {"name": "Клеймо глубин", "description": "+2,5% к критическому шансу и +2% к награде.", "slot": "weapon", "position": "suffix", "stats": {"crit": 0.025, "reward_bonus": 0.02}},
+	"bleeding_grooves": {"name": "Кровавые насечки", "description": "+6% к шансу кровотечения и +1 к его урону.", "slot": "weapon", "position": "suffix", "stats": {"bleed_chance": 0.06, "bleed_damage": 1}},
+	"reaping_echo": {"name": "Эхо жатвы", "description": "+1 лечение после победы.", "slot": "weapon", "position": "suffix", "stats": {"kill_heal": 1}},
+	"reinforced_plate": {"name": "Усиленная пластина", "description": "+1 защита и +4 здоровья.", "slot": "armor", "position": "prefix", "stats": {"defense": 1, "hp": 4}},
+	"moss_lining": {"name": "Моховая подкладка", "description": "+8 здоровья и +2 лечения после события.", "slot": "armor", "position": "prefix", "stats": {"hp": 8, "event_heal": 2}},
+	"phase_guard": {"name": "Фазовый щит", "description": "+1 защита и +3 барьера в начале боя.", "slot": "armor", "position": "prefix", "stats": {"defense": 1, "barrier_on_encounter": 3}},
+	"quiet_march": {"name": "Тихий переход", "description": "−4 п.п. к шансу встречи и +3 здоровья.", "slot": "armor", "position": "suffix", "stats": {"tile_spawn_bonus": -0.04, "hp": 3}},
+	"cartographer_stitch": {"name": "Картографский шов", "description": "+1 материал при посещении тайла и +2% к награде.", "slot": "armor", "position": "suffix", "stats": {"tile_scrap": 1, "reward_bonus": 0.02}},
+	"after_event_patch": {"name": "Запасная заплата", "description": "+3 лечения после события и +1 после победы.", "slot": "armor", "position": "suffix", "stats": {"event_heal": 3, "kill_heal": 1}},
+	"resonant_coil": {"name": "Резонансная катушка", "description": "+2% к скорости и +2% к критическому шансу.", "slot": "core", "position": "prefix", "stats": {"speed": 0.02, "crit": 0.02}},
+	"volatile_cell": {"name": "Нестабильная ячейка", "description": "+3% к скорости, но встречи вероятнее на 4 п.п.", "slot": "core", "position": "prefix", "stats": {"speed": 0.03, "tile_spawn_bonus": 0.04}},
+	"steady_heart": {"name": "Сердце ритма", "description": "+5 здоровья и +1% к скорости.", "slot": "core", "position": "prefix", "stats": {"hp": 5, "speed": 0.01}},
+	"route_echo": {"name": "Эхо маршрута", "description": "+5% к награде и +1% к критическому шансу.", "slot": "core", "position": "suffix", "stats": {"reward_bonus": 0.05, "crit": 0.01}},
+	"pathfinder_calibration": {"name": "Калибратор пути", "description": "−4 п.п. к шансу встречи и +3% к награде.", "slot": "core", "position": "suffix", "stats": {"tile_spawn_bonus": -0.04, "reward_bonus": 0.03}},
+	"impulse_overload": {"name": "Контур импульса", "description": "+1 атака и +1,5% к скорости.", "slot": "core", "position": "suffix", "stats": {"attack": 1, "speed": 0.015}}
+}
+
 const SYNERGY_DEFS := {
 	"overclock_assault": {
 		"name": "Контур перегрузки",
@@ -168,7 +191,79 @@ func roll_item(rng: RandomNumberGenerator, loop_count: int, hero_level: int) -> 
 			if item.has(stat_key):
 				item[stat_key] = item.get(stat_key, 0) + archetype_stats_value[stat_key_value]
 	item["power"] = item_power(item)
-	return item
+	return apply_random_affixes(item, rng)
+
+func _roll_item_affix(slot: String, position: String, rng: RandomNumberGenerator) -> Dictionary:
+	var candidates: Array[Dictionary] = []
+	for affix_id_value in ITEM_AFFIXES.keys():
+		var affix_id := str(affix_id_value)
+		var affix: Dictionary = ITEM_AFFIXES[affix_id_value]
+		if str(affix.get("slot", "")) != slot or str(affix.get("position", "")) != position:
+			continue
+		var candidate := affix.duplicate(true)
+		candidate["id"] = affix_id
+		candidates.append(candidate)
+	if candidates.is_empty():
+		return {}
+	return candidates[rng.randi_range(0, candidates.size() - 1)].duplicate(true)
+
+func apply_random_affixes(item: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
+	var result := item.duplicate(true)
+	result["affix_ids"] = []
+	result["affix_names"] = []
+	result["affix_description"] = ""
+	var rarity := str(result.get("rarity", "Обычный"))
+	if rarity not in ["Редкий", "Эпический"]:
+		result["power"] = item_power(result)
+		return result
+	var slot := str(result.get("slot", ""))
+	var prefix := _roll_item_affix(slot, "prefix", rng)
+	var suffix: Dictionary = {}
+	var selected: Array[Dictionary] = []
+	if not prefix.is_empty():
+		selected.append(prefix)
+	if rarity == "Эпический":
+		suffix = _roll_item_affix(slot, "suffix", rng)
+		if not suffix.is_empty():
+			selected.append(suffix)
+	var affix_ids: Array[String] = []
+	var affix_names: Array[String] = []
+	var affix_descriptions: Array[String] = []
+	for affix in selected:
+		var affix_id := str(affix.get("id", ""))
+		if affix_id.is_empty():
+			continue
+		affix_ids.append(affix_id)
+		affix_names.append(str(affix.get("name", affix_id)))
+		affix_descriptions.append(str(affix.get("description", "")))
+		var stats_value: Variant = affix.get("stats", {})
+		if typeof(stats_value) != TYPE_DICTIONARY:
+			continue
+		var stats: Dictionary = stats_value
+		for stat_key_value in stats.keys():
+			var stat_key := str(stat_key_value)
+			if not result.has(stat_key):
+				continue
+			var delta_value: Variant = stats[stat_key_value]
+			if stat_key in ["attack", "defense", "hp", "kill_heal", "tile_scrap", "event_heal", "bleed_damage", "barrier_on_encounter"]:
+				result[stat_key] = int(result.get(stat_key, 0)) + int(delta_value)
+			else:
+				result[stat_key] = float(result.get(stat_key, 0.0)) + float(delta_value)
+	result["affix_ids"] = affix_ids
+	result["affix_names"] = affix_names
+	result["affix_description"] = " ".join(affix_descriptions).strip_edges()
+	if not selected.is_empty():
+		var name_parts: Array[String] = [str(SLOT_NAMES.get(slot, slot))]
+		if not prefix.is_empty():
+			name_parts.append(str(prefix.get("name", "")))
+		name_parts.append(str(result.get("archetype_name", "Стандарт")))
+		if not suffix.is_empty():
+			name_parts.append(str(suffix.get("name", "")))
+		name_parts.append(rarity)
+		result["name"] = " · ".join(name_parts.filter(func(part: String) -> bool: return not part.is_empty()))
+	_apply_build_stat_caps(result)
+	result["power"] = item_power(result)
+	return result
 
 func roll_boss_item(enemy: Dictionary, rng: RandomNumberGenerator, loop_count: int, hero_level: int) -> Dictionary:
 	var boss_id := str(enemy.get("id", ""))
