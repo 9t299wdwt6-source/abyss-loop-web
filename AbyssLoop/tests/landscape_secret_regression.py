@@ -10,7 +10,7 @@ checks={
     "secret events require explicit per-run discovery flags and resolve once": all(token in registry for token in ('"archive_rift_echo": {','"sealed_brood": {','"requires_flag": "secret_archive_rift_found"','"requires_flag": "secret_nursery_snare_found"','"resolved_flag": "secret_archive_rift_claimed"','"resolved_flag": "secret_nursery_snare_claimed"')),
     "secret events bypass regular random rolls only after discovery": "guaranteed_candidates" in event_system and 'definition.get("guaranteed_when_flag", false)' in event_system and "candidates = guaranteed_candidates" in event_system,
     "landscape secrets require orthogonal neighboring tiles in the same route sector": "LANDSCAPE_SECRET_RECIPES" in manager and "Vector2i(col + 1, row), Vector2i(col, row + 1)" in manager and 'neighbor_tile.get("route_index", -1)) != route_index' in manager,
-    "secret flags are saved in the existing expedition ledger and do not replay": 'run_ledger["event_flags"] = flags' in manager and 'bool(flags.get(flag_id, false))' in manager and "TАЙНА ОБНАРУЖЕНА" not in manager,
+    "secret flags are saved in the existing expedition ledger, logged to the player and do not replay": 'run_ledger["event_flags"] = flags' in manager and 'bool(flags.get(flag_id, false))' in manager and "ТАЙНА ОБНАРУЖЕНА" in manager,
     "secret event outcomes have distinct risk/reward decisions": all(token in registry for token in ('"seal_echo"','"follow_echo"','"spare_brood"','"hunt_brood"','"danger_delta": 0.15','"spawn_bonus": 0.16')),
     "Godot smoke tests exercise both secrets and duplicate prevention": all(token in smoke for token in ("archive_secret_event", "brood_secret_event", "secret_unseen_event", "_discover_landscape_secrets(7", "_discover_landscape_secrets(8")),
 }
