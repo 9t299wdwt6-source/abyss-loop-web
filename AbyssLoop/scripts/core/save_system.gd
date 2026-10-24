@@ -366,14 +366,15 @@ func _canonical_json(value: Variant) -> String:
 		var numeric_value: float = float(value)
 		if not is_finite(numeric_value):
 			return JSON.stringify(numeric_value)
-		if absf(numeric_value) <= 9007199254740991.0 and floor(numeric_value) == numeric_value:
-			return str(int(numeric_value))
-		# Web/WASM may use single-precision real values even when the desktop build
-		# preserves more bits. Encode ordinary gameplay fractions at a stable
-		# decimal precision so values such as 0.7 and 0.699999988 hash identically.
-		if absf(numeric_value) <= 1000000.0:
-			return String.num(numeric_value, 7)
-		return JSON.stringify(numeric_value)
+		# Canonicalize through IEEE-754 float32 before formatting. This matches
+		# Web/WASM's real-value precision and prevents desktop doubles and browser
+		# floats from hashing distinct decimal spellings of the same stored value.
+		var stable_value: float = PackedFloat32Array([numeric_value])[0]
+		if absf(stable_value) <= 9007199254740991.0 and floor(stable_value) == stable_value:
+			return str(int(stable_value))
+		if absf(stable_value) <= 1000000.0:
+			return String.num(stable_value, 7)
+		return JSON.stringify(stable_value)
 	return JSON.stringify(value)
 
 func _validate_save_data(data: Dictionary) -> bool:

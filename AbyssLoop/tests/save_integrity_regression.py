@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import struct
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,10 +42,12 @@ def canonical(value):
     if isinstance(value, list):
         return "[" + ",".join(canonical(item) for item in value) + "]"
     if isinstance(value, float) and math.isfinite(value):
-        if abs(value) <= 9007199254740991 and value.is_integer():
-            return str(int(value))
-        if abs(value) <= 1000000:
-            return f"{value:.7f}"
+        stable = struct.unpack("!f", struct.pack("!f", value))[0]
+        if abs(stable) <= 9007199254740991 and stable.is_integer():
+            return str(int(stable))
+        if abs(stable) <= 1000000:
+            return f"{stable:.7f}"
+        return json.dumps(stable, ensure_ascii=False, separators=(",", ":"))
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 left = {"scrap": 41, "settings": {"music": 0.7, "master": 0.8}, "saved_expedition": {}}
