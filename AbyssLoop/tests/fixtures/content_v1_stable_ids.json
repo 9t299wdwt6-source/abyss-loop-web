@@ -1,7 +1,9 @@
 {
   "Тайлы ландшафта": [
+    "archive",
     "cache",
     "hunt",
+    "nursery",
     "rift",
     "signal",
     "snare",
@@ -22,7 +24,9 @@
     "tank"
   ],
   "Боссы": [
+    "bellkeeper",
     "harvester",
+    "matriarch",
     "warden"
   ],
   "Боевые статусы": [
@@ -117,9 +121,17 @@
     "shrine"
   ],
   "Синергии ландшафта": [
+    "archive_cache",
+    "archive_ward",
+    "cache_hunt",
     "double_cache",
     "hunt_rift",
+    "nursery_rift",
+    "nursery_snare",
+    "rift_signal",
     "signal_cache",
+    "signal_ward",
+    "snare_hunt",
     "supply_ward",
     "ward_hunt",
     "ward_pair"

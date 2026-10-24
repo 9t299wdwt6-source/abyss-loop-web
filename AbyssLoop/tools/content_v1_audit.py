@@ -167,6 +167,11 @@ def validate_catalogs(catalogs: dict[str, Any]) -> list[str]:
     for bid, boss in r["BOSSES"].items():
         for f in ["name", "special_name", "hp", "attack", "attack_interval", "xp", "scrap", "crystal", "phases"]:
             if f not in boss or (isinstance(boss.get(f), str) and not boss[f].strip()): issues.append(f"boss:{bid} missing {f}")
+        special_effect_id = str(boss.get("special_effect_id", "wound"))
+        if special_effect_id not in r["STATUS_EFFECTS"]:
+            issues.append(f"boss:{bid} references unknown special status {special_effect_id}")
+        if float(boss.get("special_effect_duration", 4.0)) <= 0 or float(boss.get("special_effect_magnitude", 0.12)) < 0:
+            issues.append(f"boss:{bid} has invalid special-effect duration/magnitude")
         phases = boss.get("phases", [])
         if not isinstance(phases, list) or len(phases) < 2: issues.append(f"boss:{bid} needs at least two phases"); continue
         thresholds = []

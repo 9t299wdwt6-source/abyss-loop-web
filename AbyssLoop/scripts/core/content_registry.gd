@@ -238,6 +238,8 @@ const BOSSES := {
 		"name": "Светожор — сборщик импульсов", "hp": 104, "attack": 9, "defense": 2,
 		"attack_interval": 1.18, "xp": 32, "scrap": 21, "crystal": 5,
 		"role": "boss", "special_name": "Импульсный разряд",
+		"special_effect_id": "distortion", "special_effect_duration": 3.5, "special_effect_magnitude": 0.18,
+		"special_effect_log": "Импульсный разряд замедляет атаки героя.",
 		"phases": [
 			{"threshold": 1.0, "name": "Сбор", "attack_multiplier": 1.0, "defense_bonus": 0, "attack_interval": 1.18, "special_every": 3, "telegraph": "Сборщик собирает импульсный заряд."},
 			{"threshold": 0.66, "name": "Перегрузка контура", "attack_multiplier": 1.15, "defense_bonus": 0, "attack_interval": 1.02, "special_every": 3, "telegraph": "Сборщик начинает нестабильную перезарядку.", "status_on_enter": {"target": "boss", "id": "regeneration", "duration": 3.0, "magnitude": 3.0}},
@@ -260,8 +262,8 @@ const BOSSES := {
 		"name": "Глашатай пустого колокола", "hp": 112, "attack": 11, "defense": 2,
 		"attack_interval": 1.30, "xp": 38, "scrap": 25, "crystal": 6,
 		"role": "boss", "special_name": "Резонанс тишины",
-		"special_effect_id": "distortion", "special_effect_duration": 4.0, "special_effect_magnitude": 0.22,
-		"special_effect_log": "Резонанс пустого колокола искажает импульсы героя и замедляет его атаки.",
+		"special_effect_id": "weakness", "special_effect_duration": 3.0, "special_effect_magnitude": 0.18,
+		"special_effect_log": "Звон пустого колокола ослабляет следующий ответный удар героя.",
 		"phases": [
 			{"threshold": 1.0, "name": "Первый звон", "attack_multiplier": 1.0, "defense_bonus": 0, "attack_interval": 1.30, "special_every": 3, "telegraph": "Глашатай настраивает пустой колокол."},
 			{"threshold": 0.66, "name": "Эхо в костях", "attack_multiplier": 1.18, "defense_bonus": 1, "attack_interval": 1.14, "special_every": 3, "telegraph": "Звон возвращается с искажённой частотой.", "status_on_enter": {"target": "hero", "id": "weakness", "duration": 3.0, "magnitude": 0.18}},

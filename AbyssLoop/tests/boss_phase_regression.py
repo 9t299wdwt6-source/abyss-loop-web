@@ -11,7 +11,8 @@ ui = (ROOT / "scripts/ui/ui_controller.gd").read_text(encoding="utf-8")
 smoke = (ROOT / "tests/smoke_test.gd").read_text(encoding="utf-8")
 checks = {
     "all four bosses have multi-phase definitions": registry.count('"threshold": 0.66') >= 4 and registry.count('"threshold": 0.33') >= 4 and all(token in registry for token in ('"warden": {', '"harvester": {', '"matriarch": {', '"bellkeeper": {')),
-    "boss registry defines different special effects": all(token in registry for token in ('"special_effect_id": "distortion"', '"special_effect_id": "poison"', '"special_effect_id": "weakness"')) and 'fighter.get("special_effect_id", "wound")' in manager,
+    "boss registry defines four different special effects": all(token in registry for token in ('"special_effect_id": "distortion"', '"special_effect_id": "poison"', '"special_effect_id": "weakness"')) and 'fighter.get("special_effect_id", "wound")' in manager,
+    "content audit validates per-boss special status and duration": 'special_effect_id not in r["STATUS_EFFECTS"]' in (ROOT / "tools/content_v1_audit.py").read_text(encoding="utf-8") and 'special_effect_duration' in (ROOT / "tools/content_v1_audit.py").read_text(encoding="utf-8"),
     "phase definitions tune attack, defense, cadence and warning": all(key in registry for key in ('"attack_multiplier"', '"defense_bonus"', '"special_every"', '"telegraph"')),
     "boss instance stores scaled baseline stats and phase data": all(key in enemies for key in ('"base_attack"', '"base_defense"', '"phase_index"', '"phase_name"', '"phases"', '"phase_telegraph"')),
     "health thresholds trigger one-way phase advancement": "func _update_boss_phase" in manager and 'enemy["phase_index"] = next_phase' in manager and 'hp_ratio > float(phase.get("threshold", 0.0))' in manager,

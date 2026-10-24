@@ -12,6 +12,7 @@ checks = {
     "new bosses have different multi-phase attack patterns": all(token in registry for token in ('"Матриарх мшистой гнили"', '"Глашатай пустого колокола"', '"Споровый шторм"', '"Последняя тишина"')),
     "boss special effects travel from data registry into combat status application": all(token in enemies for token in ('"special_effect_id": str(def.get("special_effect_id", "wound"))', '"special_effect_duration"', '"special_effect_magnitude"')) and 'status_effect_system.apply_effect(hero, boss_effect_id' in manager,
     "the new boss relics offer distinct build directions and matched sets": all(token in inventory for token in ('"matriarch_scythe"', '"matriarch_mantle"', '"bell_tuning_fork"', '"bell_veil"')),
+    "the content readiness audit rejects missing or invalid special status definitions": 'special_effect_id not in r["STATUS_EFFECTS"]' in (ROOT / "tools/content_v1_audit.py").read_text(encoding="utf-8"),
     "Godot smoke checks four milestones and four distinct special effects": all(token in smoke for token in ('boss_special_effects.has("wound")', 'boss_special_effects.has("distortion")', 'boss_special_effects.has("poison")', 'boss_special_effects.has("weakness")')),
 }
 failed=[name for name,ok in checks.items() if not ok]
