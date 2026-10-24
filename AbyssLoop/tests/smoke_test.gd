@@ -517,10 +517,10 @@ func _run_tests() -> void:
 		var secret_relic: Dictionary = inventory_system.make_secret_relic(str(secret_relic_id), 4, 5, 9981)
 		assert(not secret_relic.is_empty() and bool(secret_relic.get("is_secret_relic", false)) and str(secret_relic.get("rarity", "")) == "Тайная", "each secret choice must create a named secret-rarity item")
 		assert(not str(secret_relic.get("id", "")).is_empty() and float(secret_relic.get("power", 0.0)) > 0.0 and int(secret_relic.get("rank", 0)) > 0, "secret relics need a stable identity, ranked stats and usable item power")
+		assert(int(inventory_system.get_upgrade_cost(secret_relic).get("scrap", 0)) > 0 and int(inventory_system.get_salvage_reward(secret_relic).get("crystals", 0)) >= 2, "secret relics must participate in upgrade and salvage systems")
 	var repeated_seed_relic_a: Dictionary = inventory_system.make_secret_relic("echo_chart_core", 4, 5, 9981, 1)
 	var repeated_seed_relic_b: Dictionary = inventory_system.make_secret_relic("echo_chart_core", 4, 5, 9981, 2)
 	assert(str(repeated_seed_relic_a.get("id", "")) != str(repeated_seed_relic_b.get("id", "")), "replaying the same public seed on separate runs must not collapse unique relic inventory IDs")
-		assert(int(inventory_system.get_upgrade_cost(secret_relic).get("scrap", 0)) > 0 and int(inventory_system.get_salvage_reward(secret_relic).get("crystals", 0)) >= 2, "secret relics must participate in upgrade and salvage systems")
 	assert(inventory_system.make_secret_relic("unregistered_secret_item", 1, 1, 9981).is_empty(), "unregistered secret loot identifiers must be rejected")
 	var item_rng := RandomNumberGenerator.new()
 	item_rng.seed = 77531
