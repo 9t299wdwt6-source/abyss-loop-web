@@ -8,7 +8,7 @@
 
 ## Последняя подтверждённая сборка
 
-GitHub Actions: [успешная сборка, runtime приёмка, Chromium gameplay flow и деплой](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40022721056).
+GitHub Actions: [последняя успешная сборка, runtime приёмка, Chromium gameplay flow и деплой](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40072985596).
 
 - Godot 4.7.2: импорт и Web-экспорт — PASS.
 - Static/regression suite — **81/81 PASS**.

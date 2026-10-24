@@ -123,6 +123,12 @@ jobs:
           rm -rf "$HOME/.local/share/godot/app_userdata/Abyss Loop CI Acceptance"
           timeout 30s "$GODOT_BIN" --headless --path "$test_root" res://tests/expedition_runtime_acceptance_runner.tscn
 
+      - name: Run 12-loop long expedition runtime acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 90s "$GODOT_BIN" --headless --path "$test_root" res://tests/long_expedition_runtime_acceptance_runner.tscn
+
       - name: Capture five automated engine runs for Stage64B
         shell: bash
         run: |
