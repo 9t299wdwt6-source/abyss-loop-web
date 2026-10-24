@@ -273,8 +273,9 @@ func _decode_save(raw: String) -> Dictionary:
 		if typeof(checksum_value) != TYPE_STRING or not str(checksum_value).is_valid_hex_number(false) or str(checksum_value).length() != 64:
 			return _reject_decoded_save("integrity_checksum_format_invalid")
 		var checksum_data: Dictionary = data_value
-		if str(checksum_value).to_lower() != _payload_checksum(checksum_data):
-			return _reject_decoded_save("integrity_checksum_mismatch")
+		var actual_checksum: String = _payload_checksum(checksum_data)
+		if str(checksum_value).to_lower() != actual_checksum:
+			return _reject_decoded_save("integrity_checksum_mismatch_expected_%s_actual_%s" % [str(checksum_value).substr(0, 12), actual_checksum.substr(0, 12)])
 
 	var data: Dictionary = data_value.duplicate(true)
 	# Version 1 stores permanent progress only. Version 2 added research and
@@ -320,10 +321,18 @@ func _encode_save(payload: Dictionary) -> String:
 	return JSON.stringify(packed, "\t")
 
 func _payload_checksum(payload: Dictionary) -> String:
+	# Hash the payload after a JSON encode/decode roundtrip. That is the actual
+	# representation written to user:// and prevents any runtime-specific Variant
+	# type from changing the checksum between save and load.
+	var encoded_payload := JSON.stringify(payload)
+	var parsed_payload: Variant = JSON.parse_string(encoded_payload)
+	if typeof(parsed_payload) != TYPE_DICTIONARY:
+		return ""
+	var normalized_payload: Dictionary = _normalize_numeric_types(parsed_payload)
 	var context := HashingContext.new()
 	if context.start(HashingContext.HASH_SHA256) != OK:
 		return ""
-	if context.update(_canonical_json(payload).to_utf8_buffer()) != OK:
+	if context.update(_canonical_json(normalized_payload).to_utf8_buffer()) != OK:
 		return ""
 	return context.finish().hex_encode()
 

@@ -52,6 +52,10 @@ func _run_tests() -> void:
 	assert(save_system._decode_save(JSON.stringify(downgraded_envelope)).is_empty(), "envelope v2 without checksum must be rejected")
 	assert(str(saved_envelope.get("integrity", {}).get("checksum", "")).length() == 64, "save checksum should be 64 hex characters")
 	assert(save_system._payload_checksum({"a": 1, "b": 2}) == save_system._payload_checksum({"b": 2, "a": 1}), "canonical checksum must ignore dictionary key insertion order")
+	var typed_roundtrip_payload := {"nested": {"decimal": 0.7, "whole": 1.0}, "items": [{"value": 0.85}]}
+	var parsed_roundtrip_payload: Variant = JSON.parse_string(JSON.stringify(typed_roundtrip_payload))
+	assert(typeof(parsed_roundtrip_payload) == TYPE_DICTIONARY, "JSON roundtrip fixture must parse as a dictionary")
+	assert(save_system._payload_checksum(typed_roundtrip_payload) == save_system._payload_checksum(parsed_roundtrip_payload), "payload checksum must hash the same persisted JSON representation before and after load")
 	assert(save_system._canonical_json({"scrap": 41, "settings": {"ui_scale": 1.0}}) == save_system._canonical_json({"scrap": 41.0, "settings": {"ui_scale": 1.0}}), "canonical JSON must normalize whole numbers to tolerate Web/WASM integer-to-float parsing")
 	assert(save_system._payload_checksum({"scrap": 41, "settings": {"ui_scale": 1.0}}) == save_system._payload_checksum({"scrap": 41.0, "settings": {"ui_scale": 1.0}}), "save checksum must remain stable when a JSON integer is parsed as a float")
 	assert(save_system._canonical_json({"settings": {"music": 0.7, "effects": 0.85}}) == save_system._canonical_json({"settings": {"music": 0.699999988079071, "effects": 0.8500000238418579}}), "canonical JSON must stabilize fractional numbers across Web/WASM precision conversion")
