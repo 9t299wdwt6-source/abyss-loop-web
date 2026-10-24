@@ -407,6 +407,15 @@ func _run_tests() -> void:
 	assert(str(configured_boss_group[0].get("phase_name", "")).length() > 0, "boss must expose its current phase")
 	assert(str(configured_boss_group[0].get("phase_telegraph", "")).length() > 0, "boss must expose a special-attack telegraph")
 	assert(int(configured_boss_group[0].get("crystal", 0)) >= 4, "boss must promise a meaningful rare-resource reward")
+	var boss_cycle_ids: Array[String] = []
+	var boss_special_effects: Dictionary = {}
+	for boss_loop in [3, 6, 9, 12]:
+		var cycle_boss: Dictionary = enemy_system.create_boss(boss_loop, 1.2, rng)
+		boss_cycle_ids.append(str(cycle_boss.get("id", "")))
+		boss_special_effects[str(cycle_boss.get("special_effect_id", ""))] = true
+		assert(cycle_boss.get("phases", []).size() >= 3 and not str(cycle_boss.get("special_effect_id", "")).is_empty(), "each scheduled boss must define phases and a special status effect")
+	assert(boss_cycle_ids == ["warden", "harvester", "matriarch", "bellkeeper"], "boss roster must rotate through four distinct bosses on the first four milestones")
+	assert(boss_special_effects.has("wound") and boss_special_effects.has("distortion") and boss_special_effects.has("poison") and boss_special_effects.has("weakness"), "boss roster must require different combat preparations")
 	var combat_system = CombatSystemType.new()
 	var defender := {"hp": 8, "defense": 0}
 	var attack: Dictionary = combat_system.perform_attack({"attack": 20, "crit": 0.0}, defender, rng)

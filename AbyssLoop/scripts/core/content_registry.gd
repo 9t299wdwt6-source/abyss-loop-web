@@ -231,6 +231,30 @@ const BOSSES := {
 			{"threshold": 0.66, "name": "Перегрузка контура", "attack_multiplier": 1.15, "defense_bonus": 0, "attack_interval": 1.02, "special_every": 3, "telegraph": "Сборщик начинает нестабильную перезарядку.", "status_on_enter": {"target": "boss", "id": "regeneration", "duration": 3.0, "magnitude": 3.0}},
 			{"threshold": 0.33, "name": "Разряд ядра", "attack_multiplier": 1.30, "defense_bonus": 1, "attack_interval": 0.92, "special_every": 2, "telegraph": "Сборщик готовит мощный импульсный разряд.", "status_on_enter": {"target": "boss", "id": "barrier", "duration": 4.0, "magnitude": 14.0}}
 		]
+	},
+	"matriarch": {
+		"name": "Матриарх мшистой гнили", "hp": 118, "attack": 8, "defense": 2,
+		"attack_interval": 1.48, "xp": 35, "scrap": 24, "crystal": 5,
+		"role": "boss", "special_name": "Споровая корона",
+		"special_effect_id": "poison", "special_effect_duration": 4.0, "special_effect_magnitude": 2.0,
+		"special_effect_log": "Споры Матриарха отравляют героя и продолжают наносить урон после удара.",
+		"phases": [
+			{"threshold": 1.0, "name": "Пробуждение корней", "attack_multiplier": 1.0, "defense_bonus": 0, "attack_interval": 1.48, "special_every": 3, "telegraph": "Матриарх собирает облако спор."},
+			{"threshold": 0.66, "name": "Живые корни", "attack_multiplier": 1.12, "defense_bonus": 1, "attack_interval": 1.28, "special_every": 3, "telegraph": "Корни Матриарха стягиваются вокруг ядра.", "status_on_enter": {"target": "boss", "id": "regeneration", "duration": 4.0, "magnitude": 5.0}},
+			{"threshold": 0.33, "name": "Споровый шторм", "attack_multiplier": 1.32, "defense_bonus": 0, "attack_interval": 1.03, "special_every": 2, "telegraph": "Матриарх выпускает смертельный спороносный поток.", "status_on_enter": {"target": "hero", "id": "poison", "duration": 4.0, "magnitude": 2.0}}
+		]
+	},
+	"bellkeeper": {
+		"name": "Глашатай пустого колокола", "hp": 112, "attack": 11, "defense": 2,
+		"attack_interval": 1.30, "xp": 38, "scrap": 25, "crystal": 6,
+		"role": "boss", "special_name": "Резонанс тишины",
+		"special_effect_id": "distortion", "special_effect_duration": 4.0, "special_effect_magnitude": 0.22,
+		"special_effect_log": "Резонанс пустого колокола искажает импульсы героя и замедляет его атаки.",
+		"phases": [
+			{"threshold": 1.0, "name": "Первый звон", "attack_multiplier": 1.0, "defense_bonus": 0, "attack_interval": 1.30, "special_every": 3, "telegraph": "Глашатай настраивает пустой колокол."},
+			{"threshold": 0.66, "name": "Эхо в костях", "attack_multiplier": 1.18, "defense_bonus": 1, "attack_interval": 1.14, "special_every": 3, "telegraph": "Звон возвращается с искажённой частотой.", "status_on_enter": {"target": "hero", "id": "weakness", "duration": 3.0, "magnitude": 0.18}},
+			{"threshold": 0.33, "name": "Последняя тишина", "attack_multiplier": 1.36, "defense_bonus": 0, "attack_interval": 0.96, "special_every": 2, "telegraph": "Глашатай готовит резонанс, который гасит ответный удар.", "status_on_enter": {"target": "boss", "id": "barrier", "duration": 4.0, "magnitude": 16.0}}
+		]
 	}
 }
 

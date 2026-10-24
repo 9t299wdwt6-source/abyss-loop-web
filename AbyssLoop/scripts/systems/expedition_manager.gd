@@ -1158,9 +1158,10 @@ func _tick_combat(delta: float) -> void:
 				if bool(elite_status_result.get("ok", false)):
 					_log("Элитная способность накладывает на героя эффект «%s»." % str(elite_status_result.get("name", elite_status_id)))
 		if is_special and is_boss_attacker:
-			var wound_result: Dictionary = status_effect_system.apply_effect(hero, "wound", 4.0, 0.12, str(fighter.get("id", "boss")))
-			if bool(wound_result.get("ok", false)):
-				_log("Особая атака оставляет рану: следующие удары по герою усилены на 12%.")
+			var boss_effect_id := str(fighter.get("special_effect_id", "wound"))
+			var boss_effect_result: Dictionary = status_effect_system.apply_effect(hero, boss_effect_id, float(fighter.get("special_effect_duration", 4.0)), float(fighter.get("special_effect_magnitude", 0.12)), str(fighter.get("id", "boss")))
+			if bool(boss_effect_result.get("ok", false)):
+				_log(str(fighter.get("special_effect_log", "Особая атака босса накладывает эффект «%s»." % str(boss_effect_result.get("name", boss_effect_id))))
 		if role == "hunter" and int(fighter.get("attack_count", 0)) % 3 == 0 and not is_elite_attacker:
 			var weakness_result: Dictionary = status_effect_system.apply_effect(hero, "weakness", 3.0, 0.18, str(fighter.get("id", "hunter")))
 			if bool(weakness_result.get("ok", false)):

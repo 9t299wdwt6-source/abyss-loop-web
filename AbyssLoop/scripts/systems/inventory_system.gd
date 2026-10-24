@@ -43,7 +43,15 @@ const BOSS_RELIC_TABLES := {
 	"harvester": [
 		{"id": "harvester_needle", "name": "Игла Светожора", "slot": "weapon", "archetype": "wound", "archetype_name": "Резец глубин", "archetype_description": "Реликвия Светожора: импульсный клинок, вызывающий глубокие раны.", "set_id": "resonance", "stats": {"attack": 3, "crit": 0.025, "bleed_chance": 0.18, "bleed_damage": 3}},
 		{"id": "harvester_heart", "name": "Сердце импульсов", "slot": "core", "archetype": "resonance", "archetype_name": "Резонанс", "archetype_description": "Реликвия Светожора: усиливает импульс героя, добычу и восстановление после побед.", "set_id": "resonance", "stats": {"hp": 8, "speed": 0.06, "reward_bonus": 0.15, "kill_heal": 1}}
-	]
+	],
+	"matriarch": [
+		{"id": "matriarch_scythe", "name": "Серп мшистой королевы", "slot": "weapon", "archetype": "siphon", "archetype_name": "Сифон", "archetype_description": "Реликвия Матриарха: высасывает силы у противников и улучшает снабжение.", "set_id": "scavenger", "stats": {"attack": 3, "kill_heal": 2, "tile_scrap": 1, "bleed_chance": 0.10}},
+		{"id": "matriarch_mantle", "name": "Плащ корневой кладки", "slot": "armor", "archetype": "scavenger", "archetype_name": "Сборщик", "archetype_description": "Реликвия Матриарха: броня из корней помогает собирать материалы и восстанавливаться после событий.", "set_id": "scavenger", "stats": {"defense": 2, "hp": 10, "tile_scrap": 1, "event_heal": 4}}
+	],
+	"bellkeeper": [
+		{"id": "bell_tuning_fork", "name": "Калибратор последнего звона", "slot": "weapon", "archetype": "precision", "archetype_name": "Точность", "archetype_description": "Реликвия Глашатая: концентрирует импульс в критический точный удар.", "set_id": "resonance", "stats": {"attack": 4, "crit": 0.055, "reward_bonus": 0.06}},
+		{"id": "bell_veil", "name": "Вуаль немого резонанса", "slot": "core", "archetype": "pathfinder", "archetype_name": "Разведчик", "archetype_description": "Реликвия Глашатая: гасит часть сигнала встречи и ускоряет атаки.", "set_id": "resonance", "stats": {"speed": 0.07, "crit": 0.035, "tile_spawn_bonus": -0.04, "reward_bonus": 0.08}}
+	],
 }
 
 const SYNERGY_DEFS := {
