@@ -242,6 +242,7 @@ func _capture_case(case_data: Dictionary) -> Dictionary:
 		manager.active = false
 
 	var completed_summary: Dictionary = GameState.last_summary.duplicate(true)
+	var capture_challenge_id := str(manager.run_challenge.get("id", "none"))
 	manager.queue_free()
 	await get_tree().process_frame
 	if case_failed or completed_summary.is_empty():
@@ -270,7 +271,7 @@ func _capture_case(case_data: Dictionary) -> Dictionary:
 	completed_summary["capture_mode_id"] = mode_id
 	completed_summary["capture_modifier_id"] = modifier_id
 	completed_summary["capture_contract_id"] = contract_id
-	completed_summary["capture_challenge_id"] = str(manager.run_challenge.get("id", "none"))
+	completed_summary["capture_challenge_id"] = capture_challenge_id
 	completed_summary["capture_coverage_only"] = bool(case_data.get("coverage_only", false))
 	completed_summary["capture_target_loops"] = target_loops
 	completed_summary["capture_policy_version"] = 2
