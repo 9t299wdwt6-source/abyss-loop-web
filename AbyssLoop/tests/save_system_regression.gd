@@ -39,6 +39,10 @@ func _run_tests() -> void:
 	wrong_slot_affix["affix_ids"] = ["reinforced_plate"]
 	wrong_slot_affix["affix_names"] = ["Усиленная пластина"]
 	assert(not save_system._validate_item(wrong_slot_affix, "weapon"), "save validation must reject an armor affix attached to a weapon")
+	var unknown_affix := persisted_affix_weapon.duplicate(true)
+	unknown_affix["affix_ids"] = ["missing_affix_id"]
+	unknown_affix["affix_names"] = ["Неизвестный модификатор"]
+	assert(not save_system._validate_item(unknown_affix, "weapon"), "save validation must reject unknown affix IDs")
 	var duplicate_position_affixes := persisted_affix_weapon.duplicate(true)
 	duplicate_position_affixes["rarity"] = "Эпический"
 	duplicate_position_affixes["affix_ids"] = ["keen_edge", "barbed_edge"]
