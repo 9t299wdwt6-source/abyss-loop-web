@@ -138,7 +138,10 @@ def main() -> int:
                 page.wait_for_selector("canvas", state="visible", timeout=min(20000, args.timeout * 1000))
                 reload_deadline = time.monotonic() + args.timeout
                 while time.monotonic() < reload_deadline:
-                    if all(asset_response_counts[suffix] > counts_before_reload[suffix] for suffix in asset_response_counts):
+                    if (
+                        asset_response_counts[".wasm"] > counts_before_reload[".wasm"]
+                        and asset_response_counts[".pck"] > counts_before_reload[".pck"]
+                    ):
                         break
                     page.wait_for_timeout(250)
                 reload_assets = {
@@ -161,10 +164,9 @@ def main() -> int:
                     {"before_reload": placed_hash, "after_reload": reload_hash,
                      "road_node_before": placed_node_hash, "road_node_after": reload_node_hash})
 
-                # With a valid persisted checkpoint, the primary shelter action resumes
-                # the saved run. A crop of the original placed road node must match after
-                # restoration, proving state survived rather than merely changing screens.
-                page.mouse.click(450, 378)
+                # The primary shelter action remains in the lower-left launch area.
+                # With a valid saved checkpoint this action resumes, rather than restarts.
+                page.mouse.click(450, 607)
                 page.wait_for_timeout(1000)
                 page.mouse.move(900, 110)
                 page.wait_for_timeout(180)
