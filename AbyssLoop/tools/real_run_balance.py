@@ -94,6 +94,23 @@ def normalize_runs(raw_rows: list[Any]) -> tuple[list[dict[str, Any]], list[str]
         difficulty = str(row.get("difficulty_id", "standard")).strip() or "standard"
         mode = str(row.get("expedition_mode_id", "standard")).strip() or "standard"
         modifier = str(row.get("modifier_id", row.get("modifier_name", "unknown"))).strip() or "unknown"
+        contract_value = row.get("contract", {})
+        contract = contract_value if isinstance(contract_value, dict) else {}
+        contract_name = str(row.get("contract_name", "")).strip()
+        contract_status = str(row.get("contract_status", "")).strip().lower()
+        contract_id = str(row.get("contract_id", row.get("capture_contract_id", contract.get("id", "")))).strip()
+        if not contract_id:
+            if contract_name:
+                contract_id = contract_name
+            elif contract_status == "none" or not contract:
+                contract_id = "none"
+            else:
+                contract_id = "unknown"
+        challenge_value = row.get("challenge", {})
+        challenge = challenge_value if isinstance(challenge_value, dict) else {}
+        challenge_id = str(row.get("challenge_id", row.get("capture_challenge_id", challenge.get("id", "")))).strip()
+        if not challenge_id:
+            challenge_id = str(challenge.get("name", "unknown")) if challenge else "none"
         capture_kind = _capture_kind(row.get("capture_kind", "profile_history"))
         if not run_id or len(run_id) > 100 or outcome not in OUTCOMES:
             invalid_count += 1
@@ -127,6 +144,8 @@ def normalize_runs(raw_rows: list[Any]) -> tuple[list[dict[str, Any]], list[str]
         row["difficulty_id"] = difficulty
         row["expedition_mode_id"] = mode
         row["modifier_id"] = modifier
+        row["contract_id"] = contract_id
+        row["challenge_id"] = challenge_id
         row["capture_kind"] = capture_kind
         for key in REQUIRED_INT_FIELDS + OPTIONAL_INT_FIELDS:
             row.setdefault(key, 1 if key == "hero_level" else 0)
@@ -152,22 +171,23 @@ def _fmt(value: Any) -> str:
     return "—" if value is None else str(value)
 
 
-def _group_key(row: dict[str, Any]) -> tuple[str, str, str, str, str]:
+def _group_key(row: dict[str, Any]) -> tuple[str, str, str, str, str, str, str]:
     return (
         row["game_version"], row["difficulty_id"], row["modifier_id"],
-        row["expedition_mode_id"], row["capture_kind"],
+        row["expedition_mode_id"], row["contract_id"], row["challenge_id"],
+        row["capture_kind"],
     )
 
 
 def _group_table(rows: list[dict[str, Any]], minimum_repeats: int) -> list[str]:
     if not rows:
         return ["Нет пригодных забегов.", ""]
-    grouped: dict[tuple[str, str, str, str, str], list[dict[str, Any]]] = defaultdict(list)
+    grouped: dict[tuple[str, str, str, str, str, str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         grouped[_group_key(row)].append(row)
     lines = [
-        "| Сборка | Сложность | Модификатор | Режим | Источник | N | Seed | Возврат | Медиана циклов | Медиана боссов | Материалы получены / сохранены | Кристаллы получены / сохранены | Медиана времени, сек. | Оценка выборки |",
-        "|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+        "| Сборка | Сложность | Модификатор | Режим | Контракт | Испытание | Источник | N | Seed | Возврат | Медиана циклов | Медиана боссов | Материалы получены / сохранены | Кристаллы получены / сохранены | Медиана времени, сек. | Оценка выборки |",
+        "|---|---|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|",
     ]
     for key, group in sorted(grouped.items()):
         returned = sum(1 for row in group if row["outcome"] == "return")
@@ -185,8 +205,8 @@ def _group_table(rows: list[dict[str, Any]], minimum_repeats: int) -> list[str]:
         kept_crystals = _median(group, "kept_crystals")
         earned_crystals = _median(group, "earned_crystals")
         lines.append(
-            "| %s | %s | %s | %s | %s | %d | %d | %d/%d (%.0f%%) | %s | %s | %s / %s | %s / %s | %s | %s |" % (
-                key[0], key[1], key[2], key[3], key[4], n, len(seeds), returned, n,
+            "| %s | %s | %s | %s | %s | %s | %s | %d | %d | %d/%d (%.0f%%) | %s | %s | %s / %s | %s / %s | %s | %s |" % (
+                key[0], key[1], key[2], key[3], key[4], key[5], key[6], n, len(seeds), returned, n,
                 (returned / n * 100.0), _fmt(_median(group, "loops")),
                 _fmt(_median(group, "bosses_defeated")), _fmt(earned_scrap), _fmt(kept_scrap),
                 _fmt(earned_crystals), _fmt(kept_crystals),
@@ -204,7 +224,7 @@ def build_report(metadata: dict[str, Any], rows: list[dict[str, Any]], warnings:
     legacy = sum(1 for row in rows if int(row.get("telemetry_schema", 0)) < 1)
     seeds = {row["seed"] for row in rows if row["seed"] > 0}
     lines = [
-        "# Abyss Loop — анализ игровых наблюдений (Stage64B)", "",
+        "# Abyss Loop — анализ игровых наблюдений (Stage71 / Stage64B)", "",
         "## Паспорт данных", "",
         f"- Источник: {input_shape} (локальный/offline анализ).",
         f"- Метка сборки: {label or str(metadata.get('build_label', 'не указана'))}.",
@@ -241,7 +261,7 @@ def build_report(metadata: dict[str, Any], rows: list[dict[str, Any]], warnings:
         "## Интерпретация и ограничения", "",
         "- Это наблюдения из указанного источника. automated_engine_run — скриптовые прогоны движка с детерминированными решениями, а не человеческое прохождение; ни один источник сам по себе не даёт автоматического решения об изменении баланса.",
         f"- Группа считается достаточно заполненной только для первичного просмотра при N≥{minimum_repeats} и минимум 3 разных seed. Даже такая группа не доказывает статистическую значимость.",
-        "- Сравнивать следует одинаковую версию игры, сложность, модификатор, режим и источник. Если эти условия различаются, строки намеренно разделены; автоматизированные QA-забеги не объединяются с историей пользователя.",
+        "- Сравнивать следует одинаковую версию игры, сложность, модификатор, режим, контракт, испытание и источник. Если эти условия различаются, строки намеренно разделены; автоматизированные QA-забеги не объединяются с историей пользователя.",
         "- Время прохождения доступно только для телеметрии схемы 1. Старые записи не дополняются выдуманными значениями.",
         "- Баланс не оценён автоматически: решение требует гипотезы, повторов на одинаковых настройках и проверки соседнего диапазона сложности.",
         "",

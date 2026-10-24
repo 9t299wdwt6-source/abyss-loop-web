@@ -18,7 +18,8 @@ spec.loader.exec_module(real_run_balance)
 def sample(run_id: str = "r1", *, outcome: str = "return", seed: int = 42,
            version: str = "0.61.0", loops: int = 2, mode: str = "standard",
            modifier: str = "standard", schema: int = 1,
-           capture_kind: str | None = None) -> dict:
+           capture_kind: str | None = None, contract_id: str = "none",
+           challenge_id: str = "none") -> dict:
     row = {
         "run_id": run_id, "outcome": outcome, "seed": seed, "game_version": version,
         "difficulty_id": "standard", "modifier_id": modifier, "expedition_mode_id": mode,
@@ -30,6 +31,7 @@ def sample(run_id: str = "r1", *, outcome: str = "return", seed: int = 42,
         "run_elapsed_seconds": 80, "start_hp": 30, "start_max_hp": 30,
         "end_hp": 15, "end_max_hp": 40, "road_placements": 2,
         "world_placements": 1, "danger": 2.2,
+        "contract_id": contract_id, "challenge_id": challenge_id,
     }
     if capture_kind is not None:
         row["capture_kind"] = capture_kind
@@ -77,10 +79,21 @@ mixed, mixed_warnings, _, _ = real_run_balance.normalize_runs([
     sample("auto", capture_kind="automated_engine_run", seed=45),
 ])
 report = real_run_balance.build_report({}, mixed, mixed_warnings, 0, 0, "exported runs", "test label", "4.7.2.stable", "", 5)
-checks["comparison groups separate build, modifier, mode, and capture source"] = (
-    report.count("| 0.61.0 | standard | standard | standard | profile_history | 1 |") == 1
-    and report.count("| 0.61.0 | standard | standard | standard | automated_engine_run | 1 |") == 1
+checks["comparison groups separate build, modifier, mode, contract, challenge, and capture source"] = (
+    report.count("| 0.61.0 | standard | standard | standard | none | none | profile_history | 1 |") == 1
+    and report.count("| 0.61.0 | standard | standard | standard | none | none | automated_engine_run | 1 |") == 1
     and "long_expedition" in report and "glass_cannon" in report
+)
+
+contract_rows, contract_warnings, contract_invalid, contract_duplicates = real_run_balance.normalize_runs([
+    sample("bounty", seed=51, contract_id="bounty_hunter"),
+    sample("events", seed=52, contract_id="event_archive"),
+    sample("resonance", seed=53, modifier="resonance", challenge_id="resonance_boss"),
+])
+contract_report = real_run_balance.build_report({}, contract_rows, contract_warnings, contract_invalid, contract_duplicates, "exported runs", "test label", "4.7.2.stable", "", 3)
+checks["contract and modifier challenge variants remain distinct comparison groups"] = (
+    "bounty_hunter" in contract_report and "event_archive" in contract_report
+    and "resonance_boss" in contract_report and len(contract_rows) == 3
 )
 checks["report explicitly distinguishes scripted engine QA from player history"] = "not human" in report.lower() or "а не человеческое прохождение" in report
 checks["small samples are explicitly marked insufficient"] = "Мало данных (<5)" in report
