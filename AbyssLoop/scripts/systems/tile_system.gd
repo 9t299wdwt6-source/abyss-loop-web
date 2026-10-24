@@ -62,11 +62,22 @@ static func world_route_index(cell_id: String, route_size: int) -> int:
     var route_position := fposmod(angle + PI * 0.5, TAU) / TAU
     return posmod(roundi(route_position * float(route_size)), route_size)
 
-func can_place_world(route: Array, world_tiles: Dictionary, cell_id: String) -> Dictionary:
+func _tile_placement_zone(tile: Dictionary) -> String:
+    var tile_id := str(tile.get("id", ""))
+    var definition: Dictionary = ContentRegistry.TILE_DEFS.get(tile_id, {})
+    return str(tile.get("placement_zone", definition.get("placement_zone", "any")))
+
+func can_place_world(route: Array, world_tiles: Dictionary, cell_id: String, tile: Dictionary = {}) -> Dictionary:
     if route.is_empty():
         return {"ok": false, "reason": "Маршрут ещё не создан."}
     if not is_world_cell_valid(cell_id):
         return {"ok": false, "reason": "Эта клетка не относится к доступному ландшафту."}
+    if not tile.is_empty():
+        var placement_zone := _tile_placement_zone(tile)
+        if placement_zone not in ["any", "road", "landscape"]:
+            return {"ok": false, "reason": "У тайла не задана допустимая зона размещения."}
+        if placement_zone == "road":
+            return {"ok": false, "reason": "Эту карту можно разместить только на дорожном узле."}
     if world_tiles.has(cell_id):
         return {"ok": false, "reason": "На этой клетке уже размещён тайл."}
     var route_index := world_route_index(cell_id, route.size())
@@ -290,7 +301,7 @@ func get_world_placement_effect_delta(before_tiles: Dictionary, after_tiles: Dic
     return {"sectors": sectors, "totals": totals, "caps_applied": caps_applied}
 
 func get_world_placement_preview(route: Array, world_tiles: Dictionary, cell_id: String, tile: Dictionary) -> Dictionary:
-    var placement := can_place_world(route, world_tiles, cell_id)
+    var placement := can_place_world(route, world_tiles, cell_id, tile)
     if not bool(placement.get("ok", false)):
         return {"ok": false, "reason": str(placement.get("reason", "Размещение запрещено.")), "text": str(placement.get("reason", "Размещение запрещено."))}
     var tile_id := str(tile.get("id", ""))
@@ -366,15 +377,21 @@ func draw_tile(rng: RandomNumberGenerator, unlock_rift: bool) -> Dictionary:
             tile_id = choice_id
             break
     var def: Dictionary = ContentRegistry.TILE_DEFS[tile_id]
-    return {"id": tile_id, "name": def.name, "short": def.short, "kind": def.kind, "color": def.color, "description": def.description, "uid": str(rng.randi())}
+    return {"id": tile_id, "name": def.name, "short": def.short, "kind": def.kind, "color": def.color, "description": def.description, "placement_zone": str(def.get("placement_zone", "any")), "uid": str(rng.randi())}
 
-func can_place(route: Array, placed_tiles: Dictionary, index: int) -> Dictionary:
+func can_place(route: Array, placed_tiles: Dictionary, index: int, tile: Dictionary = {}) -> Dictionary:
     if index < 0 or index >= route.size():
         return {"ok": false, "reason": "Клетка находится за пределами маршрута."}
     if index == 0:
         return {"ok": false, "reason": "Стартовый узел нельзя менять."}
     if placed_tiles.has(str(index)):
         return {"ok": false, "reason": "На этой клетке уже есть тайл."}
+    if not tile.is_empty():
+        var placement_zone := _tile_placement_zone(tile)
+        if placement_zone not in ["any", "road", "landscape"]:
+            return {"ok": false, "reason": "У тайла не задана допустимая зона размещения."}
+        if placement_zone == "landscape":
+            return {"ok": false, "reason": "Эту постройку можно разместить только на ландшафтном поле."}
     return {"ok": true, "reason": "Тайл можно разместить."}
 
 func apply_tile_visit(tile: Dictionary, ledger: Dictionary, hero: Dictionary, loop_count: int) -> Dictionary:
@@ -460,7 +477,7 @@ func get_synergy_bonus(placed_tiles: Dictionary, index: int, route_size: int = 0
     return bonus
 
 func get_placement_preview(route: Array, placed_tiles: Dictionary, index: int, tile: Dictionary) -> Dictionary:
-    var placement: Dictionary = can_place(route, placed_tiles, index)
+    var placement: Dictionary = can_place(route, placed_tiles, index, tile)
     var tile_id := str(tile.get("id", ""))
     var definition: Dictionary = ContentRegistry.TILE_DEFS.get(tile_id, {})
     if not bool(placement.get("ok", false)):

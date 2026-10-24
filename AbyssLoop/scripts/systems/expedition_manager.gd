@@ -17,11 +17,6 @@ const ProceduralGenerationScript = preload("res://scripts/systems/procedural_gen
 const ExpeditionEventSystemScript = preload("res://scripts/systems/expedition_event_system.gd")
 const StatusEffectSystemScript = preload("res://scripts/systems/status_effect_system.gd")
 const EQUIPMENT_SLOT_NAMES := {"weapon": "Оружие", "armor": "Броня", "core": "Ядро"}
-const LANDSCAPE_SECRET_RECIPES := [
-	{"first_tile": "archive", "second_tile": "rift", "flag": "secret_archive_rift_found", "title": "Архив и разлом", "clue": "Архивная карта сошлась с глубинным разломом."},
-	{"first_tile": "nursery", "second_tile": "snare", "flag": "secret_nursery_snare_found", "title": "Питомник и сеть", "clue": "Сеть резонанса удерживает скрытое гнездо в питомнике."}
-]
-
 var route_system = RouteSystemScript.new()
 var tile_system = TileSystemScript.new()
 var combat_system = CombatSystemScript.new()
@@ -842,7 +837,7 @@ func _discover_landscape_secrets(route_index: int, messages: Array) -> void:
 	var flags_value: Variant = run_ledger.get("event_flags", {})
 	var flags: Dictionary = flags_value.duplicate(true) if typeof(flags_value) == TYPE_DICTIONARY else {}
 	var changed_flags := false
-	for recipe_value in LANDSCAPE_SECRET_RECIPES:
+	for recipe_value in ContentRegistry.LANDSCAPE_SECRET_RECIPES:
 		if typeof(recipe_value) != TYPE_DICTIONARY:
 			continue
 		var recipe: Dictionary = recipe_value
@@ -1507,10 +1502,10 @@ func place_tile(hand_index: int, cell_index: int) -> Dictionary:
 		return {"ok": false, "reason": "Сначала завершите текущее решение."}
 	if hand_index < 0 or hand_index >= tile_hand.size():
 		return {"ok": false, "reason": "Выберите тайл из руки."}
-	var can_place: Dictionary = tile_system.can_place(route, placed_tiles, cell_index)
+	var tile: Dictionary = tile_hand[hand_index].duplicate(true)
+	var can_place: Dictionary = tile_system.can_place(route, placed_tiles, cell_index, tile)
 	if not bool(can_place.ok):
 		return can_place
-	var tile: Dictionary = tile_hand[hand_index].duplicate(true)
 	placed_tiles[str(cell_index)] = tile
 	tile_hand.remove_at(hand_index)
 	_log("Размещён тайл «%s» на дорожном узле %d. Рука теперь содержит %d тайла(ов)." % [tile.name, cell_index + 1, tile_hand.size()])
@@ -1529,10 +1524,10 @@ func place_world_tile(hand_index: int, cell_id: String) -> Dictionary:
 		return {"ok": false, "reason": "Сначала завершите текущее решение."}
 	if hand_index < 0 or hand_index >= tile_hand.size():
 		return {"ok": false, "reason": "Выберите тайл из руки."}
-	var placement: Dictionary = tile_system.can_place_world(route, world_tiles, cell_id)
+	var tile: Dictionary = tile_hand[hand_index].duplicate(true)
+	var placement: Dictionary = tile_system.can_place_world(route, world_tiles, cell_id, tile)
 	if not bool(placement.get("ok", false)):
 		return placement
-	var tile: Dictionary = tile_hand[hand_index].duplicate(true)
 	var parts := cell_id.split(":")
 	tile["field_x"] = int(parts[0])
 	tile["field_y"] = int(parts[1])

@@ -131,35 +131,35 @@ const RUN_MODIFIERS := {
 
 const TILE_DEFS := {
 	"cache": {
-		"name": "Геодезический тайник", "short": "ТАЙНИК", "kind": "economy",
+		"name": "Геодезический тайник", "short": "ТАЙНИК", "kind": "economy", "placement_zone": "any",
 		"color": "#d9b45e", "description": "Даёт дополнительные материалы при посещении."
 	},
 	"hunt": {
-		"name": "Место следопыта", "short": "СЛЕД", "kind": "danger",
+		"name": "Место следопыта", "short": "СЛЕД", "kind": "danger", "placement_zone": "any",
 		"color": "#d97963", "description": "Повышает шанс встречи и награды за победу."
 	},
 	"ward": {
-		"name": "Корневой оберег", "short": "ОБЕРЕГ", "kind": "support",
+		"name": "Корневой оберег", "short": "ОБЕРЕГ", "kind": "support", "placement_zone": "any",
 		"color": "#a0dc79", "description": "Постепенно восстанавливает здоровье героя."
 	},
 	"rift": {
-		"name": "Глубинный разлом", "short": "РАЗЛОМ", "kind": "danger",
+		"name": "Глубинный разлом", "short": "РАЗЛОМ", "kind": "danger", "placement_zone": "any",
 		"color": "#b79de8", "description": "Опасная клетка с усиленными противниками и добычей."
 	},
 	"snare": {
-		"name": "Сеть резонанса", "short": "СЕТЬ", "kind": "control",
+		"name": "Сеть резонанса", "short": "СЕТЬ", "kind": "control", "placement_zone": "any",
 		"color": "#78c4c9", "description": "Снижает вероятность боя и ослабляет противников, если столкновение всё же начнётся."
 	},
 	"signal": {
-		"name": "Кристалл-резонатор", "short": "КРИСТАЛЛ", "kind": "rare",
+		"name": "Кристалл-резонатор", "short": "КРИСТАЛЛ", "kind": "rare", "placement_zone": "any",
 		"color": "#d8b4ee", "description": "Редкий рискованный тайл: увеличивает награду и немного повышает вероятность столкновения."
 	},
 	"archive": {
-		"name": "Архив старой экспедиции", "short": "АРХИВ", "kind": "knowledge",
+		"name": "Архив старой экспедиции", "short": "АРХИВ", "kind": "knowledge", "placement_zone": "landscape",
 		"color": "#76a8da", "description": "Редкая постройка в стороне от дороги: на каждом проходе приносит кристалл и повышает боевую награду."
 	},
 	"nursery": {
-		"name": "Питомник бездны", "short": "ПИТОМНИК", "kind": "danger",
+		"name": "Питомник бездны", "short": "ПИТОМНИК", "kind": "danger", "placement_zone": "landscape",
 		"color": "#a7c96b", "description": "Редкая постройка, где опасность растёт вместе с добычей: враги сильнее, но награда заметно выше."
 	}
 }
@@ -182,6 +182,12 @@ const TILE_SYNERGIES := [
 	{"id": "archive_ward", "name": "Тихий читальный зал", "trigger_tile": "archive", "neighbor_tile": "ward", "effects": {"heal": 3, "spawn_bonus": -0.05}, "description": "Оберег стабилизирует архив: +3 здоровья и ниже шанс столкновения."},
 	{"id": "nursery_rift", "name": "Инкубатор разлома", "trigger_tile": "nursery", "neighbor_tile": "rift", "effects": {"reward_bonus": 0.25, "enemy_bonus": 0.10}, "description": "Разлом подпитывает питомник: сильные враги несут на 25% больше награды."},
 	{"id": "nursery_snare", "name": "Сдержанный выводок", "trigger_tile": "nursery", "neighbor_tile": "snare", "effects": {"spawn_bonus": -0.10, "enemy_bonus": -0.05}, "description": "Сеть перехвата удерживает выводок: вероятность боя и сила врагов снижены."},
+]
+
+# Discovery recipes are content data because they create flags used by one-time events.
+const LANDSCAPE_SECRET_RECIPES := [
+	{"first_tile": "archive", "second_tile": "rift", "flag": "secret_archive_rift_found", "title": "Архив и разлом", "clue": "Архивная карта сошлась с глубинным разломом."},
+	{"first_tile": "nursery", "second_tile": "snare", "flag": "secret_nursery_snare_found", "title": "Питомник и сеть", "clue": "Сеть резонанса удерживает скрытое гнездо в питомнике."}
 ]
 
 const ENEMIES := {
@@ -512,8 +518,8 @@ const EXPEDITION_EVENTS := {
 		"narrative": "Когда архив и разлом оказались рядом, на старой карте проступили координаты комнаты, которой нет на плане. За стеной слышно сердцебиение глубины.",
 		"weight": 1.0, "min_loop": 1, "requires_flag": "secret_archive_rift_found", "excludes_flag": "secret_archive_rift_claimed", "resolved_flag": "secret_archive_rift_claimed", "guaranteed_when_flag": true,
 		"choices": [
-			{"id": "seal_echo", "title": "Запечатать эхо", "description": "Тайный Компас за закрытой картой, +2 редких ресурса и до 8 здоровья", "effects": {"crystals": 2, "heal": 8, "grant_item_id": "echo_chart_core", "set_flags": ["secret_echo_sealed"]}},
-			{"id": "follow_echo", "title": "Проследить за пульсом", "description": "Клинок незамкнутого разлома и +5 редких ресурсов; −18 здоровья, опасность и награда вырастут", "effects": {"crystals": 5, "damage": 18, "danger_delta": 0.15, "reward_bonus": 0.20, "grant_item_id": "riftwalker_edge", "set_flags": ["secret_echo_followed"]}}
+			{"id": "seal_echo", "title": "Запечатать эхо", "description": "Тайный Компас за закрытой картой, +2 редких ресурса и до 8 здоровья", "effects": {"crystals": 2, "heal": 8, "grant_item_id": "echo_chart_core", "set_flags": ["secret_echo_sealed", "secret_archive_rift_claimed"]}},
+			{"id": "follow_echo", "title": "Проследить за пульсом", "description": "Клинок незамкнутого разлома и +5 редких ресурсов; −18 здоровья, опасность и награда вырастут", "effects": {"crystals": 5, "damage": 18, "danger_delta": 0.15, "reward_bonus": 0.20, "grant_item_id": "riftwalker_edge", "set_flags": ["secret_echo_followed", "secret_archive_rift_claimed"]}}
 		]
 	},
 	"sealed_brood": {
@@ -521,8 +527,8 @@ const EXPEDITION_EVENTS := {
 		"narrative": "Сеть резонанса удерживала не обычную угрозу, а целое гнездо. Питомник бездны реагирует на ловушку, и теперь можно решить судьбу выводка.",
 		"weight": 1.0, "min_loop": 1, "requires_flag": "secret_nursery_snare_found", "excludes_flag": "secret_nursery_snare_claimed", "resolved_flag": "secret_nursery_snare_claimed", "guaranteed_when_flag": true,
 		"choices": [
-			{"id": "spare_brood", "title": "Усыпить выводок", "description": "Панцирь тихого выводка, +3 редких ресурса, +4 материала и до 12 здоровья", "effects": {"crystals": 3, "scrap": 4, "heal": 12, "grant_item_id": "brood_shell", "set_flags": ["secret_brood_spared"]}},
-			{"id": "hunt_brood", "title": "Использовать гнездо как приманку", "description": "Ядро приманивающего импульса, +7 материалов и +2 редких ресурса; −10 здоровья и повышенный шанс боя", "effects": {"scrap": 7, "crystals": 2, "damage": 10, "spawn_bonus": 0.16, "reward_bonus": 0.20, "grant_item_id": "snare_hunter_core", "set_flags": ["secret_brood_hunted"]}}
+			{"id": "spare_brood", "title": "Усыпить выводок", "description": "Панцирь тихого выводка, +3 редких ресурса, +4 материала и до 12 здоровья", "effects": {"crystals": 3, "scrap": 4, "heal": 12, "grant_item_id": "brood_shell", "set_flags": ["secret_brood_spared", "secret_nursery_snare_claimed"]}},
+			{"id": "hunt_brood", "title": "Использовать гнездо как приманку", "description": "Ядро приманивающего импульса, +7 материалов и +2 редких ресурса; −10 здоровья и повышенный шанс боя", "effects": {"scrap": 7, "crystals": 2, "damage": 10, "spawn_bonus": 0.16, "reward_bonus": 0.20, "grant_item_id": "snare_hunter_core", "set_flags": ["secret_brood_hunted", "secret_nursery_snare_claimed"]}}
 		]
 	}
 }
@@ -571,9 +577,11 @@ func validate_content_registry() -> Array[String]:
 	for tile_id_value in TILE_DEFS.keys():
 		var tile_id := str(tile_id_value)
 		var tile: Dictionary = TILE_DEFS[tile_id_value]
-		for field in ["name", "short", "kind", "color", "description"]:
+		for field in ["name", "short", "kind", "color", "description", "placement_zone"]:
 			if not tile.has(field) or str(tile.get(field, "")).strip_edges().is_empty():
 				issues.append("tile:%s missing %s" % [tile_id, field])
+		if str(tile.get("placement_zone", "")) not in ["any", "road", "landscape"]:
+			issues.append("tile:%s has an unknown placement_zone" % tile_id)
 	for enemy_id_value in ENEMIES.keys():
 		var enemy_id := str(enemy_id_value)
 		var enemy: Dictionary = ENEMIES[enemy_id_value]
