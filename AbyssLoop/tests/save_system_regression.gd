@@ -52,6 +52,16 @@ func _run_tests() -> void:
 	assert(save_system._decode_save(JSON.stringify(downgraded_envelope)).is_empty(), "envelope v2 without checksum must be rejected")
 	assert(str(saved_envelope.get("integrity", {}).get("checksum", "")).length() == 64, "save checksum should be 64 hex characters")
 	assert(save_system._payload_checksum({"a": 1, "b": 2}) == save_system._payload_checksum({"b": 2, "a": 1}), "canonical checksum must ignore dictionary key insertion order")
+	assert(save_system._canonical_json({"scrap": 41, "settings": {"ui_scale": 1.0}}) == save_system._canonical_json({"scrap": 41.0, "settings": {"ui_scale": 1.0}}), "canonical JSON must normalize whole numbers to tolerate Web/WASM integer-to-float parsing")
+	assert(save_system._payload_checksum({"scrap": 41, "settings": {"ui_scale": 1.0}}) == save_system._payload_checksum({"scrap": 41.0, "settings": {"ui_scale": 1.0}}), "save checksum must remain stable when a JSON integer is parsed as a float")
+	var encoded_roundtrip := save_system._encode_save(baseline)
+	assert(not encoded_roundtrip.is_empty() and not save_system._decode_save(encoded_roundtrip).is_empty(), "integrity envelope should survive an ordinary encode/decode roundtrip")
+	var web_like_envelope: Variant = JSON.parse_string(encoded_roundtrip)
+	assert(typeof(web_like_envelope) == TYPE_DICTIONARY, "roundtrip fixture should be an envelope dictionary")
+	var web_like_text := JSON.stringify(_make_integral_numbers_float(web_like_envelope), "\t")
+	var web_like_decoded: Dictionary = save_system._decode_save(web_like_text)
+	assert(not web_like_decoded.is_empty(), "valid checksum must survive Web/WASM integer-to-float JSON parsing")
+	assert(typeof(web_like_decoded.get("data", {}).get("scrap", null)) == TYPE_INT and int(web_like_decoded["data"]["scrap"]) == 41, "decoded integer resource values must be normalized before schema validation")
 
 	# Change data without updating its checksum. It must be rejected and fall back to the previous valid backup.
 	var tampered_envelope: Dictionary = saved_envelope.duplicate(true)
@@ -148,6 +158,21 @@ func _run_tests() -> void:
 
 	print("SAVE SYSTEM REGRESSION TESTS PASSED")
 	_quit_with_restore(originals, 0)
+
+func _make_integral_numbers_float(value: Variant) -> Variant:
+	if typeof(value) == TYPE_DICTIONARY:
+		var dictionary_copy: Dictionary = {}
+		for key in value.keys():
+			dictionary_copy[key] = _make_integral_numbers_float(value[key])
+		return dictionary_copy
+	if typeof(value) == TYPE_ARRAY:
+		var array_copy: Array = []
+		for entry in value:
+			array_copy.append(_make_integral_numbers_float(entry))
+		return array_copy
+	if typeof(value) == TYPE_INT:
+		return float(value)
+	return value
 
 func _write_profile_save(path: String, scrap_value: int) -> void:
 	var payload := {

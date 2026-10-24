@@ -6,6 +6,7 @@ fixtures, not GDScript execution; run save_system_regression.gd in Godot as well
 from __future__ import annotations
 import hashlib
 import json
+import math
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +18,7 @@ checks = {
     "new save envelope declares SHA-256": '"algorithm": SAVE_INTEGRITY_ALGORITHM' in save and 'const SAVE_INTEGRITY_ALGORITHM := "sha256"' in save,
     "removing checksum cannot downgrade envelope v2 to legacy": 'if envelope_version >= 2 and not parsed.has("integrity"):' in save and 'envelope v2 without checksum must be rejected' in runtime,
     "canonical payload sorts dictionary keys recursively": "func _canonical_json(value: Variant) -> String:" in save and "keys.sort()" in save and "_canonical_json(entry)" in save,
+    "Web JSON integer-to-float conversion is normalized before version/schema checks": "var parsed: Dictionary = _normalize_numeric_types(parsed_value)" in save and "func _normalize_numeric_types(value: Variant) -> Variant:" in save and "canonical JSON must normalize whole numbers" in runtime,
     "checksum is verified before migration and data validation": save.index('if parsed.has("integrity"):') < save.index('var data: Dictionary = data_value.duplicate(true)') < save.index('if not _validate_save_data(data):'),
     "unknown checksum algorithm is rejected": 'str(algorithm_value) != SAVE_INTEGRITY_ALGORITHM' in save,
     "invalid checksum length and mismatch are rejected": 'str(checksum_value).length() != 64' in save and '!= _payload_checksum(checksum_data)' in save,
@@ -37,6 +39,8 @@ def canonical(value):
         return "{" + ",".join(json.dumps(str(k), ensure_ascii=False) + ":" + canonical(value[k]) for k in sorted(value, key=lambda key: str(key))) + "}"
     if isinstance(value, list):
         return "[" + ",".join(canonical(item) for item in value) + "]"
+    if isinstance(value, float) and math.isfinite(value) and abs(value) <= 9007199254740991 and value.is_integer():
+        return str(int(value))
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 left = {"scrap": 41, "settings": {"music": 0.7, "master": 0.8}, "saved_expedition": {}}
@@ -44,6 +48,9 @@ right = {"saved_expedition": {}, "settings": {"master": 0.8, "music": 0.7}, "scr
 left_hash = hashlib.sha256(canonical(left).encode("utf-8")).hexdigest()
 right_hash = hashlib.sha256(canonical(right).encode("utf-8")).hexdigest()
 assert left_hash == right_hash, "canonical JSON hash should be insensitive to key insertion order"
+web_parsed = {"scrap": 41.0, "settings": {"music": 0.7, "master": 0.8}, "saved_expedition": {}}
+assert canonical(left) == canonical(web_parsed), "Web-style integral-float parsing must preserve canonical payload bytes"
+assert hashlib.sha256(canonical(web_parsed).encode("utf-8")).hexdigest() == left_hash, "Web-style numeric roundtrip must preserve payload checksum"
 changed = dict(right); changed["scrap"] = 42
 changed_hash = hashlib.sha256(canonical(changed).encode("utf-8")).hexdigest()
 assert changed_hash != left_hash, "payload mutation should change checksum"

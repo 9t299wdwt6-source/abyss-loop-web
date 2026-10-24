@@ -231,9 +231,13 @@ func _recover_one_replacement(target_path: String, temporary_path: String) -> vo
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(rollback_path))
 
 func _decode_save(raw: String) -> Dictionary:
-	var parsed: Variant = JSON.parse_string(raw)
-	if typeof(parsed) != TYPE_DICTIONARY:
+	var parsed_value: Variant = JSON.parse_string(raw)
+	if typeof(parsed_value) != TYPE_DICTIONARY:
 		return {}
+	# Some platform JSON implementations (including Web/WASM) may parse every
+	# JSON number as a float. Normalize finite whole numbers before strict schema
+	# checks so valid integer fields remain valid after a browser reload.
+	var parsed: Dictionary = _normalize_numeric_types(parsed_value)
 	if typeof(parsed.get("version", null)) != TYPE_INT:
 		return {}
 	var version: int = int(parsed.get("version", -1))
@@ -309,6 +313,23 @@ func _payload_checksum(payload: Dictionary) -> String:
 		return ""
 	return context.finish().hex_encode()
 
+func _normalize_numeric_types(value: Variant) -> Variant:
+	if typeof(value) == TYPE_DICTIONARY:
+		var dictionary_copy: Dictionary = {}
+		for key in value.keys():
+			dictionary_copy[key] = _normalize_numeric_types(value[key])
+		return dictionary_copy
+	if typeof(value) == TYPE_ARRAY:
+		var array_copy: Array = []
+		for entry in value:
+			array_copy.append(_normalize_numeric_types(entry))
+		return array_copy
+	if typeof(value) == TYPE_FLOAT:
+		var numeric_value: float = float(value)
+		if is_finite(numeric_value) and absf(numeric_value) <= 9007199254740991.0 and floor(numeric_value) == numeric_value:
+			return int(numeric_value)
+	return value
+
 func _canonical_json(value: Variant) -> String:
 	if typeof(value) == TYPE_DICTIONARY:
 		var dictionary: Dictionary = value
@@ -323,6 +344,15 @@ func _canonical_json(value: Variant) -> String:
 		for entry in value:
 			values.append(_canonical_json(entry))
 		return "[" + ",".join(values) + "]"
+	# JSON has one numeric type, while Web/WASM may parse an integer as a float.
+	# Hashing "41" on save and "41.0" on load rejects an otherwise valid save.
+	if typeof(value) == TYPE_INT:
+		return str(value)
+	if typeof(value) == TYPE_FLOAT:
+		var numeric_value: float = float(value)
+		if is_finite(numeric_value) and absf(numeric_value) <= 9007199254740991.0 and floor(numeric_value) == numeric_value:
+			return str(int(numeric_value))
+		return JSON.stringify(numeric_value)
 	return JSON.stringify(value)
 
 func _validate_save_data(data: Dictionary) -> bool:

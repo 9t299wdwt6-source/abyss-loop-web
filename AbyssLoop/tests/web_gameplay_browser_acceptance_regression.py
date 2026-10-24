@@ -7,7 +7,7 @@ script = SCRIPT_PATH.read_text(encoding="utf-8")
 
 checks = {
     "browser acceptance performs a real page reload after road placement": 'page.reload(wait_until="domcontentloaded"' in script and "selected tile is placed on a free road node by pointer" in script,
-    "reload test waits for JS/WASM/PCK to be fetched again": "counts_before_reload" in script and "asset_response_counts[suffix] > counts_before_reload[suffix]" in script,
+    "reload test tolerates cached JavaScript but requires fresh WASM/PCK requests": "counts_before_reload" in script and "Godot WASM/PCK are available again after browser reload" in script and 'reload_assets[".wasm"] and reload_assets[".pck"]' in script,
     "reload test checks transition to shelter": "browser reload leaves the expedition and returns to a shelter view" in script and "reload_hash != placed_hash" in script,
     "browser script explicitly checks saved-expedition resume": "saved expedition resumes after reload" in script,
     "resume test checks the same persisted road-node image crop": "road_node_clip" in script and "resumed_node_hash == placed_node_hash" in script,
