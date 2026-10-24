@@ -4,9 +4,9 @@
 
 **[Запустить игру](https://9t299wdwt6-source.github.io/abyss-loop-web/)**
 
-[Успешный pipeline: build + 81 static checks + Godot runtime + Chromium smoke/interaction + deploy](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40022721056)
+[Успешный pipeline: build + 85 static checks + Godot runtime + 12-loop long-expedition gate + Chromium smoke/interaction + deploy](https://github.com/9t299wdwt6-source/abyss-loop-web/actions/runs/40073910109)
 
-Проверенная база: Prototype 61 RC7 / Godot 4.7.2 / version 0.61.0.
+Проверенная база: Prototype 61 RC7 / Godot 4.7.2 / version 0.61.0; workflow №42 также подтверждает 12-цикловую runtime-приёмку длинной экспедиции.
 
 ## Что запускает workflow
 
