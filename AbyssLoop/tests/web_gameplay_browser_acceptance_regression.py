@@ -10,6 +10,7 @@ checks = {
     "reload test tolerates cached JavaScript but requires fresh WASM/PCK requests": "counts_before_reload" in script and "Godot WASM/PCK are available again after browser reload" in script and 'reload_assets[".wasm"] and reload_assets[".pck"]' in script,
     "reload test checks transition to shelter": "browser reload leaves the expedition and returns to a shelter view" in script and "reload_hash != placed_hash" in script,
     "browser script explicitly checks saved-expedition resume": "saved expedition resumes after reload" in script,
+    "resume click targets the compact saved-expedition button after reload": 'page.mouse.click(450, 385)' in script and "replaces the larger preparation form and moves upward" in script,
     "browser acceptance includes real touch interaction checks": "has_touch=True" in script and "touch tap dismisses first-launch tutorial" in script and "touch tap places the selected tile on a free road node" in script,
     "resume test checks the same persisted road-node image crop": "road_node_clip" in script and "resumed_node_hash == placed_node_hash" in script,
     "browser QA scope keeps responsive phone layout and full-playthrough as separate acceptance items": "browser reload and saved-run resume" in script and "responsive phone layout and full-playthrough remain separate acceptance items" in script,

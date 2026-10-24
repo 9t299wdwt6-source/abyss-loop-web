@@ -119,7 +119,7 @@ jobs:
           grep -q '^config/name="Abyss Loop CI Acceptance"$' "$test_root/project.godot"
           "$GODOT_BIN" --headless --editor --path "$test_root" --import
           timeout 30s "$GODOT_BIN" --headless --path "$test_root" res://tests/smoke_test_runner.tscn
-          timeout 60s "$GODOT_BIN" --headless --path "$test_root" --script res://tests/save_system_regression.gd
+          timeout 60s "$GODOT_BIN" --headless --path "$test_root" res://tests/save_system_regression_runner.tscn
           rm -rf "$HOME/.local/share/godot/app_userdata/Abyss Loop CI Acceptance"
           timeout 30s "$GODOT_BIN" --headless --path "$test_root" res://tests/expedition_runtime_acceptance_runner.tscn
 

@@ -82,6 +82,7 @@ REQUIRED_FILES = (
     "STAGE65D_BUILD_REPORT_RU.md",
     "tests/smoke_test.gd",
     "tests/save_system_regression.gd",
+    "tests/save_system_regression_runner.tscn",
     "tests/save_integrity_regression.py",
     "tests/expedition_integration_audit.gd",
     "tools/package_release.py",

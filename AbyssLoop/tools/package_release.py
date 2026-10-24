@@ -95,6 +95,7 @@ REQUIRED = (
     "tests/smoke_test.gd",
     "tests/status_effect_presenter_regression.py",
     "tests/save_system_regression.gd",
+    "tests/save_system_regression_runner.tscn",
     "tests/save_integrity_regression.py",
     "tests/expedition_integration_audit.gd",
     "tests/expedition_integration_audit_regression.py",

@@ -164,9 +164,9 @@ def main() -> int:
                     {"before_reload": placed_hash, "after_reload": reload_hash,
                      "road_node_before": placed_node_hash, "road_node_after": reload_node_hash})
 
-                # The primary shelter action remains in the lower-left launch area.
-                # With a valid saved checkpoint this action resumes, rather than restarts.
-                page.mouse.click(450, 607)
+                # When a checkpoint is available, the shelter's primary "continue" button
+                # replaces the larger preparation form and moves upward. Click its center.
+                page.mouse.click(450, 385)
                 page.wait_for_timeout(1000)
                 page.mouse.move(900, 110)
                 page.wait_for_timeout(180)

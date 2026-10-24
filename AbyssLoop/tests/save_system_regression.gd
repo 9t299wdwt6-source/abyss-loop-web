@@ -1,6 +1,4 @@
-extends SceneTree
-
-const SaveSystemScript = preload("res://scripts/core/save_system.gd")
+extends Node
 
 const TARGET_PATHS := [
 	"user://loop_roguelite_save.json",
@@ -13,14 +11,14 @@ const TARGET_PATHS := [
 	"user://loop_roguelite_save.backup.json.previous.tmp"
 ]
 
-func _initialize() -> void:
+func _ready() -> void:
 	call_deferred("_run_tests")
 
 func _run_tests() -> void:
 	var originals: Dictionary = {}
 	for path in TARGET_PATHS:
 		originals[path] = {"exists": FileAccess.file_exists(path), "text": FileAccess.get_file_as_string(path) if FileAccess.file_exists(path) else ""}
-	var save_system = root.get_node_or_null("SaveSystem")
+	var save_system = get_tree().root.get_node_or_null("SaveSystem")
 	if save_system == null:
 		push_error("SaveSystem autoload was not created. Run this test with the project loaded in Godot.")
 		_quit_with_restore(originals, 1)
@@ -227,4 +225,4 @@ func _quit_with_restore(originals: Dictionary, exit_code: int) -> void:
 			if file != null:
 				file.store_string(str(previous.get("text", "")))
 				file.close()
-	quit(exit_code)
+	get_tree().quit(exit_code)

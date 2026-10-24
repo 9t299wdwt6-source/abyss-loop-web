@@ -44,6 +44,8 @@ checks = {
     "independent preflight enforces Stage64B automated capture evidence": all(x in (ROOT / "tools" / "release_preflight.py").read_text(encoding="utf-8") for x in ["tests/stage64b_engine_run_capture.gd", "tests/stage64b_engine_run_capture_regression.py", "STAGE64B_AUTOMATED_ENGINE_RUN_CAPTURE_GUIDE_RU.md"]),
     "RC7 package includes browser reload/resume acceptance": all(x in packager for x in ["tools/web_gameplay_browser_acceptance.py", "tests/web_gameplay_browser_acceptance_regression.py"]),
     "RC7 package includes road/landscape touch placement regression": "tests/dual_placement_regression.py" in packager,
+    "RC7 package includes the autoload-aware save-system regression scene": '"tests/save_system_regression_runner.tscn"' in packager,
+    "Web CI runs the save-system regression with autoloads initialized": 'res://tests/save_system_regression_runner.tscn' in (ROOT / ".github" / "workflows" / "abyssloop-web.yml").read_text(encoding="utf-8"),
     "independent preflight enforces road/landscape touch placement regression": '"tests/dual_placement_regression.py"' in (ROOT / "tools" / "release_preflight.py").read_text(encoding="utf-8"),
     "independent preflight enforces browser reload/resume acceptance": all(x in (ROOT / "tools" / "release_preflight.py").read_text(encoding="utf-8") for x in ["tools/web_gameplay_browser_acceptance.py", "tests/web_gameplay_browser_acceptance_regression.py"]),
 }
