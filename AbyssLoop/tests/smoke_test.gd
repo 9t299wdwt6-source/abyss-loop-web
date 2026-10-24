@@ -301,6 +301,9 @@ func _run_tests() -> void:
 	assert(not bool(tile_system.can_place(route, {"1": {"id": "cache"}}, 1).ok), "occupied node must reject tiles")
 	var tile_draw_rng := RandomNumberGenerator.new()
 	tile_draw_rng.seed = 23019
+	# The saved profile can retain upgrades from prior sessions. Pin this first
+	# distribution sample to the baseline so its rarity bounds stay reproducible.
+	GameState.buildings["cartographer"] = 0
 	var locked_rare_tiles := 0
 	var unlocked_rare_tiles := 0
 	var unlocked_draw_count := 1200

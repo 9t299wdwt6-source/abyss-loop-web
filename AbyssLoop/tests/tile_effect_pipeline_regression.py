@@ -24,7 +24,7 @@ checks = {
     ),
     "smoke tests cover all three final modifier caps": "final encounter chance modifier must be capped" in smoke and "final enemy strength modifier must be capped" in smoke and "final combat reward modifier must be capped" in smoke,
     "smoke tests cover removal and replacement without ghost bonuses": "removing a neighbour tile must remove the old synergy bonus" in smoke and "replacing a synergy tile must not leave a ghost bonus" in smoke,
-    "tile card discovery uses weighted probabilities and keeps rare cards gated": "const TILE_DRAW_WEIGHTS" in tile and "total_weight" in tile and "TILE_DRAW_WEIGHTS.get(choice_id" in tile and "unlocked_rare_tiles" in smoke and '"archive": 0.35' in tile and '"nursery": 0.30' in tile,
+    "tile card discovery uses weighted probabilities and keeps rare cards gated": "const TILE_DRAW_WEIGHTS" in tile and "total_weight" in tile and "_get_tile_draw_weight(choice_id)" in tile and "GameState.get_rare_tile_weight_multiplier()" in tile and "unlocked_rare_tiles" in smoke and '"archive": 0.35' in tile and '"nursery": 0.30' in tile,
     "forecast smoke verifies no source-map mutation": "placement forecasts must not mutate the live tile map" in smoke,
 }
 missing = [label for label, ok in checks.items() if not ok]
