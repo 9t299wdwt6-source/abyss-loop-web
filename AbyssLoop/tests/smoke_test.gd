@@ -565,6 +565,8 @@ func _run_tests() -> void:
 	var rare_affix_ids: Array = rare_affixed.get("affix_ids", [])
 	assert(rare_affix_ids.size() == 1 and not str(rare_affixed.get("affix_description", "")).is_empty(), "rare gear must roll exactly one readable prefix affix")
 	assert(float(rare_affixed.get("power", 0.0)) > float(weapon_fixture.get("power", 0.0)), "a weapon affix must change the real item comparison score")
+	var affix_changed_stat := int(rare_affixed.get("attack", 0)) != int(weapon_fixture.get("attack", 0)) or float(rare_affixed.get("crit", 0.0)) != float(weapon_fixture.get("crit", 0.0)) or float(rare_affixed.get("bleed_chance", 0.0)) != float(weapon_fixture.get("bleed_chance", 0.0)) or int(rare_affixed.get("bleed_damage", 0)) != int(weapon_fixture.get("bleed_damage", 0)) or int(rare_affixed.get("kill_heal", 0)) != int(weapon_fixture.get("kill_heal", 0))
+	assert(affix_changed_stat, "rare affixes must change at least one actual combat or utility stat")
 	assert(not weapon_fixture.has("affix_ids"), "affix rolls must not mutate the source item fixture")
 	var epic_affix_rng := RandomNumberGenerator.new()
 	epic_affix_rng.seed = 7319
