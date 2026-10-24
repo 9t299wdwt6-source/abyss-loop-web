@@ -54,6 +54,8 @@ func _run_tests() -> void:
 	assert(save_system._payload_checksum({"a": 1, "b": 2}) == save_system._payload_checksum({"b": 2, "a": 1}), "canonical checksum must ignore dictionary key insertion order")
 	assert(save_system._canonical_json({"scrap": 41, "settings": {"ui_scale": 1.0}}) == save_system._canonical_json({"scrap": 41.0, "settings": {"ui_scale": 1.0}}), "canonical JSON must normalize whole numbers to tolerate Web/WASM integer-to-float parsing")
 	assert(save_system._payload_checksum({"scrap": 41, "settings": {"ui_scale": 1.0}}) == save_system._payload_checksum({"scrap": 41.0, "settings": {"ui_scale": 1.0}}), "save checksum must remain stable when a JSON integer is parsed as a float")
+	assert(save_system._canonical_json({"settings": {"music": 0.7, "effects": 0.85}}) == save_system._canonical_json({"settings": {"music": 0.699999988079071, "effects": 0.8500000238418579}}), "canonical JSON must stabilize fractional numbers across Web/WASM precision conversion")
+	assert(save_system._payload_checksum({"settings": {"music": 0.7, "effects": 0.85}}) == save_system._payload_checksum({"settings": {"music": 0.699999988079071, "effects": 0.8500000238418579}}), "save checksum must remain stable across Web/WASM single-precision fraction conversion")
 	var encoded_roundtrip: String = save_system._encode_save(baseline)
 	assert(not encoded_roundtrip.is_empty() and not save_system._decode_save(encoded_roundtrip).is_empty(), "integrity envelope should survive an ordinary encode/decode roundtrip")
 	var web_like_envelope: Variant = JSON.parse_string(encoded_roundtrip)

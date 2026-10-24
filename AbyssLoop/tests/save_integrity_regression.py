@@ -40,8 +40,11 @@ def canonical(value):
         return "{" + ",".join(json.dumps(str(k), ensure_ascii=False) + ":" + canonical(value[k]) for k in sorted(value, key=lambda key: str(key))) + "}"
     if isinstance(value, list):
         return "[" + ",".join(canonical(item) for item in value) + "]"
-    if isinstance(value, float) and math.isfinite(value) and abs(value) <= 9007199254740991 and value.is_integer():
-        return str(int(value))
+    if isinstance(value, float) and math.isfinite(value):
+        if abs(value) <= 9007199254740991 and value.is_integer():
+            return str(int(value))
+        if abs(value) <= 1000000:
+            return f"{value:.7f}"
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 left = {"scrap": 41, "settings": {"music": 0.7, "master": 0.8}, "saved_expedition": {}}
@@ -52,6 +55,10 @@ assert left_hash == right_hash, "canonical JSON hash should be insensitive to ke
 web_parsed = {"scrap": 41.0, "settings": {"music": 0.7, "master": 0.8}, "saved_expedition": {}}
 assert canonical(left) == canonical(web_parsed), "Web-style integral-float parsing must preserve canonical payload bytes"
 assert hashlib.sha256(canonical(web_parsed).encode("utf-8")).hexdigest() == left_hash, "Web-style numeric roundtrip must preserve payload checksum"
+fractional = {"settings": {"music": 0.7, "effects": 0.85}}
+web_fractional = {"settings": {"music": 0.699999988079071, "effects": 0.8500000238418579}}
+assert canonical(fractional) == canonical(web_fractional), "single-precision Web fractions must share canonical JSON"
+assert hashlib.sha256(canonical(fractional).encode("utf-8")).hexdigest() == hashlib.sha256(canonical(web_fractional).encode("utf-8")).hexdigest(), "fractional Web roundtrip must preserve save checksum"
 changed = dict(right); changed["scrap"] = 42
 changed_hash = hashlib.sha256(canonical(changed).encode("utf-8")).hexdigest()
 assert changed_hash != left_hash, "payload mutation should change checksum"

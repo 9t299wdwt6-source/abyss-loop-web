@@ -364,8 +364,15 @@ func _canonical_json(value: Variant) -> String:
 		return str(value)
 	if typeof(value) == TYPE_FLOAT:
 		var numeric_value: float = float(value)
-		if is_finite(numeric_value) and absf(numeric_value) <= 9007199254740991.0 and floor(numeric_value) == numeric_value:
+		if not is_finite(numeric_value):
+			return JSON.stringify(numeric_value)
+		if absf(numeric_value) <= 9007199254740991.0 and floor(numeric_value) == numeric_value:
 			return str(int(numeric_value))
+		# Web/WASM may use single-precision real values even when the desktop build
+		# preserves more bits. Encode ordinary gameplay fractions at a stable
+		# decimal precision so values such as 0.7 and 0.699999988 hash identically.
+		if absf(numeric_value) <= 1000000.0:
+			return String.num(numeric_value, 7)
 		return JSON.stringify(numeric_value)
 	return JSON.stringify(value)
 
