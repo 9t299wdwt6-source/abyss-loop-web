@@ -54,7 +54,7 @@ func _run_tests() -> void:
 	assert(save_system._payload_checksum({"a": 1, "b": 2}) == save_system._payload_checksum({"b": 2, "a": 1}), "canonical checksum must ignore dictionary key insertion order")
 	assert(save_system._canonical_json({"scrap": 41, "settings": {"ui_scale": 1.0}}) == save_system._canonical_json({"scrap": 41.0, "settings": {"ui_scale": 1.0}}), "canonical JSON must normalize whole numbers to tolerate Web/WASM integer-to-float parsing")
 	assert(save_system._payload_checksum({"scrap": 41, "settings": {"ui_scale": 1.0}}) == save_system._payload_checksum({"scrap": 41.0, "settings": {"ui_scale": 1.0}}), "save checksum must remain stable when a JSON integer is parsed as a float")
-	var encoded_roundtrip := save_system._encode_save(baseline)
+	var encoded_roundtrip: String = save_system._encode_save(baseline)
 	assert(not encoded_roundtrip.is_empty() and not save_system._decode_save(encoded_roundtrip).is_empty(), "integrity envelope should survive an ordinary encode/decode roundtrip")
 	var web_like_envelope: Variant = JSON.parse_string(encoded_roundtrip)
 	assert(typeof(web_like_envelope) == TYPE_DICTIONARY, "roundtrip fixture should be an envelope dictionary")

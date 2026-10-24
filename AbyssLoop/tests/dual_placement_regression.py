@@ -22,6 +22,9 @@ route_place = block(manager, "func place_tile(hand_index: int, cell_index: int) 
 
 checks = {
     "road-node click invokes the route-tile placement API": "manager.place_tile(selected_tile_hand_index, cell_index)" in route_click,
+    "route view handles touch press and ignores touch release/cancel": "if event is InputEventScreenTouch:" in route and "not touch_event.pressed or touch_event.canceled" in route,
+    "screen-touch viewport coordinates are converted to RouteView-local coordinates": "make_input_local(touch_event)" in route and "_handle_click_position(local_touch.position)" in route,
+    "mouse and touch use the same road/landscape click dispatcher": "func _handle_click_position(local_position: Vector2) -> void:" in route and "_handle_click_position(mouse_event.position)" in route and "world_cell_clicked.emit(world_id)" in route and "cell_clicked.emit(closest_index)" in route,
     "landscape click invokes the separate world-placement API": "manager.place_world_tile(selected_tile_hand_index, cell_id)" in ui,
     "road hover calls the road-synergy preview": "get_placement_preview(manager.route, manager.placed_tiles, cell_index, selected_tile)" in route_hover,
     "landscape hover calls the landscape-sector preview": "get_world_placement_preview(manager.route, manager.world_tiles, cell_id, selected_tile)" in world_hover,

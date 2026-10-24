@@ -183,6 +183,59 @@ def main() -> int:
                 add("game canvas stays visible after the UI transitions",
                     bool(canvas_info.get("visible")) and canvas_info.get("clientWidth", 0) > 10 and canvas_info.get("clientHeight", 0) > 10,
                     canvas_info)
+
+                # A second independent browser context emits real touch events rather
+                # than mouse clicks. Keep the same desktop viewport here so this tests
+                # touch delivery to Godot's custom map control independently from the
+                # separate responsive-layout/mobile-sizing acceptance stage.
+                touch_context = browser.new_context(
+                    viewport={"width": 1280, "height": 800},
+                    device_scale_factor=1,
+                    has_touch=True,
+                )
+                try:
+                    touch_page = touch_context.new_page()
+                    touch_page.on("pageerror", lambda exc: errors.append("touch context: " + str(exc)))
+                    touch_page.on("console", lambda msg: console_errors.append("touch context: " + msg.text) if msg.type == "error" else None)
+                    touch_response = touch_page.goto(url, wait_until="domcontentloaded", timeout=args.timeout * 1000)
+                    touch_page.wait_for_selector("canvas", state="visible", timeout=min(20000, args.timeout * 1000))
+                    touch_page.wait_for_timeout(1200)
+                    touch_tutorial = capture(touch_page, "09-touch-first-launch-tutorial")
+                    touch_page.touchscreen.tap(640, 512)
+                    touch_page.wait_for_timeout(450)
+                    touch_shelter = capture(touch_page, "10-touch-shelter")
+                    add("touch tap dismisses first-launch tutorial",
+                        touch_response is not None and touch_shelter != touch_tutorial,
+                        {"tutorial": touch_tutorial, "shelter": touch_shelter})
+                    touch_page.touchscreen.tap(450, 607)
+                    touch_page.wait_for_timeout(1200)
+                    touch_expedition = capture(touch_page, "11-touch-expedition")
+                    add("touch tap starts the expedition",
+                        touch_expedition != touch_shelter,
+                        {"shelter": touch_shelter, "expedition": touch_expedition})
+                    touch_page.touchscreen.tap(1095, 316)
+                    touch_page.wait_for_timeout(350)
+                    touch_paused = capture(touch_page, "12-touch-expedition-paused")
+                    add("touch tap activates expedition pause",
+                        touch_paused != touch_expedition,
+                        {"expedition": touch_expedition, "paused": touch_paused})
+                    touch_page.touchscreen.tap(1020, 565)
+                    touch_page.wait_for_timeout(350)
+                    touch_selected = capture(touch_page, "13-touch-road-tile-selected")
+                    add("touch tap selects a road tile",
+                        touch_selected != touch_paused,
+                        {"paused": touch_paused, "selected": touch_selected})
+                    touch_page.touchscreen.tap(585, 348)
+                    touch_page.wait_for_timeout(350)
+                    touch_placed = capture(touch_page, "14-touch-road-tile-placed")
+                    add("touch tap places the selected tile on a free road node",
+                        touch_placed != touch_selected,
+                        {"selected": touch_selected, "placed": touch_placed})
+                except Exception as touch_exc:
+                    add("touch interaction flow completes",
+                        False, f"{type(touch_exc).__name__}: {touch_exc}")
+                finally:
+                    touch_context.close()
             except Exception as exc:
                 add("browser gameplay flow completes", False, f"{type(exc).__name__}: {exc}")
             finally:
@@ -202,7 +255,7 @@ def main() -> int:
         "checked_utc": datetime.now(timezone.utc).isoformat(),
         "url": url,
         "result": "FAIL" if failures else "PASS",
-        "scope": "real Chromium pointer interaction through tutorial dismiss, expedition launch, pause, tile selection, road placement, browser reload, and saved-run resume; not full-playthrough or iPhone Safari acceptance",
+        "scope": "real Chromium mouse and touchscreen interaction, road placement, browser reload and saved-run resume; responsive phone layout and full-playthrough remain separate acceptance items",
         "runtime_assets": assets,
         "screenshots": screenshots,
         "javascript_errors": errors,

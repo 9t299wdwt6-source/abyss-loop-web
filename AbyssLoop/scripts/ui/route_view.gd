@@ -279,16 +279,31 @@ func _gui_input(event: InputEvent) -> void:
 			cell_hovered.emit(hovered_cell_index)
 			queue_redraw()
 		return
+	if event is InputEventScreenTouch:
+		var touch_event := event as InputEventScreenTouch
+		if not touch_event.pressed or touch_event.canceled:
+			return
+		# Screen-touch positions are viewport-relative, unlike mouse positions in
+		# _gui_input. Convert them to this RouteView's local coordinate space.
+		var local_touch := make_input_local(touch_event) as InputEventScreenTouch
+		if local_touch == null:
+			return
+		_handle_click_position(local_touch.position)
+		accept_event()
+		return
 	if not (event is InputEventMouseButton):
 		return
 	var mouse_event := event as InputEventMouseButton
 	if not mouse_event.pressed or mouse_event.button_index != MOUSE_BUTTON_LEFT:
 		return
-	var world_id := _find_world_cell(mouse_event.position)
+	_handle_click_position(mouse_event.position)
+
+func _handle_click_position(local_position: Vector2) -> void:
+	var world_id := _find_world_cell(local_position)
 	if not world_id.is_empty():
 		world_cell_clicked.emit(world_id)
 		return
-	var closest_index := _find_closest_cell(mouse_event.position)
+	var closest_index := _find_closest_cell(local_position)
 	if closest_index >= 0:
 		cell_clicked.emit(closest_index)
 

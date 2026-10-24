@@ -110,6 +110,7 @@ REQUIRED_FILES = (
     "ROADMAP_CONTINUATION_STAGES29-61_RU.md",
     "GAMEPLAY_CYCLE_RUNTIME_CHECKLIST_Prototype60.md",
     "tests/gameplay_cycle_regression.py",
+    "tests/dual_placement_regression.py",
     "RUN_RELEASE_GATE_WINDOWS.bat",
     "RUN_TESTS_WINDOWS.bat",
 )

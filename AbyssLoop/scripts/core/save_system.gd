@@ -18,6 +18,7 @@ const TileSystemScript = preload("res://scripts/systems/tile_system.gd")
 const MAX_SNAPSHOT_LOG_LINES := 300
 
 var last_load_status: String = "not_loaded"
+var last_decode_failure_reason: String = ""
 
 func save_game(payload: Dictionary) -> bool:
 	if not _validate_save_data(payload):
@@ -81,7 +82,7 @@ func load_game() -> Dictionary:
 		last_load_status = "loaded_primary"
 		return normalized.get("data", {})
 
-	push_warning("Основное сохранение повреждено или несовместимо; пробуется резервная копия.")
+	push_warning("Основное сохранение повреждено или несовместимо (%s); пробуется резервная копия." % last_decode_failure_reason)
 	var backup := _load_backup()
 	if not backup.is_empty():
 		# Quarantine the damaged primary before replacing it. If quarantine fails,
@@ -231,30 +232,31 @@ func _recover_one_replacement(target_path: String, temporary_path: String) -> vo
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(rollback_path))
 
 func _decode_save(raw: String) -> Dictionary:
+	last_decode_failure_reason = ""
 	var parsed_value: Variant = JSON.parse_string(raw)
 	if typeof(parsed_value) != TYPE_DICTIONARY:
-		return {}
+		return _reject_decoded_save("root_not_dictionary")
 	# Some platform JSON implementations (including Web/WASM) may parse every
 	# JSON number as a float. Normalize finite whole numbers before strict schema
 	# checks so valid integer fields remain valid after a browser reload.
 	var parsed: Dictionary = _normalize_numeric_types(parsed_value)
 	if typeof(parsed.get("version", null)) != TYPE_INT:
-		return {}
+		return _reject_decoded_save("payload_version_not_integer")
 	var version: int = int(parsed.get("version", -1))
 	var data_value: Variant = parsed.get("data", null)
 	if version < MIN_SUPPORTED_VERSION or version > SAVE_VERSION or typeof(data_value) != TYPE_DICTIONARY:
-		return {}
+		return _reject_decoded_save("payload_version_or_data_invalid")
 	# Keep the payload schema version independent from the file envelope version.
 	# Legacy files omit envelope_version (equivalent to envelope v1) and remain
 	# loadable; envelope v2 is integrity-aware and cannot omit its checksum.
 	var envelope_version_value: Variant = parsed.get("envelope_version", 1)
 	if typeof(envelope_version_value) != TYPE_INT:
-		return {}
+		return _reject_decoded_save("envelope_version_not_integer")
 	var envelope_version: int = int(envelope_version_value)
 	if envelope_version < 1 or envelope_version > SAVE_ENVELOPE_VERSION:
-		return {}
+		return _reject_decoded_save("envelope_version_unsupported")
 	if envelope_version >= 2 and not parsed.has("integrity"):
-		return {}
+		return _reject_decoded_save("integrity_metadata_missing")
 
 	# New saves include a checksum of canonical JSON. Legacy envelopes without an
 	# integrity object remain supported for backward compatibility; malformed or
@@ -262,17 +264,17 @@ func _decode_save(raw: String) -> Dictionary:
 	if parsed.has("integrity"):
 		var integrity_value: Variant = parsed.get("integrity", null)
 		if typeof(integrity_value) != TYPE_DICTIONARY:
-			return {}
+			return _reject_decoded_save("integrity_metadata_not_dictionary")
 		var integrity: Dictionary = integrity_value
 		var algorithm_value: Variant = integrity.get("algorithm", null)
 		var checksum_value: Variant = integrity.get("checksum", null)
 		if typeof(algorithm_value) != TYPE_STRING or str(algorithm_value) != SAVE_INTEGRITY_ALGORITHM:
-			return {}
+			return _reject_decoded_save("integrity_algorithm_unsupported")
 		if typeof(checksum_value) != TYPE_STRING or not str(checksum_value).is_valid_hex_number(false) or str(checksum_value).length() != 64:
-			return {}
+			return _reject_decoded_save("integrity_checksum_format_invalid")
 		var checksum_data: Dictionary = data_value
 		if str(checksum_value).to_lower() != _payload_checksum(checksum_data):
-			return {}
+			return _reject_decoded_save("integrity_checksum_mismatch")
 
 	var data: Dictionary = data_value.duplicate(true)
 	# Version 1 stores permanent progress only. Version 2 added research and
@@ -284,9 +286,21 @@ func _decode_save(raw: String) -> Dictionary:
 		data["tutorial_page"] = 0
 		data["tutorial_completed"] = false
 
+	var snapshot_value: Variant = data.get("saved_expedition", {})
+	if typeof(snapshot_value) == TYPE_DICTIONARY and not snapshot_value.is_empty() and bool(snapshot_value.get("active", false)):
+		if not _validate_expedition_snapshot(snapshot_value):
+			var snapshot_version := int(snapshot_value.get("snapshot_version", -1))
+			var status_schema := int(snapshot_value.get("status_schema", 0))
+			var telemetry_schema := int(snapshot_value.get("telemetry_schema", 0))
+			return _reject_decoded_save("expedition_snapshot_invalid_v%d_status%d_telemetry%d" % [snapshot_version, status_schema, telemetry_schema])
 	if not _validate_save_data(data):
-		return {}
+		return _reject_decoded_save("save_payload_validation_failed")
 	return {"version": SAVE_VERSION, "data": data}
+
+
+func _reject_decoded_save(reason: String) -> Dictionary:
+	last_decode_failure_reason = reason
+	return {}
 
 
 func _encode_save(payload: Dictionary) -> String:

@@ -43,6 +43,8 @@ checks = {
     "RC7 package includes Stage64B automated engine capture with source labels": all(x in packager for x in ["tests/stage64b_engine_run_capture.gd", "tests/stage64b_engine_run_capture_runner.tscn", "tests/stage64b_engine_run_capture_regression.py", "tests/reports/STAGE64B_AUTOMATED_ENGINE_RUN_CAPTURE_GUIDE_RU.md"]),
     "independent preflight enforces Stage64B automated capture evidence": all(x in (ROOT / "tools" / "release_preflight.py").read_text(encoding="utf-8") for x in ["tests/stage64b_engine_run_capture.gd", "tests/stage64b_engine_run_capture_regression.py", "STAGE64B_AUTOMATED_ENGINE_RUN_CAPTURE_GUIDE_RU.md"]),
     "RC7 package includes browser reload/resume acceptance": all(x in packager for x in ["tools/web_gameplay_browser_acceptance.py", "tests/web_gameplay_browser_acceptance_regression.py"]),
+    "RC7 package includes road/landscape touch placement regression": "tests/dual_placement_regression.py" in packager,
+    "independent preflight enforces road/landscape touch placement regression": '"tests/dual_placement_regression.py"' in (ROOT / "tools" / "release_preflight.py").read_text(encoding="utf-8"),
     "independent preflight enforces browser reload/resume acceptance": all(x in (ROOT / "tools" / "release_preflight.py").read_text(encoding="utf-8") for x in ["tools/web_gameplay_browser_acceptance.py", "tests/web_gameplay_browser_acceptance_regression.py"]),
 }
 failed = [name for name, passed in checks.items() if not passed]

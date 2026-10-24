@@ -125,6 +125,7 @@ REQUIRED = (
     "ROADMAP_CONTINUATION_STAGES29-60_RU.md",
     "ROADMAP_CONTINUATION_STAGES29-61_RU.md",
     "tests/gameplay_cycle_regression.py",
+    "tests/dual_placement_regression.py",
     "tests/release_artifact_hygiene_regression.py",
     "tests/runtime_gate_report_validation_regression.py",
     "tests/release_candidate_regression.py",

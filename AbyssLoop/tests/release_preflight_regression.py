@@ -42,6 +42,7 @@ STAGE64B_REQUIRED = {
     "tests/reports/STAGE64B_AUTOMATED_ENGINE_RUN_CAPTURE_GUIDE_RU.md",
 }
 assert STAGE64B_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage64B automated engine capture and evidence must be mandatory in independent preflight"
+assert "tests/dual_placement_regression.py" in REQUIRED_FILES, "dual-placement mouse/touch regression must be included in independent preflight"
 
 
 def write_fixture(root: Path) -> None:
