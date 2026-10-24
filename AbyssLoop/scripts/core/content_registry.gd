@@ -512,8 +512,8 @@ const EXPEDITION_EVENTS := {
 		"narrative": "Когда архив и разлом оказались рядом, на старой карте проступили координаты комнаты, которой нет на плане. За стеной слышно сердцебиение глубины.",
 		"weight": 1.0, "min_loop": 1, "requires_flag": "secret_archive_rift_found", "excludes_flag": "secret_archive_rift_claimed", "resolved_flag": "secret_archive_rift_claimed", "guaranteed_when_flag": true,
 		"choices": [
-			{"id": "seal_echo", "title": "Запечатать эхо", "description": "+2 редких ресурса и восстановить до 8 здоровья", "effects": {"crystals": 2, "heal": 8, "set_flags": ["secret_echo_sealed"]}},
-			{"id": "follow_echo", "title": "Проследить за пульсом", "description": "+5 редких ресурсов, но −18 здоровья; опасность и награда за бой вырастут", "effects": {"crystals": 5, "damage": 18, "danger_delta": 0.15, "reward_bonus": 0.20, "set_flags": ["secret_echo_followed"]}}
+			{"id": "seal_echo", "title": "Запечатать эхо", "description": "Тайный Компас за закрытой картой, +2 редких ресурса и до 8 здоровья", "effects": {"crystals": 2, "heal": 8, "grant_item_id": "echo_chart_core", "set_flags": ["secret_echo_sealed"]}},
+			{"id": "follow_echo", "title": "Проследить за пульсом", "description": "Клинок незамкнутого разлома и +5 редких ресурсов; −18 здоровья, опасность и награда вырастут", "effects": {"crystals": 5, "damage": 18, "danger_delta": 0.15, "reward_bonus": 0.20, "grant_item_id": "riftwalker_edge", "set_flags": ["secret_echo_followed"]}}
 		]
 	},
 	"sealed_brood": {
@@ -521,8 +521,8 @@ const EXPEDITION_EVENTS := {
 		"narrative": "Сеть резонанса удерживала не обычную угрозу, а целое гнездо. Питомник бездны реагирует на ловушку, и теперь можно решить судьбу выводка.",
 		"weight": 1.0, "min_loop": 1, "requires_flag": "secret_nursery_snare_found", "excludes_flag": "secret_nursery_snare_claimed", "resolved_flag": "secret_nursery_snare_claimed", "guaranteed_when_flag": true,
 		"choices": [
-			{"id": "spare_brood", "title": "Усыпить выводок", "description": "+3 редких ресурса, +4 материала и восстановить до 12 здоровья", "effects": {"crystals": 3, "scrap": 4, "heal": 12, "set_flags": ["secret_brood_spared"]}},
-			{"id": "hunt_brood", "title": "Использовать гнездо как приманку", "description": "+7 материалов и +2 редких ресурса, но −10 здоровья и повышенный шанс боя", "effects": {"scrap": 7, "crystals": 2, "damage": 10, "spawn_bonus": 0.16, "reward_bonus": 0.20, "set_flags": ["secret_brood_hunted"]}}
+			{"id": "spare_brood", "title": "Усыпить выводок", "description": "Панцирь тихого выводка, +3 редких ресурса, +4 материала и до 12 здоровья", "effects": {"crystals": 3, "scrap": 4, "heal": 12, "grant_item_id": "brood_shell", "set_flags": ["secret_brood_spared"]}},
+			{"id": "hunt_brood", "title": "Использовать гнездо как приманку", "description": "Ядро приманивающего импульса, +7 материалов и +2 редких ресурса; −10 здоровья и повышенный шанс боя", "effects": {"scrap": 7, "crystals": 2, "damage": 10, "spawn_bonus": 0.16, "reward_bonus": 0.20, "grant_item_id": "snare_hunter_core", "set_flags": ["secret_brood_hunted"]}}
 		]
 	}
 }

@@ -981,6 +981,9 @@ func resolve_event_choice(choice_id: String) -> Dictionary:
 	if not resolved_flag.is_empty():
 		event_flags[resolved_flag] = true
 	run_ledger["event_flags"] = event_flags
+	var granted_item_id := str(effects.get("grant_item_id", ""))
+	if not granted_item_id.is_empty():
+		_grant_secret_event_item(granted_item_id)
 	pending_event.clear()
 	run_ledger["events_resolved"] = int(run_ledger.get("events_resolved", 0)) + 1
 	var history_value: Variant = run_ledger.get("event_history", [])
@@ -1020,6 +1023,26 @@ func resolve_event_choice(choice_id: String) -> Dictionary:
 	changed.emit()
 	save_run_snapshot()
 	return {"ok": true, "reason": "Решение применено."}
+
+func _grant_secret_event_item(relic_id: String) -> Dictionary:
+	var item: Dictionary = inventory_system.make_secret_relic(relic_id, loop_count, int(hero.get("level", 1)), run_seed)
+	if item.is_empty():
+		_log("Секретная награда не распознана: %s. Остальные последствия выбора сохранены." % relic_id)
+		return {}
+	bag.append(item.duplicate(true))
+	GameState.register_item(item)
+	var slot := str(item.get("slot", ""))
+	var current: Dictionary = equipment.get(slot, {})
+	if inventory_system.should_equip(item, current):
+		equipment[slot] = item.duplicate(true)
+		GameState.loadout[slot] = item.duplicate(true)
+		GameState.save_now()
+		_sync_hero_stats()
+		_log("ТАЙНАЯ РЕЛИКВИЯ: %s. Автоматически экипирована." % str(item.get("name", "Новая реликвия")))
+	else:
+		_log("ТАЙНАЯ РЕЛИКВИЯ: %s. Сохранена в арсенале для будущей сборки." % str(item.get("name", "Новая реликвия")))
+	_request_feedback("loot", str(item.get("name", "Тайная реликвия")))
+	return item
 
 func _start_encounter(index: int, strength_bonus: float, reward_bonus: float, boss_encounter: bool) -> void:
 	var active_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])

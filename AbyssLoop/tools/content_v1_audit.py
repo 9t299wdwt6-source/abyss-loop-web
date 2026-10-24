@@ -16,7 +16,7 @@ REGISTRY_CONSTANTS = [
     "PERKS", "EXPEDITION_EVENTS", "EXPEDITION_OBJECTIVES", "EXPEDITION_CONTRACTS",
     "ROUTE_CELL_TYPES",
 ]
-INVENTORY_CONSTANTS = ["ARCHETYPES", "SET_DEFS", "SYNERGY_DEFS"]
+INVENTORY_CONSTANTS = ["ARCHETYPES", "SET_DEFS", "SYNERGY_DEFS", "SECRET_RELIC_TEMPLATES"]
 
 
 def parse_literal_constants(path: Path, names: list[str]) -> dict[str, Any]:
@@ -99,6 +99,7 @@ def read_catalogs(root: Path) -> dict[str, Any]:
 
     add("Синергии ландшафта", "scripts/core/content_registry.gd:TILE_SYNERGIES", {str(item.get("id", f"entry_{i}")): item for i, item in enumerate(registry["TILE_SYNERGIES"])})
     add("Сеты экипировки", "scripts/systems/inventory_system.gd:SET_DEFS", inventory["SET_DEFS"])
+    add("Секретные реликвии", "scripts/systems/inventory_system.gd:SECRET_RELIC_TEMPLATES", inventory["SECRET_RELIC_TEMPLATES"])
     add("Синергии экипировки", "scripts/systems/inventory_system.gd:SYNERGY_DEFS", inventory["SYNERGY_DEFS"])
     archetypes: dict[str, Any] = {}
     for slot, definitions in inventory["ARCHETYPES"].items():
