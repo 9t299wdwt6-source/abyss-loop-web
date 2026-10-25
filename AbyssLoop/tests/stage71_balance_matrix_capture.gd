@@ -1,6 +1,7 @@
 extends Node
 
 const ExpeditionManagerScript = preload("res://scripts/systems/expedition_manager.gd")
+const TileSystemScript = preload("res://scripts/systems/tile_system.gd")
 const OUTPUT_PATH: String = "user://STAGE71_BALANCE_MATRIX.json"
 const MAX_PROCESS_FRAMES_PER_RUN: int = 6000
 const DIFFICULTY_IDS: Array[String] = ["standard", "volatile", "attrition", "abyssal"]
@@ -241,29 +242,52 @@ func _capture_case(case_data: Dictionary) -> Dictionary:
 func _place_one_legal_road_tile(manager: Variant) -> bool:
 	if manager.tile_hand.is_empty():
 		return false
-	for route_index in range(1, manager.route.size()):
-		var preview: Dictionary = manager.tile_system.can_place(manager.route, manager.placed_tiles, route_index)
-		if not bool(preview.get("ok", false)):
+	# The same hand may contain road-only, landscape-only and roadside cards.
+	# Use the candidate card in the placement preview and try every current slot.
+	for hand_index in range(manager.tile_hand.size()):
+		var tile_value: Variant = manager.tile_hand[hand_index]
+		if typeof(tile_value) != TYPE_DICTIONARY:
 			continue
-		var result: Dictionary = manager.place_tile(0, route_index)
-		if bool(result.get("ok", false)):
-			return true
+		var tile: Dictionary = tile_value
+		for route_index in range(1, manager.route.size()):
+			var preview: Dictionary = manager.tile_system.can_place(manager.route, manager.placed_tiles, route_index, tile)
+			if not bool(preview.get("ok", false)):
+				continue
+			var result: Dictionary = manager.place_tile(hand_index, route_index)
+			if bool(result.get("ok", false)):
+				return true
 	return false
 
 func _place_landscape_tiles(manager: Variant, target_count: int) -> int:
 	var placed := 0
-	for y in range(8):
-		for x in range(10):
-			if placed >= target_count or manager.tile_hand.is_empty():
-				break
-			var cell_id := "%d:%d" % [x, y]
-			var preview: Dictionary = manager.tile_system.can_place_world(manager.route, manager.world_tiles, cell_id)
-			if not bool(preview.get("ok", false)):
+	# Search the complete 19x14 board, not the legacy 10x8 ID set. Candidate
+	# previews must receive the actual card so placement-zone rules match execution.
+	while placed < target_count and not manager.tile_hand.is_empty():
+		var placed_this_round := false
+		for hand_index in range(manager.tile_hand.size()):
+			var tile_value: Variant = manager.tile_hand[hand_index]
+			if typeof(tile_value) != TYPE_DICTIONARY:
 				continue
-			var result: Dictionary = manager.place_world_tile(0, cell_id)
-			if bool(result.get("ok", false)):
-				placed += 1
-		if placed >= target_count or manager.tile_hand.is_empty():
+			var tile: Dictionary = tile_value
+			for y in range(TileSystemScript.MAP_ROWS):
+				for x in range(TileSystemScript.MAP_COLUMNS):
+					var cell_id := TileSystemScript.map_world_cell_id(x, y)
+					var preview: Dictionary = manager.tile_system.can_place_world(
+						manager.route, manager.world_tiles, cell_id, tile,
+						manager.get_route_shape_id(), manager.get_route_geometry_seed()
+					)
+					if not bool(preview.get("ok", false)):
+						continue
+					var result: Dictionary = manager.place_world_tile(hand_index, cell_id)
+					if bool(result.get("ok", false)):
+						placed += 1
+						placed_this_round = true
+						break
+				if placed_this_round:
+					break
+			if placed_this_round:
+				break
+		if not placed_this_round:
 			break
 	return placed
 
