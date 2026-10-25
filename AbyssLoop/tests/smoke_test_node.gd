@@ -36,6 +36,7 @@ func _run_tests() -> void:
 	assert(route.size() == 18, "legacy 18-node route geometry remains loadable for older saved expeditions")
 	assert(str(route[0].kind) == "shrine", "route must have a stable start cell")
 	# Stage 86 procedural contours are seed-reproducible, bounded and preserve legacy geometry at seed 0.
+	var procedural_tile_system = TileSystemType.new()
 	for procedural_shape_id in ["classic_ring", "deep_descent", "narrow_ring", "fractured_loop"]:
 		var legacy_contour: Array[Vector2i] = TileSystemType.get_road_grid_coordinates_for_seed(str(procedural_shape_id), 0)
 		assert(legacy_contour == TileSystemType.get_road_grid_coordinates(str(procedural_shape_id)), "seed 0 must preserve legacy rectangular geometry")
@@ -51,7 +52,7 @@ func _run_tests() -> void:
 		assert(shape_signatures.size() >= 8, "each route family must expose multiple distinct procedural contours across seeds")
 		var seeded_cells: Array[Vector2i] = TileSystemType.get_road_grid_coordinates_for_seed(str(procedural_shape_id), 42)
 		var seeded_road_cell := "m:%d:%d" % [seeded_cells[0].x, seeded_cells[0].y]
-		assert(not bool(TileSystemType.can_place_world(route, {}, seeded_road_cell, {"id": "archive"}, str(procedural_shape_id), 42).get("ok", true)), "landscape placement must reject road cells for the same geometry seed")
+		assert(not bool(procedural_tile_system.can_place_world(route, {}, seeded_road_cell, {"id": "archive"}, str(procedural_shape_id), 42).get("ok", true)), "landscape placement must reject road cells for the same geometry seed")
 
 	# Regression: visual node positions and mouse hit-testing must share geometry
 	# for every expedition contour and supported content-panel size.

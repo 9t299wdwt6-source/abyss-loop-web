@@ -657,12 +657,12 @@ func get_world_placement_preview(route: Array, world_tiles: Dictionary, cell_id:
     for affinity_key in ["heal", "scrap", "crystals"]:
         var affinity_amount := int(affinity_effects.get(affinity_key, 0))
         if affinity_amount > 0:
-            var affinity_label := {"heal": "здоровья", "scrap": "материала", "crystals": "кристалла"}.get(affinity_key, affinity_key)
+            var affinity_label: String = str({"heal": "здоровья", "scrap": "материала", "crystals": "кристалла"}.get(affinity_key, affinity_key))
             affinity_parts.append("+%d %s" % [affinity_amount, affinity_label])
     for affinity_key in ["spawn_bonus", "enemy_bonus", "reward_bonus"]:
         var affinity_amount_float := float(affinity_effects.get(affinity_key, 0.0))
         if not is_zero_approx(affinity_amount_float):
-            var affinity_label := {"spawn_bonus": "п.п. к риску встречи", "enemy_bonus": "% к силе врагов", "reward_bonus": "% к награде"}.get(affinity_key, affinity_key)
+            var affinity_label: String = str({"spawn_bonus": "п.п. к риску встречи", "enemy_bonus": "% к силе врагов", "reward_bonus": "% к награде"}.get(affinity_key, affinity_key))
             affinity_parts.append("%+d %s" % [int(round(affinity_amount_float * 100.0)), affinity_label])
     if not affinity_parts.is_empty():
         lines.append("Эффект надетой экипировки на этом ландшафте: %s." % ", ".join(affinity_parts))
@@ -1173,8 +1173,9 @@ func get_placement_preview(route: Array, placed_tiles: Dictionary, index: int, t
             break
     if has_created_effects:
         lines.append("Суммарный эффект новых связок на затронутых узлах (до общих лимитов узла): %s." % _format_synergy_effects(newly_created_effects))
-    var route_slot := route[index] if index >= 0 and index < route.size() else {}
-    if typeof(route_slot) == TYPE_DICTIONARY:
+    var route_slot_value: Variant = route[index] if index >= 0 and index < route.size() else {}
+    if typeof(route_slot_value) == TYPE_DICTIONARY:
+        var route_slot: Dictionary = route_slot_value
         var route_kind := str(route_slot.get("kind", "plain"))
         var route_kind_name := str(ContentRegistry.ROUTE_CELL_TYPES.get(route_kind, {}).get("name", route_kind))
         lines.append("Тип дорожного узла: %s. Карта повлияет на сам узел и указанные выше соседние связки." % route_kind_name)
