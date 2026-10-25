@@ -420,7 +420,7 @@ func _run_tests() -> void:
 	var replacement_delta: Dictionary = tile_system.get_world_placement_effect_delta(world_after_reverse, replacement_tiles, "1:0")
 	assert(int(replacement_delta.get("totals", {}).get("scrap", 0)) == -4, "replacing a synergy tile must not leave a ghost bonus")
 	assert(not bool(tile_system.can_place_world(route, {"2:0": field_cache}, "2:0").get("ok", true)), "occupied landscape cell must reject another tile")
-	assert(not bool(tile_system.can_place_world(route, {}, "4:0").get("ok", true)), "unregistered landscape cell must reject placement")
+	assert(not bool(tile_system.can_place_world(route, {}, "10:8").get("ok", true)), "unregistered landscape cell must reject placement")
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	var enemy_system = EnemySystemType.new()
