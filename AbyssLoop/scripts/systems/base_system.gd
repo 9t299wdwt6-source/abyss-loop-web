@@ -9,6 +9,7 @@ func get_upgrade_cost(building_id: String) -> Dictionary:
 	return {
 		"scrap": int(def.base_scrap) + level * int(def.scrap_step),
 		"crystals": int(def.base_crystal) + level * int(def.crystal_step),
+		"echo_dust": int(def.get("echo_dust_base", 0)) + level * int(def.get("echo_dust_step", 0)),
 		"level": level,
 		"max_level": int(def.max_level)
 	}
@@ -22,14 +23,31 @@ func try_upgrade(building_id: String) -> Dictionary:
 	var cost := get_upgrade_cost(building_id)
 	if int(cost.level) >= int(cost.max_level):
 		return {"ok": false, "message": "Достигнут максимальный уровень."}
-	if GameState.scrap < int(cost.scrap) or GameState.crystals < int(cost.crystals):
-		return {"ok": false, "message": "Недостаточно материалов для улучшения."}
+	var dust_cost := int(cost.get("echo_dust", 0))
+	if GameState.scrap < int(cost.scrap) or GameState.crystals < int(cost.crystals) or GameState.echo_dust < dust_cost:
+		var missing_text := "Недостаточно ресурсов: нужно %d материалов и %d редких ресурсов." % [int(cost.scrap), int(cost.crystals)]
+		if dust_cost > 0:
+			missing_text = "Недостаточно ресурсов: нужно %d материалов, %d редких ресурсов и %d пыли утраченных вещей." % [int(cost.scrap), int(cost.crystals), dust_cost]
+		return {"ok": false, "message": missing_text}
+	var old_scrap: int = GameState.scrap
+	var old_crystals: int = GameState.crystals
+	var old_echo_dust: int = GameState.echo_dust
+	var old_building_level: int = int(GameState.buildings.get(building_id, 0))
 	GameState.scrap -= int(cost.scrap)
 	GameState.crystals -= int(cost.crystals)
+	GameState.echo_dust -= dust_cost
 	GameState.buildings[building_id] = int(cost.level) + 1
-	GameState.save_now()
+	if not GameState.save_now():
+		GameState.scrap = old_scrap
+		GameState.crystals = old_crystals
+		GameState.echo_dust = old_echo_dust
+		GameState.buildings[building_id] = old_building_level
+		return {"ok": false, "message": "Не удалось сохранить улучшение. Уровень и все ресурсы восстановлены."}
 	GameState.changed.emit()
-	return {"ok": true, "message": "%s улучшено до уровня %d." % [def.name, int(GameState.buildings[building_id])], "building_id": building_id}
+	var message := "%s улучшено до уровня %d." % [def.name, int(GameState.buildings[building_id])]
+	if dust_cost > 0:
+		message += " Потрачено %d пыли утраченных вещей." % dust_cost
+	return {"ok": true, "message": message, "building_id": building_id, "echo_dust_spent": dust_cost}
 
 func get_research_status(research_id: String) -> Dictionary:
 	if not ContentRegistry.BASE_RESEARCH.has(research_id):

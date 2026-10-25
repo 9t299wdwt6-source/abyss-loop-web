@@ -16,7 +16,10 @@ const LootSystemScript = preload("res://scripts/systems/loot_system.gd")
 const ProceduralGenerationScript = preload("res://scripts/systems/procedural_generation.gd")
 const ExpeditionEventSystemScript = preload("res://scripts/systems/expedition_event_system.gd")
 const StatusEffectSystemScript = preload("res://scripts/systems/status_effect_system.gd")
-const EQUIPMENT_SLOT_NAMES := {"weapon": "Оружие", "armor": "Броня", "core": "Ядро"}
+const EQUIPMENT_SLOT_NAMES := InventorySystemScript.SLOT_NAMES
+const BACKPACK_CAPACITY := InventorySystemScript.BACKPACK_CAPACITY
+const INVENTORY_ORDER_VERSION := 2
+const FIELD_CACHE_CAPACITY := 6 # legacy snapshot migration only
 var route_system = RouteSystemScript.new()
 var tile_system = TileSystemScript.new()
 var combat_system = CombatSystemScript.new()
@@ -32,6 +35,7 @@ var active: bool = false
 var paused: bool = false
 var speed: float = 1.0
 var run_seed: int = 0
+var route_geometry_seed: int = 0
 # Bounded local measurements for reproducible balance capture; no network telemetry.
 var run_elapsed_seconds: float = 0.0
 var run_baseline: Dictionary = {}
@@ -50,9 +54,16 @@ var hero: Dictionary = {}
 var run_ledger: Dictionary = {"scrap": 0, "crystals": 0, "victories": 0, "bosses_defeated": 0, "elites_defeated": 0}
 var placed_tiles: Dictionary = {}
 var world_tiles: Dictionary = {}
+# Canonical modern map IDs (`m:col:row`) revealed during this expedition.
+# Old snapshots without this mask are migrated to a fully revealed field.
+var discovered_world_cells: Dictionary = {}
 var tile_hand: Array = []
 var bag: Array = []
-var equipment: Dictionary = {"weapon": {}, "armor": {}, "core": {}}
+# The active-run backpack is a newest-first 12-item queue, like Loop Hero.
+# Older snapshots may still contain field_cache; restore folds it into the queue.
+var field_cache: Array = []
+var last_inventory_evicted_item: Dictionary = {}
+var equipment: Dictionary = {"weapon": {}, "helmet": {}, "armor": {}, "shield": {}, "amulet": {}, "core": {}}
 var enemy: Dictionary = {}
 # All active enemies in this encounter. The hero focuses encounter_enemies[0],
 # while every living member can attack on its own timer.
@@ -141,6 +152,9 @@ func start_run(requested_difficulty_id: String = "standard", requested_seed: int
 		run_contract["failure_reason"] = ""
 		run_contract["cost_paid"] = true # committed atomically with the first snapshot below
 	run_seed = ProceduralGenerationScript.create_seed() if requested_seed <= 0 else requested_seed
+	# New runs get a seed-driven map contour. Legacy snapshots without this field
+	# deliberately keep route_geometry_seed=0 and therefore their historic geometry.
+	route_geometry_seed = maxi(1, run_seed)
 	run_elapsed_seconds = 0.0
 	run_baseline.clear()
 	run_rng = RandomNumberGenerator.new()
@@ -154,13 +168,17 @@ func start_run(requested_difficulty_id: String = "standard", requested_seed: int
 	danger = maxf(1.0, float(difficulty_config.get("starting_danger", 1.0)))
 	paused = false
 	speed = 1.0
-	run_ledger = {"scrap": 0, "crystals": 0, "victories": 0, "bosses_defeated": 0, "elites_defeated": 0, "events_resolved": 0, "event_history": [], "event_flags": {}}
+	run_ledger = {"scrap": 0, "crystals": 0, "victories": 0, "bosses_defeated": 0, "elites_defeated": 0, "events_resolved": 0, "event_history": [], "event_flags": {}, "trophy_drops": _empty_trophy_counts(), "echo_item_charges": 0, "pending_item_rarity_bonus": 0.0, "pending_item_drop_bonus": 0.0, "inventory_ejections": [], "inventory_ejections_count": 0, "inventory_ejections_dust": 0, "last_tile_exchange_loop": -1}
 	placed_tiles.clear()
 	world_tiles.clear()
+	discovered_world_cells.clear()
+	_reveal_world_cells_near_route_index(0)
 	tile_hand.clear()
 	bag.clear()
+	field_cache.clear()
 	equipment = GameState.loadout.duplicate(true)
-	for slot in ["weapon", "armor", "core"]:
+	for slot_value in InventorySystemScript.EQUIPMENT_SLOTS:
+		var slot := str(slot_value)
 		if typeof(equipment.get(slot, {})) != TYPE_DICTIONARY:
 			equipment[slot] = {}
 	enemy.clear()
@@ -297,6 +315,9 @@ func _maybe_finish_long_expedition() -> void:
 
 func get_route_shape_id() -> String:
 	return str(get_run_modifier().get("route_shape", "classic_ring"))
+
+func get_route_geometry_seed() -> int:
+	return route_geometry_seed
 
 func _get_modifier_chance_delta() -> float:
 	return float(get_run_modifier().get("encounter_chance_delta", 0.0))
@@ -466,6 +487,18 @@ func get_return_forecast() -> Dictionary:
 		"difficulty_name": str(active_difficulty.get("name", "Стандарт"))
 	}
 
+func _empty_trophy_counts() -> Dictionary:
+	return {"spore_pollen": 0, "prism_fragment": 0, "bone_fragment": 0, "echo_residue": 0}
+
+func _normalize_trophy_counts(value: Variant) -> Dictionary:
+	var result := _empty_trophy_counts()
+	if typeof(value) != TYPE_DICTIONARY:
+		return result
+	var source: Dictionary = value
+	for trophy_id in result.keys():
+		result[trophy_id] = clampi(int(source.get(trophy_id, 0)), 0, 1000000)
+	return result
+
 func export_run_state() -> Dictionary:
 	if not active or route.is_empty() or hero.is_empty():
 		return {}
@@ -475,10 +508,12 @@ func export_run_state() -> Dictionary:
 		"run_elapsed_seconds": maxf(0.0, run_elapsed_seconds),
 		"run_baseline": run_baseline.duplicate(true),
 		"status_schema": 1,
-		"field_schema": 2,
+		"field_schema": 3,
 		"world_tiles": world_tiles.duplicate(true),
+		"discovered_world_cells": discovered_world_cells.duplicate(true),
 		"active": true,
 		"run_seed": run_seed,
+		"route_geometry_seed": route_geometry_seed,
 		"difficulty_id": difficulty_id,
 		"run_modifier_id": run_modifier_id,
 		"expedition_mode_id": expedition_mode_id,
@@ -497,6 +532,8 @@ func export_run_state() -> Dictionary:
 		"placed_tiles": placed_tiles.duplicate(true),
 		"tile_hand": tile_hand.duplicate(true),
 		"bag": bag.duplicate(true),
+		"inventory_order_version": INVENTORY_ORDER_VERSION,
+		"field_cache": [],
 		"equipment": equipment.duplicate(true),
 		"enemy": enemy.duplicate(true),
 		"encounter_enemies": encounter_enemies.duplicate(true),
@@ -548,6 +585,7 @@ func restore_saved_run() -> bool:
 		if typeof(route_cell_value) != TYPE_DICTIONARY:
 			return false
 	run_seed = int(snapshot.get("run_seed", ProceduralGenerationScript.create_seed()))
+	route_geometry_seed = maxi(0, int(snapshot.get("route_geometry_seed", 0)))
 	run_elapsed_seconds = maxf(0.0, float(snapshot.get("run_elapsed_seconds", 0.0)))
 	var baseline_value: Variant = snapshot.get("run_baseline", {})
 	run_baseline = baseline_value.duplicate(true) if typeof(baseline_value) == TYPE_DICTIONARY else {}
@@ -589,6 +627,42 @@ func restore_saved_run() -> bool:
 	run_ledger = ledger_value.duplicate(true) if typeof(ledger_value) == TYPE_DICTIONARY else {}
 	for ledger_key in ["scrap", "crystals", "victories", "bosses_defeated", "elites_defeated", "events_resolved"]:
 		run_ledger[ledger_key] = maxi(0, int(run_ledger.get(ledger_key, 0)))
+	run_ledger["trophy_drops"] = _normalize_trophy_counts(run_ledger.get("trophy_drops", {}))
+	run_ledger["echo_item_charges"] = clampi(int(run_ledger.get("echo_item_charges", 0)), 0, 4)
+	run_ledger["pending_item_rarity_bonus"] = clampf(float(run_ledger.get("pending_item_rarity_bonus", 0.0)), 0.0, 0.18)
+	run_ledger["pending_item_drop_bonus"] = clampf(float(run_ledger.get("pending_item_drop_bonus", 0.0)), 0.0, 0.30)
+	var inventory_ejections_value: Variant = run_ledger.get("inventory_ejections", [])
+	var restored_inventory_ejections: Array = inventory_ejections_value.duplicate(true) if typeof(inventory_ejections_value) == TYPE_ARRAY else []
+	var normalized_inventory_ejections: Array = []
+	var seen_ejection_ids: Dictionary = {}
+	for ejected_item_value in restored_inventory_ejections:
+		if typeof(ejected_item_value) != TYPE_DICTIONARY or not inventory_system.can_equip_item(ejected_item_value):
+			continue
+		var ejected_item: Dictionary = ejected_item_value
+		var ejected_id := str(ejected_item.get("id", ""))
+		if ejected_id.is_empty() or seen_ejection_ids.has(ejected_id):
+			continue
+		seen_ejection_ids[ejected_id] = true
+		normalized_inventory_ejections.append(ejected_item.duplicate(true))
+	while normalized_inventory_ejections.size() > 100:
+		normalized_inventory_ejections.pop_front()
+	run_ledger["inventory_ejections"] = normalized_inventory_ejections
+	# Old saves only keep a bounded list of ejected items. Where the cumulative
+	# conversion fields are absent, derive a safe value from the available entries.
+	var ejection_inventory_system = InventorySystemScript.new()
+	if run_ledger.has("inventory_ejections_dust"):
+		run_ledger["inventory_ejections_dust"] = clampi(int(run_ledger.get("inventory_ejections_dust", 0)), 0, GameState.MAX_ECHO_DUST)
+	else:
+		var migrated_dust := 0
+		for migrated_item_value in normalized_inventory_ejections:
+			migrated_dust = mini(GameState.MAX_ECHO_DUST, migrated_dust + int(ejection_inventory_system.get_ejection_echo_dust(migrated_item_value)))
+		run_ledger["inventory_ejections_dust"] = migrated_dust
+	run_ledger["inventory_ejections_count"] = clampi(int(run_ledger.get("inventory_ejections_count", normalized_inventory_ejections.size())), normalized_inventory_ejections.size(), 1000000)
+	last_inventory_evicted_item.clear()
+	if not normalized_inventory_ejections.is_empty():
+		var last_ejection_value: Variant = normalized_inventory_ejections.back()
+		if typeof(last_ejection_value) == TYPE_DICTIONARY:
+			last_inventory_evicted_item = (last_ejection_value as Dictionary).duplicate(true)
 	var history_value: Variant = run_ledger.get("event_history", [])
 	var restored_event_history: Array = history_value.duplicate(true) if typeof(history_value) == TYPE_ARRAY else []
 	while restored_event_history.size() > int(ContentRegistry.BALANCE.get("max_event_history", 100)):
@@ -627,15 +701,77 @@ func restore_saved_run() -> bool:
 	placed_tiles = placed_value.duplicate(true) if typeof(placed_value) == TYPE_DICTIONARY else {}
 	var world_tiles_value: Variant = snapshot.get("world_tiles", {})
 	world_tiles = world_tiles_value.duplicate(true) if typeof(world_tiles_value) == TYPE_DICTIONARY else {}
+	# Preserve the old fully visible map for saves created before Stage 88. Newer
+	# snapshots carry a bounded discovery dictionary and are validated on restore.
+	if snapshot.has("discovered_world_cells"):
+		discovered_world_cells = _normalize_discovered_world_cells(snapshot.get("discovered_world_cells", {}))
+	else:
+		discovered_world_cells = _get_all_offroad_cells_discovered()
 	var hand_value: Variant = snapshot.get("tile_hand", [])
 	tile_hand = hand_value.duplicate(true) if typeof(hand_value) == TYPE_ARRAY else []
+	run_ledger["last_tile_exchange_loop"] = clampi(int(run_ledger.get("last_tile_exchange_loop", -1)), -1, maxi(-1, int(snapshot.get("loop_count", 0))))
 	var bag_value: Variant = snapshot.get("bag", [])
-	bag = bag_value.duplicate(true) if typeof(bag_value) == TYPE_ARRAY else []
+	var legacy_bag: Array = bag_value.duplicate(true) if typeof(bag_value) == TYPE_ARRAY else []
+	var field_cache_value: Variant = snapshot.get("field_cache", [])
+	var legacy_cache: Array = field_cache_value.duplicate(true) if typeof(field_cache_value) == TYPE_ARRAY else []
+	var inventory_order_version := clampi(int(snapshot.get("inventory_order_version", 1)), 1, INVENTORY_ORDER_VERSION)
+	var imported_items: Array = []
+	if inventory_order_version < INVENTORY_ORDER_VERSION:
+		# Stage 78 and earlier stored oldest-first in bag, then newer overflow in field_cache.
+		# Reverse the combined chronology to migrate to newest-first queue semantics.
+		imported_items.append_array(legacy_bag)
+		imported_items.append_array(legacy_cache)
+		imported_items.reverse()
+	else:
+		imported_items = legacy_bag
+		# Defensive recovery for a hand-edited snapshot that still has legacy overflow.
+		if not legacy_cache.is_empty():
+			var older_overflow: Array = legacy_cache.duplicate(true)
+			older_overflow.reverse()
+			imported_items.append_array(older_overflow)
+	var normalized_bag: Array = []
+	var seen_run_item_ids: Dictionary = {}
+	for imported_item_value in imported_items:
+		if typeof(imported_item_value) != TYPE_DICTIONARY:
+			continue
+		var imported_item: Dictionary = imported_item_value
+		var imported_item_id := str(imported_item.get("id", ""))
+		if imported_item_id.is_empty() or seen_run_item_ids.has(imported_item_id) or not inventory_system.can_equip_item(imported_item):
+			continue
+		seen_run_item_ids[imported_item_id] = true
+		normalized_bag.append(imported_item.duplicate(true))
+	while normalized_bag.size() > BACKPACK_CAPACITY:
+		normalized_bag.pop_back()
+	bag = normalized_bag
+	field_cache.clear()
 	var equipment_value: Variant = snapshot.get("equipment", {})
-	equipment = equipment_value.duplicate(true) if typeof(equipment_value) == TYPE_DICTIONARY else {"weapon": {}, "armor": {}, "core": {}}
-	for slot in ["weapon", "armor", "core"]:
-		if typeof(equipment.get(slot, {})) != TYPE_DICTIONARY:
-			equipment[slot] = {}
+	var imported_equipment: Dictionary = equipment_value.duplicate(true) if typeof(equipment_value) == TYPE_DICTIONARY else {}
+	var normalized_equipment: Dictionary = {}
+	var seen_equipped_item_ids: Dictionary = {}
+	# Repair the cross-container identity invariant when restoring old or hand-edited
+	# snapshots: a single item ID may exist in exactly one equipment slot or bag cell.
+	# Equipped gear takes precedence over a duplicate backpack copy.
+	for slot_value in InventorySystemScript.EQUIPMENT_SLOTS:
+		var slot := str(slot_value)
+		var candidate_value: Variant = imported_equipment.get(slot, {})
+		var candidate: Dictionary = candidate_value if typeof(candidate_value) == TYPE_DICTIONARY else {}
+		var candidate_id := str(candidate.get("id", ""))
+		if inventory_system.can_equip_item(candidate, slot) and not seen_equipped_item_ids.has(candidate_id):
+			normalized_equipment[slot] = candidate.duplicate(true)
+			seen_equipped_item_ids[candidate_id] = true
+		else:
+			normalized_equipment[slot] = {}
+	equipment = normalized_equipment
+	var unique_bag: Array = []
+	for bag_item_value in bag:
+		if typeof(bag_item_value) != TYPE_DICTIONARY:
+			continue
+		var bag_item: Dictionary = bag_item_value
+		var bag_item_id := str(bag_item.get("id", ""))
+		if seen_equipped_item_ids.has(bag_item_id):
+			continue
+		unique_bag.append(bag_item.duplicate(true))
+	bag = unique_bag
 	var enemy_value: Variant = snapshot.get("enemy", {})
 	enemy = enemy_value.duplicate(true) if typeof(enemy_value) == TYPE_DICTIONARY else {}
 	var encounter_value: Variant = snapshot.get("encounter_enemies", [])
@@ -720,15 +856,67 @@ func _tick_route(delta: float) -> void:
 			save_run_snapshot()
 			break
 
+func _normalize_discovered_world_cells(value: Variant) -> Dictionary:
+	var result: Dictionary = {}
+	if typeof(value) != TYPE_DICTIONARY:
+		return result
+	var source: Dictionary = value
+	for cell_id_value in source.keys():
+		var cell_id := str(cell_id_value)
+		if not TileSystemScript.is_map_world_cell_id(cell_id):
+			continue
+		if bool(source.get(cell_id_value, false)):
+			result[cell_id] = true
+	return result
+
+func _get_all_offroad_cells_discovered() -> Dictionary:
+	var result: Dictionary = {}
+	var road_lookup: Dictionary = {}
+	for coord_value in TileSystemScript.get_road_grid_coordinates_for_seed(get_route_shape_id(), route_geometry_seed):
+		var coord: Vector2i = coord_value
+		road_lookup["%d:%d" % [coord.x, coord.y]] = true
+	for row in range(TileSystemScript.MAP_ROWS):
+		for col in range(TileSystemScript.MAP_COLUMNS):
+			if road_lookup.has("%d:%d" % [col, row]):
+				continue
+			result[TileSystemScript.map_world_cell_id(col, row)] = true
+	return result
+
+func _reveal_world_cells_near_route_index(route_index: int) -> void:
+	if route.is_empty():
+		return
+	var road_cells: Array[Vector2i] = TileSystemScript.get_road_grid_coordinates_for_seed(get_route_shape_id(), route_geometry_seed)
+	if road_cells.is_empty():
+		return
+	var route_slot := posmod(roundi(float(route_index) * float(road_cells.size()) / float(route.size())), road_cells.size())
+	var pivot: Vector2i = road_cells[route_slot]
+	var road_lookup: Dictionary = {}
+	for coord_value in road_cells:
+		var coord: Vector2i = coord_value
+		road_lookup["%d:%d" % [coord.x, coord.y]] = true
+	# Reveal a small Manhattan-radius around the visited road cell. Discovery is
+	# presentation-only: this does not change card eligibility or stable tile IDs.
+	for row in range(TileSystemScript.MAP_ROWS):
+		for col in range(TileSystemScript.MAP_COLUMNS):
+			if absi(col - pivot.x) + absi(row - pivot.y) > 3:
+				continue
+			if road_lookup.has("%d:%d" % [col, row]):
+				continue
+			var cell_id := TileSystemScript.map_world_cell_id(col, row)
+			discovered_world_cells[cell_id] = true
+
 func _visit_cell(index: int) -> void:
 	if route.is_empty():
 		return
+	_reveal_world_cells_near_route_index(index)
 	var base_kind: String = route_system.get_cell_kind(route, index)
 	var spawn_bonus := clampf(float(hero.get("equipped_tile_spawn_bonus", 0.0)) + float(hero.get("perk_tile_spawn_bonus", 0.0)), -0.25, 0.25)
 	var strength_bonus := 0.0
 	var reward_bonus := 0.0
 	var should_offer_event: bool = false
+	var cache_node_found: bool = base_kind == "cache"
 	var messages: Array = []
+	var encounter_pool: Array[String] = []
 	match base_kind:
 		"cache":
 			resource_system.add(run_ledger, "scrap", 2 + mini(loop_count, 2))
@@ -748,7 +936,14 @@ func _visit_cell(index: int) -> void:
 				if healing > 0:
 					messages.append("Тихая зона восстановила %d здоровья." % healing)
 	if placed_tiles.has(str(index)):
+		var placed_tile_value: Variant = placed_tiles[str(index)]
+		if typeof(placed_tile_value) == TYPE_DICTIONARY and str(placed_tile_value.get("id", "")) == "cache":
+			cache_node_found = true
 		var effects: Dictionary = tile_system.apply_tile_visit(placed_tiles[str(index)], run_ledger, hero, loop_count)
+		for pool_value in effects.get("enemy_pool", []):
+			var pool_id := str(pool_value)
+			if not pool_id.is_empty() and not encounter_pool.has(pool_id):
+				encounter_pool.append(pool_id)
 		var equipment_tile_scrap: int = clampi(int(hero.get("equipped_tile_scrap", 0)) + int(hero.get("perk_tile_scrap_bonus", 0)), 0, 5)
 		if equipment_tile_scrap > 0:
 			resource_system.add(run_ledger, "scrap", equipment_tile_scrap)
@@ -765,7 +960,29 @@ func _visit_cell(index: int) -> void:
 		var world_tile: Dictionary = world_tile_value
 		if int(world_tile.get("route_index", -1)) != index:
 			continue
+		if str(world_tile.get("id", "")) == "cache":
+			cache_node_found = true
 		var world_effects: Dictionary = tile_system.apply_tile_visit(world_tile, run_ledger, hero, loop_count)
+		var landscape_affinity: Dictionary = inventory_system.get_landscape_affinity_effects(equipment, str(world_tile.get("id", "")))
+		var affinity_heal := mini(_scale_healing(int(landscape_affinity.get("heal", 0))), maxi(0, int(hero.get("max_hp", 0)) - int(hero.get("hp", 0))))
+		if affinity_heal > 0:
+			hero["hp"] = mini(int(hero.get("max_hp", 0)), int(hero.get("hp", 0)) + affinity_heal)
+			world_effects.messages.append("Резонанс экипировки восстановил %d здоровья." % affinity_heal)
+		for affinity_resource in ["scrap", "crystals"]:
+			var affinity_amount := maxi(0, int(landscape_affinity.get(affinity_resource, 0)))
+			if affinity_amount > 0:
+				resource_system.add(run_ledger, affinity_resource, affinity_amount)
+				world_effects.messages.append("Резонанс экипировки: +%d %s." % [affinity_amount, "материала" if affinity_resource == "scrap" else "кристалл(ов)"])
+		world_effects["spawn_bonus"] = clampf(float(world_effects.get("spawn_bonus", 0.0)) + float(landscape_affinity.get("spawn_bonus", 0.0)), -0.5, 0.5)
+		world_effects["enemy_bonus"] = clampf(float(world_effects.get("enemy_bonus", 0.0)) + float(landscape_affinity.get("enemy_bonus", 0.0)), -0.5, 0.75)
+		world_effects["reward_bonus"] = clampf(float(world_effects.get("reward_bonus", 0.0)) + float(landscape_affinity.get("reward_bonus", 0.0)), -0.25, 1.5)
+		var affinity_messages: Variant = landscape_affinity.get("messages", [])
+		if typeof(affinity_messages) == TYPE_ARRAY:
+			world_effects.messages.append_array(affinity_messages)
+		for world_pool_value in world_effects.get("enemy_pool", []):
+			var world_pool_id := str(world_pool_value)
+			if not world_pool_id.is_empty() and not encounter_pool.has(world_pool_id):
+				encounter_pool.append(world_pool_id)
 		var tile_scrap_bonus: int = clampi(int(hero.get("equipped_tile_scrap", 0)) + int(hero.get("perk_tile_scrap_bonus", 0)), 0, 5)
 		if tile_scrap_bonus > 0:
 			resource_system.add(run_ledger, "scrap", tile_scrap_bonus)
@@ -787,7 +1004,7 @@ func _visit_cell(index: int) -> void:
 		hero["hp"] = mini(int(hero.get("max_hp", 0)), int(hero.get("hp", 0)) + world_synergy_heal)
 		messages.append("Сочетание ландшафта восстановило %d здоровья." % world_synergy_heal)
 	messages.append_array(world_synergy.get("messages", []))
-	var synergy: Dictionary = tile_system.get_synergy_bonus(placed_tiles, index, route.size())
+	var synergy: Dictionary = tile_system.get_synergy_bonus(placed_tiles, index, route.size(), equipment)
 	reward_bonus += float(synergy.get("reward", 0.0))
 	spawn_bonus += float(synergy.get("spawn_bonus", 0.0))
 	strength_bonus += float(synergy.get("enemy_bonus", 0.0))
@@ -806,6 +1023,8 @@ func _visit_cell(index: int) -> void:
 		for synergy_message in synergy_messages_value:
 			messages.append(str(synergy_message))
 	_discover_landscape_secrets(index, messages)
+	if cache_node_found:
+		_try_cache_equipment_drop(index)
 	# Final stage of the pipeline: apply limits once after base node, local,
 	# equipment/perk, and neighbour modifiers have all been accumulated.
 	var capped_visit: Dictionary = tile_system.clamp_visit_modifiers({"spawn_bonus": spawn_bonus, "enemy_bonus": strength_bonus, "reward_bonus": reward_bonus})
@@ -817,7 +1036,7 @@ func _visit_cell(index: int) -> void:
 	for message in messages:
 		_log(str(message))
 	if should_offer_event:
-		_begin_expedition_event(index, spawn_bonus, strength_bonus, reward_bonus)
+		_begin_expedition_event(index, spawn_bonus, strength_bonus, reward_bonus, encounter_pool)
 		return
 	var active_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
 	var base_chance := clampf(float(ContentRegistry.BALANCE.get("encounter_chance_base", 0.22)) + float(loop_count) * float(ContentRegistry.BALANCE.get("encounter_chance_per_loop", 0.04)) + spawn_bonus + float(active_difficulty.get("encounter_chance_delta", 0.0)) + _get_modifier_chance_delta(), float(ContentRegistry.BALANCE.get("encounter_chance_min", 0.08)), float(ContentRegistry.BALANCE.get("encounter_chance_max", 0.96)))
@@ -826,10 +1045,38 @@ func _visit_cell(index: int) -> void:
 	if is_boss_node:
 		_start_encounter(index, strength_bonus, reward_bonus, true)
 	elif _rng_for_event().randf() < base_chance:
-		_start_encounter(index, strength_bonus, reward_bonus, false)
+		_start_encounter(index, strength_bonus, reward_bonus, false, encounter_pool)
 	else:
 		if messages.is_empty():
 			_log("Узел %d: маршрут свободен." % (index + 1))
+
+func _try_cache_equipment_drop(route_index: int) -> void:
+	var drop_rng := _rng_for_event()
+	var echo_charges := clampi(int(run_ledger.get("echo_item_charges", 0)), 0, 4)
+	var pending_drop_bonus := clampf(float(run_ledger.get("pending_item_drop_bonus", 0.0)), 0.0, 0.30)
+	var cache_chance: float = loot_system.get_equipment_drop_chance("cache", 0.0, echo_charges, pending_drop_bonus)
+	if drop_rng.randf() >= cache_chance:
+		_log("Тайник на узле %d открыт, но экипировки внутри не оказалось. Шанс находки: %d%%; качество не бросалось, так как предмет не выпал." % [route_index + 1, int(round(cache_chance * 100.0))])
+		return
+	var pending_rarity_bonus := clampf(float(run_ledger.get("pending_item_rarity_bonus", 0.0)), 0.0, 0.18)
+	var equipped_rarity_bonus := clampf(float(hero.get("equipped_rare_find_bonus", 0.0)), 0.0, 0.12)
+	var effective_rarity_bonus: float = inventory_system.get_effective_rarity_bonus(equipped_rarity_bonus, pending_rarity_bonus, loot_system.get_source_rarity_bonus("cache"))
+	var item: Dictionary = inventory_system.roll_item(drop_rng, loop_count, int(hero.get("level", 1)), effective_rarity_bonus)
+	if item.is_empty():
+		return
+	item["drop_source"] = "cache"
+	if not _store_run_item(item):
+		_log("ТАЙНИК: предмет не удалось добавить в рюкзак — данные предмета не прошли проверку.")
+		return
+	if echo_charges > 0:
+		run_ledger["echo_item_charges"] = maxi(0, echo_charges - 1)
+	run_ledger["pending_item_rarity_bonus"] = 0.0
+	run_ledger["pending_item_drop_bonus"] = 0.0
+	var rarity_distribution: Dictionary = inventory_system.get_rarity_distribution(effective_rarity_bonus)
+	var rolled_rarity := str(item.get("rarity", "Обычный"))
+	var rolled_rarity_chance := float(rarity_distribution.get(rolled_rarity, 0.0))
+	_log("ТАЙНИК ОТКРЫТ: %s · %s. Шанс предмета %d%%; шанс этого качества при текущей подготовке %.1f%%. Предмет в начало рюкзака; правый клик — быстро надеть." % [str(item.get("name", "Находка")), rolled_rarity, int(round(cache_chance * 100.0)), rolled_rarity_chance * 100.0])
+	_request_feedback("loot", str(item.get("name", "Предмет из тайника")))
 
 func _discover_landscape_secrets(route_index: int, messages: Array) -> void:
 	if world_tiles.is_empty() or route_index < 0:
@@ -855,16 +1102,12 @@ func _discover_landscape_secrets(route_index: int, messages: Array) -> void:
 			var current_tile: Dictionary = cell_value_data
 			if int(current_tile.get("route_index", -1)) != route_index:
 				continue
-			var coordinates := cell_id.split(":")
-			if coordinates.size() != 2 or not coordinates[0].is_valid_int() or not coordinates[1].is_valid_int():
+			if not TileSystemScript.is_world_cell_valid(cell_id):
 				continue
-			var col := int(coordinates[0])
-			var row := int(coordinates[1])
 			var current_id := str(current_tile.get("id", ""))
-			# Scan only right/down neighbours to visit each physical pair once.
-			for position in [Vector2i(col + 1, row), Vector2i(col, row + 1)]:
-				var neighbor_id := TileSystemScript.world_cell_id(position.x, position.y)
-				if not TileSystemScript.is_world_cell_valid(neighbor_id) or not world_tiles.has(neighbor_id):
+			# Visit each orthogonal pair once; works for legacy and full-board IDs.
+			for neighbor_id in TileSystemScript.world_cell_neighbors(cell_id):
+				if neighbor_id <= cell_id or not world_tiles.has(neighbor_id):
 					continue
 				var neighbor_value: Variant = world_tiles[neighbor_id]
 				if typeof(neighbor_value) != TYPE_DICTIONARY:
@@ -887,7 +1130,7 @@ func _discover_landscape_secrets(route_index: int, messages: Array) -> void:
 	if changed_flags:
 		run_ledger["event_flags"] = flags
 
-func _begin_expedition_event(index: int, spawn_bonus: float, strength_bonus: float, reward_bonus: float) -> void:
+func _begin_expedition_event(index: int, spawn_bonus: float, strength_bonus: float, reward_bonus: float, enemy_pool: Array = []) -> void:
 	pending_event = expedition_event_system.draw_event(run_rng, loop_count, last_event_id, run_ledger.get("event_flags", {}))
 	if pending_event.is_empty():
 		_log("Событие не удалось сформировать; маршрут продолжается без остановки.")
@@ -897,7 +1140,8 @@ func _begin_expedition_event(index: int, spawn_bonus: float, strength_bonus: flo
 		"cell_index": index,
 		"spawn_bonus": spawn_bonus,
 		"strength_bonus": strength_bonus,
-		"reward_bonus": reward_bonus
+		"reward_bonus": reward_bonus,
+		"enemy_pool": enemy_pool.duplicate(true)
 	}
 	_log("Событие «%s»: ожидается решение игрока." % str(pending_event.get("name", "Событие")))
 	changed.emit()
@@ -1008,10 +1252,12 @@ func resolve_event_choice(choice_id: String) -> Dictionary:
 	var spawn_bonus: float = float(context.get("spawn_bonus", 0.0)) + float(effects.get("spawn_bonus", 0.0))
 	var strength_bonus: float = float(context.get("strength_bonus", 0.0))
 	var reward_bonus: float = float(context.get("reward_bonus", 0.0)) + float(effects.get("reward_bonus", 0.0))
+	var event_pool_value: Variant = context.get("enemy_pool", [])
+	var event_enemy_pool: Array = event_pool_value.duplicate(true) if typeof(event_pool_value) == TYPE_ARRAY else []
 	var encounter_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
 	var base_chance: float = clampf(float(ContentRegistry.BALANCE.get("encounter_chance_base", 0.22)) + float(loop_count) * float(ContentRegistry.BALANCE.get("encounter_chance_per_loop", 0.04)) + spawn_bonus + float(encounter_difficulty.get("encounter_chance_delta", 0.0)) + _get_modifier_chance_delta(), float(ContentRegistry.BALANCE.get("encounter_chance_min", 0.08)), float(ContentRegistry.BALANCE.get("encounter_chance_max", 0.96)))
 	if _rng_for_event().randf() < base_chance:
-		_start_encounter(int(context.get("cell_index", current_cell())), strength_bonus, reward_bonus, false)
+		_start_encounter(int(context.get("cell_index", current_cell())), strength_bonus, reward_bonus, false, event_enemy_pool)
 	else:
 		_log("После события маршрут остаётся свободным.")
 	_update_objective_progress()
@@ -1024,26 +1270,21 @@ func _grant_secret_event_item(relic_id: String) -> Dictionary:
 	if item.is_empty():
 		_log("Секретная награда не распознана: %s. Остальные последствия выбора сохранены." % relic_id)
 		return {}
-	bag.append(item.duplicate(true))
-	GameState.register_item(item)
-	var slot := str(item.get("slot", ""))
-	var current: Dictionary = equipment.get(slot, {})
-	if inventory_system.should_equip(item, current):
-		equipment[slot] = item.duplicate(true)
-		GameState.loadout[slot] = item.duplicate(true)
-		GameState.save_now()
-		_sync_hero_stats()
-		_log("ТАЙНАЯ РЕЛИКВИЯ: %s. Автоматически экипирована." % str(item.get("name", "Новая реликвия")))
+	if _store_run_item(item):
+		var affinity_text := " Связана с ландшафтом: %s." % str(item.get("affinity_name", "неизвестный участок")) if not str(item.get("landscape_affinity", "")).is_empty() else ""
+		_log("ТАЙНАЯ РЕЛИКВИЯ: %s. Помещена в начало рюкзака — наденьте её вручную.%s" % [str(item.get("name", "Новая реликвия")), affinity_text])
+		if not last_inventory_evicted_item.is_empty():
+			_log("Старейшая вещь вытеснена: %s." % str(last_inventory_evicted_item.get("name", "Предмет")))
 	else:
-		_log("ТАЙНАЯ РЕЛИКВИЯ: %s. Сохранена в арсенале для будущей сборки." % str(item.get("name", "Новая реликвия")))
+		_log("ТАЙНАЯ РЕЛИКВИЯ: %s не удалось добавить в рюкзак; предмет не закреплён за убежищем." % str(item.get("name", "Новая реликвия")))
 	_request_feedback("loot", str(item.get("name", "Тайная реликвия")))
 	return item
 
-func _start_encounter(index: int, strength_bonus: float, reward_bonus: float, boss_encounter: bool) -> void:
+func _start_encounter(index: int, strength_bonus: float, reward_bonus: float, boss_encounter: bool, enemy_pool: Array = []) -> void:
 	var active_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
 	var modifier: Dictionary = get_run_modifier()
 	var encounter_scaling_loop := _effective_scaling_loop(loop_count)
-	encounter_enemies = enemy_system.create_encounter(encounter_scaling_loop, danger, _rng_for_event(), strength_bonus, boss_encounter, int(active_difficulty.get("extra_group_members", 0)) + int(modifier.get("extra_group_members", 0)))
+	encounter_enemies = enemy_system.create_encounter(encounter_scaling_loop, danger, _rng_for_event(), strength_bonus, boss_encounter, int(active_difficulty.get("extra_group_members", 0)) + int(modifier.get("extra_group_members", 0)), enemy_pool)
 	if encounter_enemies.is_empty():
 		return
 	var elite_interval := maxi(1, int(ContentRegistry.BALANCE.get("elite_loop_interval", 4)))
@@ -1122,6 +1363,29 @@ func _start_encounter(index: int, strength_bonus: float, reward_bonus: float, bo
 func _rng_for_event() -> RandomNumberGenerator:
 	return run_rng
 
+
+func _get_current_landscape_tile_ids() -> Array[String]:
+	var tile_ids: Array[String] = []
+	for cell_value in world_tiles.keys():
+		var tile_value: Variant = world_tiles[cell_value]
+		if typeof(tile_value) != TYPE_DICTIONARY:
+			continue
+		var world_tile: Dictionary = tile_value
+		if int(world_tile.get("route_index", -1)) != combat_cell:
+			continue
+		var tile_id := str(world_tile.get("id", ""))
+		if not tile_id.is_empty() and not tile_ids.has(tile_id):
+			tile_ids.append(tile_id)
+	return tile_ids
+
+func _get_biome_stat(enemy_data: Dictionary, stat_suffix: String) -> float:
+	var tag := str(enemy_data.get("biome_tag", ""))
+	if tag.is_empty():
+		return 0.0
+	var universal_key := "biome_damage_bonus" if stat_suffix == "damage_bonus" else "biome_resistance"
+	var specific_key := tag + "_" + stat_suffix
+	return maxf(0.0, float(hero.get(universal_key, 0.0)) + float(hero.get(specific_key, 0.0)))
+
 func _tick_combat(delta: float) -> void:
 	if enemy.is_empty() or encounter_enemies.is_empty() or pending_perk_count > 0:
 		return
@@ -1156,7 +1420,22 @@ func _tick_combat(delta: float) -> void:
 	var hero_interval := maxf(0.24, float(ContentRegistry.BALANCE.hero_attack_interval) / maxf(0.35, float(hero.get("attack_speed", 1.0)) * (1.0 - speed_penalty)))
 	if float(combat_timers.hero) >= hero_interval:
 		combat_timers.hero = float(combat_timers.hero) - hero_interval
-		var player_hit: Dictionary = combat_system.perform_attack(hero, enemy, _rng_for_event())
+		var player_attack_source: Dictionary = hero.duplicate(true)
+		var elite_boss_bonus := clampf(float(hero.get("elite_boss_damage_bonus", 0.0)), 0.0, 0.25)
+		if (bool(enemy.get("is_elite", false)) or bool(enemy.get("is_boss", false))) and elite_boss_bonus > 0.0:
+			player_attack_source["attack"] = float(player_attack_source.get("attack", 1.0)) * (1.0 + elite_boss_bonus)
+		var biome_bonus := clampf(_get_biome_stat(enemy, "damage_bonus"), 0.0, 0.35)
+		var affinity_bonus_data: Dictionary = inventory_system.get_landscape_combat_bonus(equipment, _get_current_landscape_tile_ids(), enemy)
+		var affinity_bonus := float(affinity_bonus_data.get("bonus", 0.0))
+		var combined_biome_bonus := clampf(biome_bonus + affinity_bonus, 0.0, 0.35)
+		if combined_biome_bonus > 0.0:
+			player_attack_source["attack"] = float(player_attack_source.get("attack", 1.0)) * (1.0 + combined_biome_bonus)
+		var player_hit: Dictionary = combat_system.perform_attack(player_attack_source, enemy, _rng_for_event())
+		var lifesteal_ratio := clampf(float(hero.get("lifesteal", 0.0)), 0.0, 0.25)
+		var stolen_health := mini(maxi(0, int(hero.get("max_hp", 1)) - int(hero.get("hp", 1))), int(floor(float(player_hit.get("damage", 0)) * lifesteal_ratio)))
+		if stolen_health > 0:
+			hero["hp"] = int(hero.get("hp", 1)) + stolen_health
+			_log("Живой импульс возвращает %d здоровья." % stolen_health)
 		var bleed_chance := clampf(float(hero.get("bleed_chance", 0.0)), 0.0, 0.5)
 		if not bool(player_hit.get("defeated", false)) and bleed_chance > 0.0 and _rng_for_event().randf() < bleed_chance:
 			var bleed_result: Dictionary = status_effect_system.apply_effect(enemy, "bleed", -1.0, float(maxi(1, int(hero.get("bleed_damage", 2)))), "equipment_weapon")
@@ -1166,7 +1445,10 @@ func _tick_combat(delta: float) -> void:
 			var exposed_result: Dictionary = status_effect_system.apply_effect(enemy, "exposed", -1.0, -1.0, "hero_critical")
 			if bool(exposed_result.get("ok", false)):
 				_log("Критический удар накладывает уязвимость: защита цели снижена на время эффекта.")
-		_log("Герой наносит %d урона%s цели «%s»." % [int(player_hit.damage), " — критический удар" if bool(player_hit.critical) else "", str(enemy.get("name", "противник"))])
+		var target_note := ""
+		if combined_biome_bonus > 0.0:
+			target_note = " · настройка против биома +%d%%" % int(round(combined_biome_bonus * 100.0))
+		_log("Герой наносит %d урона%s цели «%s»%s." % [int(player_hit.damage), " — критический удар" if bool(player_hit.critical) else "", str(enemy.get("name", "противник")), target_note])
 		if int(player_hit.get("absorbed", 0)) > 0:
 			_log("Защитный барьер цели поглотил %d урона." % int(player_hit.get("absorbed", 0)))
 		if not bool(player_hit.defeated):
@@ -1212,7 +1494,12 @@ func _tick_combat(delta: float) -> void:
 		if is_special and not bool(fighter.get("telegraph_pending", false)):
 			fighter["telegraph_pending"] = true
 			fighter["attack_timer"] = 0.0
-			_log("ПРЕДУПРЕЖДЕНИЕ: %s — %s" % [str(fighter.get("name", "Противник")), str(fighter.get("phase_telegraph", "готовит особую атаку"))])
+			var telegraph_status_id := str(fighter.get("elite_ability_id", "")) if is_elite_attacker else str(fighter.get("special_effect_id", ""))
+			var telegraph_resistance := clampf(float(hero.get(telegraph_status_id + "_resistance", 0.0)), 0.0, 0.25) if not telegraph_status_id.is_empty() else 0.0
+			var counter_hint := ""
+			if telegraph_resistance > 0.0:
+				counter_hint = " · экипировка: %d%% шанс подавить статус «%s»" % [int(round(telegraph_resistance * 100.0)), str(ContentRegistry.STATUS_EFFECTS.get(telegraph_status_id, {}).get("name", telegraph_status_id))]
+			_log("ПРЕДУПРЕЖДЕНИЕ: %s — %s%s" % [str(fighter.get("name", "Противник")), str(fighter.get("phase_telegraph", "готовит особую атаку")), counter_hint])
 			continue
 		fighter["attack_count"] = next_attack_count
 		if is_special:
@@ -1223,7 +1510,19 @@ func _tick_combat(delta: float) -> void:
 		if role == "hunter" and float(hero.get("hp", 1)) / maxf(1.0, float(hero.get("max_hp", 1))) <= 0.35:
 			attack_source["attack"] = float(attack_source.get("attack", 1.0)) * 1.35
 			_log("Охотник замечает слабость героя и усиливает удар!")
+		var special_guard := clampf(float(hero.get("special_damage_reduction", 0.0)), 0.0, 0.35)
+		if is_special and special_guard > 0.0:
+			attack_source["attack"] = float(attack_source.get("attack", 1.0)) * (1.0 - special_guard)
+			_log("Экипировка рассеивает %d%% усиления особой атаки." % int(round(special_guard * 100.0)))
+		var biome_resistance := clampf(_get_biome_stat(fighter, "resistance"), 0.0, 0.30)
+		if biome_resistance > 0.0:
+			attack_source["attack"] = float(attack_source.get("attack", 1.0)) * (1.0 - biome_resistance)
+			if is_special or int(fighter.get("attack_count", 0)) == 1:
+				_log("Экипировка смягчает удар биома «%s» на %d%%." % [str(fighter.get("biome_tag", "")), int(round(biome_resistance * 100.0))])
 		var enemy_hit: Dictionary = combat_system.perform_attack(attack_source, hero, _rng_for_event())
+		if bool(enemy_hit.get("dodged", false)):
+			_log("Герой уходит в фазовый шаг и полностью избегает атаки %s." % str(fighter.get("name", "противника")))
+			continue
 		var hit_message := "%s наносит %d урона герою." % [str(fighter.get("name", "Противник")), int(enemy_hit.damage)]
 		if int(enemy_hit.get("absorbed", 0)) > 0:
 			hit_message += " Барьер поглотил %d." % int(enemy_hit.get("absorbed", 0))
@@ -1233,27 +1532,36 @@ func _tick_combat(delta: float) -> void:
 		if is_special and is_elite_attacker:
 			var elite_status_id := str(fighter.get("elite_ability_id", ""))
 			if not elite_status_id.is_empty():
-				var elite_status_result: Dictionary = status_effect_system.apply_effect(hero, elite_status_id, float(fighter.get("elite_effect_duration", 3.0)), float(fighter.get("elite_effect_magnitude", 0.0)), str(fighter.get("uid", "elite")))
+				var elite_status_result: Dictionary = _apply_enemy_status_effect(elite_status_id, float(fighter.get("elite_effect_duration", 3.0)), float(fighter.get("elite_effect_magnitude", 0.0)), str(fighter.get("uid", "elite")))
 				if bool(elite_status_result.get("ok", false)):
 					_log("Элитная способность накладывает на героя эффект «%s»." % str(elite_status_result.get("name", elite_status_id)))
 		if is_special and is_boss_attacker:
 			var boss_effect_id := str(fighter.get("special_effect_id", "wound"))
-			var boss_effect_result: Dictionary = status_effect_system.apply_effect(hero, boss_effect_id, float(fighter.get("special_effect_duration", 4.0)), float(fighter.get("special_effect_magnitude", 0.12)), str(fighter.get("id", "boss")))
+			var boss_effect_result: Dictionary = _apply_enemy_status_effect(boss_effect_id, float(fighter.get("special_effect_duration", 4.0)), float(fighter.get("special_effect_magnitude", 0.12)), str(fighter.get("id", "boss")))
 			if bool(boss_effect_result.get("ok", false)):
 				var boss_effect_log := str(fighter.get("special_effect_log", "Особая атака босса накладывает эффект «%s»." % str(boss_effect_result.get("name", boss_effect_id))))
 				_log(boss_effect_log)
 		if role == "hunter" and int(fighter.get("attack_count", 0)) % 3 == 0 and not is_elite_attacker:
-			var weakness_result: Dictionary = status_effect_system.apply_effect(hero, "weakness", 3.0, 0.18, str(fighter.get("id", "hunter")))
+			var weakness_result: Dictionary = _apply_enemy_status_effect("weakness", 3.0, 0.18, str(fighter.get("id", "hunter")))
 			if bool(weakness_result.get("ok", false)):
 				_log("Охотник ослабляет ответный удар героя на время эффекта.")
 		if role == "caster" and int(fighter.get("attack_count", 0)) % 3 == 0 and not is_elite_attacker:
-			var applied_status: Dictionary = status_effect_system.apply_effect(hero, "distortion", float(ContentRegistry.BALANCE.get("enemy_caster_debuff_duration", 3.5)), float(ContentRegistry.BALANCE.get("enemy_caster_debuff", 0.18)), str(fighter.get("id", "caster")))
+			var applied_status: Dictionary = _apply_enemy_status_effect("distortion", float(ContentRegistry.BALANCE.get("enemy_caster_debuff_duration", 3.5)), float(ContentRegistry.BALANCE.get("enemy_caster_debuff", 0.18)), str(fighter.get("id", "caster")))
 			if bool(applied_status.get("ok", false)):
 				_log("Искажение замедляет атаки героя на %.1f секунды." % float(applied_status.get("duration", 3.5)))
 		if int(hero.hp) <= 0:
 			_log("Герой потерял сознание. Будет сохранена только часть добычи.")
 			_finish_run("defeat")
 			return
+
+func _apply_enemy_status_effect(effect_id: String, duration: float, magnitude: float, source_id: String) -> Dictionary:
+	var resistance := clampf(float(hero.get(effect_id + "_resistance", 0.0)), 0.0, 0.25)
+	if resistance > 0.0 and _rng_for_event().randf() < resistance:
+		var definition: Dictionary = ContentRegistry.STATUS_EFFECTS.get(effect_id, {})
+		var effect_name := str(definition.get("name", effect_id))
+		_log("Контр-экипировка подавляет эффект «%s» (%d%% шанс сопротивления)." % [effect_name, int(round(resistance * 100.0))])
+		return {"ok": false, "resisted": true, "reason": "equipment_resisted", "id": effect_id, "name": effect_name}
+	return status_effect_system.apply_effect(hero, effect_id, duration, magnitude, source_id)
 
 func _update_boss_phase() -> void:
 	if enemy.is_empty() or not bool(enemy.get("is_boss", false)):
@@ -1285,7 +1593,11 @@ func _update_boss_phase() -> void:
 		var phase_effect_id := str(phase_effect.get("id", ""))
 		var effect_target: Dictionary = hero if str(phase_effect.get("target", "boss")) == "hero" else enemy
 		if not phase_effect_id.is_empty():
-			var phase_status_result: Dictionary = status_effect_system.apply_effect(effect_target, phase_effect_id, float(phase_effect.get("duration", 3.0)), float(phase_effect.get("magnitude", 0.0)), str(enemy.get("id", "boss_phase")))
+			var phase_status_result: Dictionary
+			if effect_target == hero:
+				phase_status_result = _apply_enemy_status_effect(phase_effect_id, float(phase_effect.get("duration", 3.0)), float(phase_effect.get("magnitude", 0.0)), str(enemy.get("id", "boss_phase")))
+			else:
+				phase_status_result = status_effect_system.apply_effect(effect_target, phase_effect_id, float(phase_effect.get("duration", 3.0)), float(phase_effect.get("magnitude", 0.0)), str(enemy.get("id", "boss_phase")))
 			if bool(phase_status_result.get("ok", false)):
 				var target_label := "героя" if effect_target == hero else "босса"
 				_log("Фаза накладывает на %s эффект «%s»." % [target_label, str(phase_status_result.get("name", phase_effect_id))])
@@ -1318,9 +1630,39 @@ func _on_victory() -> void:
 	var reward_bonus := combat_reward_bonus + (float(ContentRegistry.BALANCE.get("boss_reward_bonus", 0.60)) if is_boss else 0.0)
 	if is_elite:
 		reward_bonus += float(ContentRegistry.BALANCE.get("elite_reward_bonus", 0.40))
-	var reward: Dictionary = loot_system.roll_victory(defeated_enemy, loop_count, _rng_for_event(), reward_bonus)
+	var trophy_rng := _rng_for_event()
+	var defeated_biome := str(defeated_enemy.get("biome_tag", ""))
+	var contextual_trophy_bonus := clampf(float(hero.get("equipped_" + defeated_biome + "_trophy_bonus", 0.0)), 0.0, 0.12)
+	var trophy: Dictionary = loot_system.roll_biome_trophy(defeated_enemy, trophy_rng, _get_current_landscape_tile_ids(), float(hero.get("equipped_trophy_find_bonus", 0.0)), contextual_trophy_bonus)
+	var reward: Dictionary = loot_system.roll_victory(defeated_enemy, loop_count, trophy_rng, reward_bonus)
 	resource_system.add(run_ledger, "scrap", int(reward.scrap))
 	resource_system.add(run_ledger, "crystals", int(reward.crystals))
+	if not trophy.is_empty():
+		var trophy_counts := _normalize_trophy_counts(run_ledger.get("trophy_drops", {}))
+		var trophy_id := str(trophy.get("material_id", ""))
+		var trophy_amount := clampi(int(trophy.get("amount", 1)), 1, 3)
+		if trophy_counts.has(trophy_id):
+			trophy_counts[trophy_id] = mini(1000000, int(trophy_counts[trophy_id]) + trophy_amount)
+			run_ledger["trophy_drops"] = trophy_counts
+			match str(trophy.get("biome_tag", "")):
+				"spore":
+					var trophy_heal := _scale_healing(2 * trophy_amount)
+					var missing_hp := maxi(0, int(hero.get("max_hp", 0)) - int(hero.get("hp", 0)))
+					var actual_trophy_heal := mini(missing_hp, trophy_heal)
+					if actual_trophy_heal > 0:
+						hero["hp"] = mini(int(hero.get("max_hp", 1)), int(hero.get("hp", 0)) + actual_trophy_heal)
+						_log("Трофей «%s» восстановил %d здоровья." % [str(trophy.get("name", "Пыльца")), actual_trophy_heal])
+				"crystal":
+					resource_system.add(run_ledger, "crystals", trophy_amount)
+					_log("ТРОФЕЙ: %s ×%d · +%d кристалл(ов)." % [str(trophy.get("name", "Осколок призмы")), trophy_amount, trophy_amount])
+				"bone":
+					resource_system.add(run_ledger, "scrap", trophy_amount)
+					_log("ТРОФЕЙ: %s ×%d · +%d материала." % [str(trophy.get("name", "Фрагмент")), trophy_amount, trophy_amount])
+				"echo":
+					run_ledger["echo_item_charges"] = clampi(int(run_ledger.get("echo_item_charges", 0)) + trophy_amount, 0, 4)
+					_log("ТРОФЕЙ: %s ×%d · шанс находки повышен до следующего предмета." % [str(trophy.get("name", "Остаток эха")), trophy_amount])
+			if bool(trophy.get("focused_by_landscape", false)):
+				_log("Родной ландшафт усилил трофей: шанс выпадения был повышен.")
 	run_ledger.victories = int(run_ledger.get("victories", 0)) + 1
 	GameState.record_victory()
 	if is_boss:
@@ -1347,13 +1689,26 @@ func _on_victory() -> void:
 		pending_perk_count += xp_levels
 		_prepare_perk_choice()
 	var drop_rng := _rng_for_event()
-	var item_chance := 1.0 if is_boss else float(ContentRegistry.BALANCE.loot_item_chance) + minf(float(ContentRegistry.BALANCE.loot_item_bonus_cap), combat_reward_bonus * float(ContentRegistry.BALANCE.loot_item_bonus_multiplier))
-	if is_elite:
-		item_chance = maxf(item_chance, float(ContentRegistry.BALANCE.get("elite_item_chance", 0.45)))
+	var echo_charges := clampi(int(run_ledger.get("echo_item_charges", 0)), 0, 4)
+	var pending_drop_bonus := clampf(float(run_ledger.get("pending_item_drop_bonus", 0.0)), 0.0, 0.30)
+	var drop_source := "boss" if is_boss else ("elite" if is_elite else "enemy")
+	var item_chance: float = loot_system.get_equipment_drop_chance(drop_source, combat_reward_bonus, echo_charges, pending_drop_bonus)
+	var pending_rarity_bonus := clampf(float(run_ledger.get("pending_item_rarity_bonus", 0.0)), 0.0, 0.18)
+	var equipped_rarity_bonus := clampf(float(hero.get("equipped_rare_find_bonus", 0.0)), 0.0, 0.12)
+	var source_quality_bonus: float = 0.0 if is_boss else loot_system.get_source_rarity_bonus(drop_source)
+	var effective_rarity_bonus: float = inventory_system.get_effective_rarity_bonus(equipped_rarity_bonus, pending_rarity_bonus, source_quality_bonus)
 	if drop_rng.randf() < item_chance:
+		if not is_boss and echo_charges > 0:
+			run_ledger["echo_item_charges"] = maxi(0, echo_charges - 1)
 		var item: Dictionary = inventory_system.roll_boss_item(defeated_enemy, drop_rng, loop_count, int(hero.level)) if is_boss else {}
 		if item.is_empty():
-			item = inventory_system.roll_item(drop_rng, loop_count, int(hero.level))
+			var boss_rarity_bonus: float = 0.0 if is_boss else effective_rarity_bonus
+			item = inventory_system.roll_item(drop_rng, loop_count, int(hero.level), boss_rarity_bonus)
+		if not is_boss:
+			# Prepared road-card bonuses are consumed only when an ordinary/elite
+			# equipment drop actually succeeds, never by a failed chance roll.
+			run_ledger["pending_item_rarity_bonus"] = 0.0
+			run_ledger["pending_item_drop_bonus"] = 0.0
 		# Unknown boss profiles retain generic boss gear; registered bosses use
 		# named relics with signature stats and a linked two-piece set.
 		if is_boss and not bool(item.get("is_boss_relic", false)):
@@ -1366,27 +1721,34 @@ func _on_victory() -> void:
 			item["speed"] = minf(0.24, float(item.get("speed", 0.0)) * 1.20)
 			item["crit"] = minf(0.20, float(item.get("crit", 0.0)) * 1.20)
 		elif is_elite:
-			item["rarity"] = "Элитная"
-			item["name"] = "%s · Элитная находка" % str(item.get("name", "Предмет"))
+			# Elites increase both drop reliability and quality bias, but do not
+			# force every item into a separate rarity tier. Preserve its actual
+			# Common/Rare/Epic/Relic roll and apply a separate 10% stat premium.
+			item["name"] = "%s · Трофей элиты" % str(item.get("name", "Предмет"))
 			for stat_key in ["attack", "defense", "hp"]:
 				var elite_stat_value := int(item.get(stat_key, 0))
 				if elite_stat_value > 0:
 					item[stat_key] = maxi(1, int(ceil(float(elite_stat_value) * 1.10)))
 		item["power"] = inventory_system.item_power(item)
-		bag.append(item)
-		GameState.register_item(item)
-		var slot := str(item.slot)
-		var current: Dictionary = equipment.get(slot, {})
-		if inventory_system.should_equip(item, current):
-			equipment[slot] = item
-			GameState.loadout[slot] = item.duplicate(true)
-			GameState.save_now()
-			_sync_hero_stats()
-			_log(("ИМЕННАЯ РЕЛИКВИЯ БОССА: %s. Она автоматически экипирована." if bool(item.get("is_boss_relic", false)) else "Найден предмет: %s. Он автоматически экипирован.") % str(item.get("name", "Предмет")))
-			_request_feedback("loot", str(item.get("name", "Предмет найден")))
+		item["drop_source"] = drop_source
+		if _store_run_item(item):
+			var slot_label := inventory_system.slot_name(str(item.get("slot", "")))
+			var item_kind := "ИМЕННАЯ РЕЛИКВИЯ БОССА" if bool(item.get("is_boss_relic", false)) else "НАЙДЕН ПРЕДМЕТ"
+			if is_boss:
+				var boss_item_label := "Именная реликвия" if bool(item.get("is_boss_relic", false)) else "Боссовая экипировка"
+				_log("%s: %s · %s. %s — гарантированная награда босса; обычная шкала редкости для неё не используется. Предмет помещён в ячейку 01." % [item_kind, str(item.get("name", "Предмет")), slot_label, boss_item_label])
+			else:
+				var rarity_distribution: Dictionary = inventory_system.get_rarity_distribution(0.0 if is_boss else effective_rarity_bonus)
+				var rolled_rarity := str(item.get("rarity", "Обычный"))
+				var rolled_rarity_chance := float(rarity_distribution.get(rolled_rarity, 0.0))
+				_log("%s: %s · %s. Шанс предмета: %d%%; шанс качества «%s» при текущей подготовке: %.1f%%. Предмет в ячейку 01 — решайте, экипировать ли." % [item_kind, str(item.get("name", "Предмет")), slot_label, int(round(item_chance * 100.0)), rolled_rarity.to_lower(), rolled_rarity_chance * 100.0])
+			if not last_inventory_evicted_item.is_empty():
+				_log("РЮКЗАК ПЕРЕПОЛНЕН: вытеснен старейший предмет «%s» из ячейки 12." % str(last_inventory_evicted_item.get("name", "Старая вещь")))
 		else:
-			_log(("ИМЕННАЯ РЕЛИКВИЯ БОССА: %s. Предмет сохранён в арсенале — текущая экипировка сильнее." if bool(item.get("is_boss_relic", false)) else "Найден предмет: %s. Текущая экипировка лучше.") % str(item.get("name", "Предмет")))
-			_request_feedback("loot", str(item.get("name", "Предмет найден")))
+			_log("НАЙДЕН ПРЕДМЕТ: %s не удалось поместить в текущий рюкзак; коллекция убежища остаётся нетронутой." % str(item.get("name", "Предмет")))
+		_request_feedback("loot", str(item.get("name", "Предмет найден")))
+	else:
+		_log("Предмет не выпал: шанс экипировки для этой победы составлял %d%%. Шанс редкости не бросался, поскольку предмета нет." % int(round(item_chance * 100.0)))
 	# Remove only the focused target. Remaining members keep their attack timers
 	# and continue the same battle; no extra rewards are granted for the target swap.
 	if not encounter_enemies.is_empty():
@@ -1404,6 +1766,56 @@ func _on_victory() -> void:
 	changed.emit()
 	if active:
 		save_run_snapshot()
+
+func get_tile_exchange_preview(hand_index: int) -> Dictionary:
+	if not active:
+		return {"ok": false, "reason": "Переписывать карты можно только во время экспедиции."}
+	if not pending_end_outcome.is_empty():
+		return {"ok": false, "reason": "Сначала завершите сохранение итогов экспедиции."}
+	if not enemy.is_empty() or not pending_event.is_empty() or pending_perk_count > 0:
+		return {"ok": false, "reason": "В бою и во время текущего решения карты переписывать нельзя."}
+	if hand_index < 0 or hand_index >= tile_hand.size():
+		return {"ok": false, "reason": "Сначала выберите карту в руке."}
+	if int(run_ledger.get("last_tile_exchange_loop", -1)) == loop_count:
+		return {"ok": false, "reason": "Картограф уже переписал одну карту в этом цикле."}
+	if int(run_ledger.get("crystals", 0)) < 1:
+		return {"ok": false, "reason": "Для переписывания карты нужен 1 кристалл."}
+	var tile_value: Variant = tile_hand[hand_index]
+	if typeof(tile_value) != TYPE_DICTIONARY or str(tile_value.get("id", "")).is_empty():
+		return {"ok": false, "reason": "Выбранная карта повреждена; обмен отменён."}
+	return {"ok": true, "reason": "Можно переписать карту за 1 кристалл. Один обмен на цикл.", "cost_crystals": 1, "tile_name": str(tile_value.get("name", "Тайл"))}
+
+func exchange_tile(hand_index: int) -> Dictionary:
+	var availability := get_tile_exchange_preview(hand_index)
+	if not bool(availability.get("ok", false)):
+		return availability
+	var previous_hand := tile_hand.duplicate(true)
+	var previous_ledger := run_ledger.duplicate(true)
+	var previous_rng_state := run_rng.state
+	var previous_event_log := event_log.duplicate(true)
+	var old_tile: Dictionary = tile_hand[hand_index].duplicate(true)
+	var old_tile_id := str(old_tile.get("id", ""))
+	run_ledger["crystals"] = maxi(0, int(run_ledger.get("crystals", 0)) - 1)
+	run_ledger["last_tile_exchange_loop"] = loop_count
+	var unlock_rare := loop_count >= 3 or GameState.get_unlock_effect("unlock_rare_tiles") > 0.0
+	var new_tile: Dictionary = tile_system.draw_tile(run_rng, unlock_rare, [old_tile_id])
+	if str(new_tile.get("id", "")) == old_tile_id:
+		# Fail closed if the eligible pool ever changes to contain only one card.
+		run_ledger = previous_ledger
+		run_rng.state = previous_rng_state
+		return {"ok": false, "reason": "Нет другой доступной карты для обмена."}
+	tile_hand[hand_index] = new_tile
+	_log("Картограф переписал «%s» в «%s»: потрачен 1 кристалл. Повторный обмен будет доступен в следующем цикле." % [str(old_tile.get("name", old_tile_id)), str(new_tile.get("name", new_tile.get("id", "Тайл")))])
+	if not save_run_snapshot():
+		tile_hand = previous_hand
+		run_ledger = previous_ledger
+		run_rng.state = previous_rng_state
+		event_log = previous_event_log
+		_log("Обмен карты отменён: новое состояние не удалось надёжно сохранить. Кристалл возвращён.")
+		changed.emit()
+		return {"ok": false, "reason": "Не удалось сохранить обмен; карта и кристалл восстановлены."}
+	changed.emit()
+	return {"ok": true, "reason": "«%s» заменён на «%s». Потрачен 1 кристалл." % [str(old_tile.get("name", old_tile_id)), str(new_tile.get("name", new_tile.get("id", "Тайл")))], "old_tile": old_tile, "new_tile": new_tile}
 
 func _maybe_add_tile(source: String, chance: float) -> void:
 	if tile_hand.size() >= get_tile_hand_limit():
@@ -1484,6 +1896,21 @@ func _sync_hero_stats() -> void:
 	hero["bleed_chance"] = clampf(float(equipment_stats.get("bleed_chance", 0.0)), 0.0, 0.5)
 	hero["bleed_damage"] = clampi(int(equipment_stats.get("bleed_damage", 0)), 0, 100)
 	hero["barrier_on_encounter"] = clampi(int(equipment_stats.get("barrier_on_encounter", 0)), 0, 100)
+	hero["lifesteal"] = clampf(float(equipment_stats.get("lifesteal", 0.0)), 0.0, 0.25)
+	hero["dodge_chance"] = clampf(float(equipment_stats.get("dodge_chance", 0.0)), 0.0, 0.25)
+	hero["special_damage_reduction"] = clampf(float(equipment_stats.get("special_damage_reduction", 0.0)), 0.0, 0.35)
+	hero["elite_boss_damage_bonus"] = clampf(float(equipment_stats.get("elite_boss_damage_bonus", 0.0)), 0.0, 0.25)
+	hero["biome_damage_bonus"] = clampf(float(equipment_stats.get("biome_damage_bonus", 0.0)), 0.0, 0.20)
+	hero["biome_resistance"] = clampf(float(equipment_stats.get("biome_resistance", 0.0)), 0.0, 0.20)
+	hero["equipped_trophy_find_bonus"] = clampf(float(equipment_stats.get("trophy_find_bonus", 0.0)), 0.0, 0.25)
+	for trophy_biome in ["spore", "crystal", "bone", "echo"]:
+		hero["equipped_" + trophy_biome + "_trophy_bonus"] = clampf(float(equipment_stats.get(trophy_biome + "_trophy_bonus", 0.0)), 0.0, 0.12)
+	hero["equipped_rare_find_bonus"] = clampf(float(equipment_stats.get("rare_find_bonus", 0.0)), 0.0, 0.12)
+	for status_id in ["poison", "bleed", "wound", "distortion", "weakness"]:
+		hero[status_id + "_resistance"] = clampf(float(equipment_stats.get(status_id + "_resistance", 0.0)), 0.0, 0.25)
+	for biome_tag in ["spore", "crystal", "bone", "echo"]:
+		hero[biome_tag + "_damage_bonus"] = clampf(float(equipment_stats.get(biome_tag + "_damage_bonus", 0.0)), 0.0, 0.25)
+		hero[biome_tag + "_resistance"] = clampf(float(equipment_stats.get(biome_tag + "_resistance", 0.0)), 0.0, 0.20)
 	hero["equipment_sets"] = equipment_stats.get("active_sets", []).duplicate(true)
 	hero["equipment_synergies"] = equipment_stats.get("active_synergies", []).duplicate(true)
 	if int(hero.max_hp) > old_max:
@@ -1525,14 +1952,17 @@ func place_world_tile(hand_index: int, cell_id: String) -> Dictionary:
 	if hand_index < 0 or hand_index >= tile_hand.size():
 		return {"ok": false, "reason": "Выберите тайл из руки."}
 	var tile: Dictionary = tile_hand[hand_index].duplicate(true)
-	var placement: Dictionary = tile_system.can_place_world(route, world_tiles, cell_id, tile)
+	var placement: Dictionary = tile_system.can_place_world(route, world_tiles, cell_id, tile, get_route_shape_id(), get_route_geometry_seed())
 	if not bool(placement.get("ok", false)):
 		return placement
-	var parts := cell_id.split(":")
-	tile["field_x"] = int(parts[0])
-	tile["field_y"] = int(parts[1])
+	var field_coord: Vector2i = TileSystemScript.world_cell_coordinates(cell_id)
+	tile["field_x"] = field_coord.x
+	tile["field_y"] = field_coord.y
+	tile["field_schema"] = 3 if TileSystemScript.is_map_world_cell_id(cell_id) else 2
 	tile["route_index"] = int(placement.get("route_index", -1))
 	world_tiles[cell_id] = tile
+	if TileSystemScript.is_map_world_cell_id(cell_id):
+		discovered_world_cells[cell_id] = true
 	tile_hand.remove_at(hand_index)
 	_log("Тайл «%s» размещён на ландшафте (%d, %d), сектор маршрута %d." % [str(tile.get("name", "Тайл")), int(tile.field_x) + 1, int(tile.field_y) + 1, int(tile.route_index) + 1])
 	changed.emit()
@@ -1562,6 +1992,34 @@ func end_run(outcome: String = "return") -> void:
 	if not pending_end_outcome.is_empty():
 		outcome = pending_end_outcome
 	_finish_run(outcome)
+
+func _collect_run_items_for_settlement(outcome: String) -> Array:
+	var collected: Array = []
+	var seen_ids: Dictionary = {}
+	# Equipped items survive defeat because they define the finalized loadout.
+	for slot_value in InventorySystemScript.EQUIPMENT_SLOTS:
+		var equipped_value: Variant = equipment.get(str(slot_value), {})
+		if typeof(equipped_value) != TYPE_DICTIONARY:
+			continue
+		var equipped_item: Dictionary = equipped_value
+		var equipped_id := str(equipped_item.get("id", ""))
+		if equipped_id.is_empty() or seen_ids.has(equipped_id) or not inventory_system.can_equip_item(equipped_item, str(slot_value)):
+			continue
+		seen_ids[equipped_id] = true
+		collected.append(equipped_item.duplicate(true))
+	# On a safe return, the still-carried backpack items are banked too. On defeat,
+	# un-equipped backpack items are lost; ejected items are never eligible to bank.
+	if outcome == "return":
+		for bag_item_value in bag:
+			if typeof(bag_item_value) != TYPE_DICTIONARY:
+				continue
+			var bag_item: Dictionary = bag_item_value
+			var bag_item_id := str(bag_item.get("id", ""))
+			if bag_item_id.is_empty() or seen_ids.has(bag_item_id) or not inventory_system.can_equip_item(bag_item):
+				continue
+			seen_ids[bag_item_id] = true
+			collected.append(bag_item.duplicate(true))
+	return collected
 
 func _finish_run(outcome: String) -> void:
 	if not active:
@@ -1606,6 +2064,8 @@ func _finish_run(outcome: String) -> void:
 			break
 	var contract_status := "completed" if bool(run_contract.get("completed", false)) and not bool(run_contract.get("failed", false)) else ("failed" if bool(run_contract.get("failed", false)) else ("active" if not run_contract.is_empty() else "none"))
 	var record_key := difficulty_id if expedition_mode_id == "standard" else "%s:%s" % [difficulty_id, expedition_mode_id]
+	var inventory_ejections_value: Variant = run_ledger.get("inventory_ejections", [])
+	var inventory_ejection_count: int = inventory_ejections_value.size() if typeof(inventory_ejections_value) == TYPE_ARRAY else 0
 	var summary_metadata: Dictionary = {
 		"events_resolved": int(run_ledger.get("events_resolved", 0)),
 		"event_history": run_event_history,
@@ -1650,6 +2110,11 @@ func _finish_run(outcome: String) -> void:
 		"end_max_hp": maxi(0, int(hero.get("max_hp", 0))),
 		"end_attack": maxi(0, int(hero.get("attack", 0))),
 		"end_defense": maxi(0, int(hero.get("defense", 0))),
+		"field_cache_item_names": [],
+		"field_cache_item_count": 0,
+		"backpack_item_count": bag.size(),
+		"backpack_ejected_item_count": inventory_ejection_count,
+		"backpack_last_evicted_name": str(last_inventory_evicted_item.get("name", "")),
 		"road_placements": placed_tiles.size(),
 		"world_placements": world_tiles.size(),
 		"route_cells": route.size(),
@@ -1662,10 +2127,11 @@ func _finish_run(outcome: String) -> void:
 		"tiles": recent_tile_names,
 		"event_decisions": recent_decisions
 	}
+	var retained_run_items := _collect_run_items_for_settlement(outcome)
 	var summary: Dictionary = GameState.settle_expedition(
 		run_ledger, outcome, loop_count, int(hero.get("level", 1)), defeat_keep_ratio,
 		summary_metadata, record_key, challenge_score,
-		int(run_ledger.get("bosses_defeated", 0)), int(run_ledger.get("elites_defeated", 0)), equipment
+		int(run_ledger.get("bosses_defeated", 0)), int(run_ledger.get("elites_defeated", 0)), equipment, retained_run_items
 	)
 	if not bool(summary.get("_persistence_ok", true)):
 		active = true
@@ -1683,9 +2149,19 @@ func _finish_run(outcome: String) -> void:
 	changed.emit()
 	run_finished.emit(summary.duplicate(true))
 
+func _get_field_cache_item_names() -> Array[String]:
+	var names: Array[String] = []
+	for item_value in field_cache:
+		if typeof(item_value) != TYPE_DICTIONARY:
+			continue
+		var item: Dictionary = item_value
+		names.append(str(item.get("name", "Предмет")))
+	return names
+
 func _build_run_baseline() -> Dictionary:
 	var loadout_ids: Dictionary = {}
-	for slot in ["weapon", "armor", "core"]:
+	for slot_value in InventorySystemScript.EQUIPMENT_SLOTS:
+		var slot := str(slot_value)
 		var item_value: Variant = equipment.get(slot, {})
 		var item: Dictionary = item_value if typeof(item_value) == TYPE_DICTIONARY else {}
 		loadout_ids[slot] = str(item.get("id", ""))
@@ -1724,10 +2200,200 @@ func _log(message: String) -> void:
 	while event_log.size() > int(ContentRegistry.BALANCE.get("max_event_log_entries", 8)):
 		event_log.pop_back()
 
+func _store_run_item(item: Dictionary, except_equipped_slot: String = "") -> bool:
+	if not inventory_system.can_equip_item(item):
+		return false
+	var item_id := str(item.get("id", ""))
+	if item_id.is_empty():
+		return false
+	# A duplicate is not a successful reward: do not consume one-shot loot bonuses,
+	# emit loot feedback, or evict a different item for an item that was never added.
+	if not find_run_item(item_id).is_empty():
+		return false
+	for slot_value in InventorySystemScript.EQUIPMENT_SLOTS:
+		var equipped_slot := str(slot_value)
+		if equipped_slot == except_equipped_slot:
+			continue
+		var equipped_value: Variant = equipment.get(equipped_slot, {})
+		if typeof(equipped_value) == TYPE_DICTIONARY and str(equipped_value.get("id", "")) == item_id:
+			return false
+	last_inventory_evicted_item.clear()
+	# The item enters the first (top-left) cell. If full, the oldest item at the
+	# end (bottom-right) is ejected from this expedition's backpack queue.
+	if bag.size() >= BACKPACK_CAPACITY:
+		var evicted_value: Variant = bag.pop_back()
+		if typeof(evicted_value) == TYPE_DICTIONARY:
+			last_inventory_evicted_item = (evicted_value as Dictionary).duplicate(true)
+			var ejections_value: Variant = run_ledger.get("inventory_ejections", [])
+			var ejections: Array = ejections_value.duplicate(true) if typeof(ejections_value) == TYPE_ARRAY else []
+			ejections.append(last_inventory_evicted_item.duplicate(true))
+			var dust_value := inventory_system.get_ejection_echo_dust(last_inventory_evicted_item)
+			run_ledger["inventory_ejections_dust"] = clampi(int(run_ledger.get("inventory_ejections_dust", 0)) + dust_value, 0, GameState.MAX_ECHO_DUST)
+			run_ledger["inventory_ejections_count"] = mini(1000000, int(run_ledger.get("inventory_ejections_count", 0)) + 1)
+			while ejections.size() > 100:
+				ejections.pop_front()
+			run_ledger["inventory_ejections"] = ejections
+			_log("РЮКЗАК ПЕРЕПОЛНЕН: «%s» вытеснен и исчез из экспедиционного рюкзака." % str(last_inventory_evicted_item.get("name", "Старая вещь")))
+	bag.push_front(item.duplicate(true))
+	return true
+
+func find_bag_item(item_id: String) -> Dictionary:
+	if item_id.is_empty():
+		return {}
+	for item_value in bag:
+		if typeof(item_value) == TYPE_DICTIONARY and str(item_value.get("id", "")) == item_id:
+			return item_value.duplicate(true)
+	return {}
+
+func find_field_cache_item(_item_id: String) -> Dictionary:
+	# Retained for compatibility with older callers; current expeditions have no extra cache.
+	return {}
+
+func find_run_item(item_id: String) -> Dictionary:
+	return find_bag_item(item_id)
+
+func equip_bag_item(item_id: String) -> Dictionary:
+	if not active or not pending_end_outcome.is_empty():
+		return {"ok": false, "message": "Сейчас экипировку менять нельзя."}
+	if not pending_event.is_empty() or pending_perk_count > 0:
+		return {"ok": false, "message": "Сначала завершите текущее событие или выбор улучшения."}
+	var item_index := -1
+	for index in range(bag.size()):
+		var item_value: Variant = bag[index]
+		if typeof(item_value) == TYPE_DICTIONARY and str(item_value.get("id", "")) == item_id:
+			item_index = index
+			break
+	if item_index < 0:
+		return {"ok": false, "message": "Предмет больше не находится в рюкзаке: он мог быть вытеснен новой добычей."}
+	var candidate: Dictionary = bag[item_index].duplicate(true)
+	if not inventory_system.can_equip_item(candidate):
+		return {"ok": false, "message": "Предмет не подходит ни к одному слоту экипировки."}
+	var candidate_id := str(candidate.get("id", ""))
+	for slot_value in InventorySystemScript.EQUIPMENT_SLOTS:
+		var equipped_value: Variant = equipment.get(str(slot_value), {})
+		if typeof(equipped_value) == TYPE_DICTIONARY and str(equipped_value.get("id", "")) == candidate_id:
+			return {"ok": false, "message": "Этот экземпляр предмета уже экипирован; дубликат не будет создан."}
+	var slot := str(candidate.get("slot", ""))
+	var old_bag: Array = bag.duplicate(true)
+	var old_equipment: Dictionary = equipment.duplicate(true)
+	var old_hero: Dictionary = hero.duplicate(true)
+	var old_event_log: Array = event_log.duplicate(true)
+	var current_value: Variant = equipment.get(slot, {})
+	var displaced: Dictionary = current_value.duplicate(true) if typeof(current_value) == TYPE_DICTIONARY else {}
+	bag.remove_at(item_index)
+	# Loop Hero-style replacement: the previously equipped run item is not
+	# moved back into the backpack. Permanent shelter collection is a separate system.
+	equipment[slot] = candidate.duplicate(true)
+	var hp_before_change := int(hero.get("hp", 1))
+	_sync_hero_stats()
+	hero["hp"] = mini(int(hero.get("max_hp", hp_before_change)), hp_before_change)
+	_log("Экипировано вручную: %s → %s. Старая экипировка не возвращается в рюкзак." % [str(candidate.get("name", "Предмет")), inventory_system.slot_name(slot)])
+	if not save_run_snapshot():
+		bag = old_bag
+		equipment = old_equipment
+		hero = old_hero
+		event_log = old_event_log
+		return {"ok": false, "message": "Не удалось сохранить смену экипировки. Изменения отменены."}
+	changed.emit()
+	return {"ok": true, "message": "Предмет экипирован.", "item": candidate, "displaced": displaced, "source": "bag"}
+
+func unequip_run_slot(slot: String) -> Dictionary:
+	if not active or not InventorySystemScript.EQUIPMENT_SLOTS.has(slot):
+		return {"ok": false, "message": "Этот слот недоступен."}
+	if not pending_event.is_empty() or pending_perk_count > 0 or not pending_end_outcome.is_empty():
+		return {"ok": false, "message": "Сначала завершите текущее решение."}
+	var item_value: Variant = equipment.get(slot, {})
+	if typeof(item_value) != TYPE_DICTIONARY or item_value.is_empty():
+		return {"ok": false, "message": "Слот уже пуст."}
+	var old_bag: Array = bag.duplicate(true)
+	var old_equipment: Dictionary = equipment.duplicate(true)
+	var old_hero: Dictionary = hero.duplicate(true)
+	var old_event_log: Array = event_log.duplicate(true)
+	var old_run_ledger: Dictionary = run_ledger.duplicate(true)
+	var old_evicted: Dictionary = last_inventory_evicted_item.duplicate(true)
+	var stored: bool = _store_run_item(item_value, slot)
+	if not stored:
+		return {"ok": false, "message": "Не удалось переместить предмет в рюкзак."}
+	equipment[slot] = {}
+	var hp_before_change := int(hero.get("hp", 1))
+	_sync_hero_stats()
+	hero["hp"] = mini(int(hero.get("max_hp", hp_before_change)), hp_before_change)
+	_log("Снят предмет: %s. Он помещён в начало рюкзака." % str(item_value.get("name", "Предмет")))
+	if not save_run_snapshot():
+		bag = old_bag
+		equipment = old_equipment
+		hero = old_hero
+		event_log = old_event_log
+		run_ledger = old_run_ledger
+		last_inventory_evicted_item = old_evicted
+		return {"ok": false, "message": "Не удалось сохранить изменение. Экипировка восстановлена."}
+	changed.emit()
+	return {"ok": true, "message": "Предмет снят."}
+
+func can_reorder_run_bag_item(item_id: String, target_index: int) -> bool:
+	if not active or not pending_end_outcome.is_empty() or not pending_event.is_empty() or pending_perk_count > 0:
+		return false
+	if bag.is_empty() or target_index < 0 or target_index >= BACKPACK_CAPACITY:
+		return false
+	return not find_bag_item(item_id).is_empty()
+
+func reorder_run_bag_item(item_id: String, target_index: int) -> Dictionary:
+	if not can_reorder_run_bag_item(item_id, target_index):
+		return {"ok": false, "message": "Нельзя переставить этот предмет сейчас."}
+	var source_index := -1
+	for index in range(bag.size()):
+		if str(bag[index].get("id", "")) == item_id:
+			source_index = index
+			break
+	if source_index < 0:
+		return {"ok": false, "message": "Предмет больше не находится в рюкзаке."}
+	var normalized_target := clampi(target_index, 0, bag.size() - 1)
+	if source_index == normalized_target:
+		return {"ok": true, "message": "Порядок рюкзака не изменился."}
+	var old_bag: Array = bag.duplicate(true)
+	var old_log: Array = event_log.duplicate(true)
+	var item: Dictionary = bag[source_index].duplicate(true)
+	bag.remove_at(source_index)
+	bag.insert(normalized_target, item)
+	_log("Предмет перемещён в ячейку %02d рюкзака; порядок вытеснения обновлён." % (normalized_target + 1))
+	if not save_run_snapshot():
+		bag = old_bag
+		event_log = old_log
+		return {"ok": false, "message": "Не удалось сохранить порядок рюкзака. Изменения отменены."}
+	changed.emit()
+	return {"ok": true, "message": "Порядок рюкзака изменён."}
+
+func discard_run_bag_item(item_id: String) -> Dictionary:
+	if not active or not pending_end_outcome.is_empty():
+		return {"ok": false, "message": "Сейчас нельзя менять содержимое рюкзака."}
+	if not pending_event.is_empty() or pending_perk_count > 0:
+		return {"ok": false, "message": "Сначала завершите текущее решение."}
+	var item_index := -1
+	for index in range(bag.size()):
+		var item_value: Variant = bag[index]
+		if typeof(item_value) == TYPE_DICTIONARY and str(item_value.get("id", "")) == item_id:
+			item_index = index
+			break
+	if item_index < 0:
+		return {"ok": false, "message": "Предмет не найден в рюкзаке; он мог быть вытеснен новой добычей."}
+	var old_bag: Array = bag.duplicate(true)
+	var old_event_log: Array = event_log.duplicate(true)
+	var item: Dictionary = bag[item_index].duplicate(true)
+	bag.remove_at(item_index)
+	_log("Убрано из текущего забега: %s. Постоянная коллекция убежища хранится отдельно." % str(item.get("name", "Предмет")))
+	if not save_run_snapshot():
+		bag = old_bag
+		event_log = old_event_log
+		return {"ok": false, "message": "Не удалось сохранить изменение. Предмет возвращён."}
+	changed.emit()
+	return {"ok": true, "message": "Предмет убран из текущего забега; копия в арсенале сохранена."}
+
 func get_equipment_summary() -> Array:
 	var lines: Array = []
-	for slot in ["weapon", "armor", "core"]:
-		var item: Dictionary = equipment.get(slot, {})
+	for slot_value in InventorySystemScript.EQUIPMENT_SLOTS:
+		var slot := str(slot_value)
+		var item_value: Variant = equipment.get(slot, {})
+		var item: Dictionary = item_value if typeof(item_value) == TYPE_DICTIONARY else {}
 		if item.is_empty():
 			lines.append("%s: пусто" % EQUIPMENT_SLOT_NAMES[slot])
 		else:
@@ -1746,6 +2412,10 @@ func get_equipment_summary() -> Array:
 				bonuses.append("Кровотечение %d%%" % int(round(float(item.get("bleed_chance", 0.0)) * 100.0)))
 			if int(item.get("barrier_on_encounter", 0)) > 0:
 				bonuses.append("Барьер %d" % int(item.get("barrier_on_encounter", 0)))
+			if float(item.get("lifesteal", 0.0)) > 0.0:
+				bonuses.append("вампиризм %d%%" % int(round(float(item.get("lifesteal", 0.0)) * 100.0)))
+			if float(item.get("dodge_chance", 0.0)) > 0.0:
+				bonuses.append("уклонение %d%%" % int(round(float(item.get("dodge_chance", 0.0)) * 100.0)))
 			var archetype_text := str(item.get("archetype_name", ""))
 			if not archetype_text.is_empty():
 				bonuses.append("профиль: " + archetype_text)

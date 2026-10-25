@@ -1,0 +1,4 @@
+STAGE 87 BIOME TERRAIN VISUAL REGRESSION PASSED
+- Source guards: 9 PASS.
+- Independent deterministic reference-grid scenarios: 5 PASS; each covers all 266 cells and all four visual palettes.
+- This report confirms source/numerical checks only; runtime not confirmed.

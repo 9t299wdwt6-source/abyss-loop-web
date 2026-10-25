@@ -1,8 +1,18 @@
 extends RefCounted
 class_name EnemySystem
 
-func create_enemy(loop_count: int, danger: float, rng: RandomNumberGenerator, strength_bonus: float = 0.0) -> Dictionary:
-	var ids: Array = ContentRegistry.ENEMIES.keys()
+func create_enemy(loop_count: int, danger: float, rng: RandomNumberGenerator, strength_bonus: float = 0.0, preferred_pool: Array = []) -> Dictionary:
+	var ids: Array = []
+	for preferred_value in preferred_pool:
+		var preferred_id := str(preferred_value)
+		if ContentRegistry.ENEMIES.has(preferred_id) and not ids.has(preferred_id):
+			ids.append(preferred_id)
+	if ids.is_empty():
+		for enemy_id_value in ContentRegistry.ENEMIES.keys():
+			var candidate_id := str(enemy_id_value)
+			var definition: Dictionary = ContentRegistry.ENEMIES[candidate_id]
+			if not bool(definition.get("landscape_only", false)):
+				ids.append(candidate_id)
 	if ids.is_empty():
 		push_error("ContentRegistry.ENEMIES is empty; cannot create encounter")
 		return {}
@@ -10,11 +20,15 @@ func create_enemy(loop_count: int, danger: float, rng: RandomNumberGenerator, st
 	var def: Dictionary = ContentRegistry.ENEMIES[enemy_id]
 	var scaling := 1.0 + maxf(0.0, float(loop_count)) * float(ContentRegistry.BALANCE.get("enemy_loop_scaling", 0.18)) + maxf(0.0, danger - 1.0) * float(ContentRegistry.BALANCE.get("enemy_danger_scaling", 0.32)) + strength_bonus
 	var enemy_hp := maxi(1, int(round(float(def.hp) * scaling)))
+	var enemy_tags_value: Variant = def.get("tags", [])
+	var enemy_tags: Array = enemy_tags_value.duplicate(true) if typeof(enemy_tags_value) == TYPE_ARRAY else []
 	return {
 		"id": enemy_id,
 		"uid": "%s_%d" % [enemy_id, rng.randi()],
 		"name": def.name,
 		"role": def.role,
+		"biome_tag": str(def.get("biome_tag", "")),
+		"tags": enemy_tags,
 		"behavior_hint": str(def.get("behavior_hint", "Обычная атака")),
 		"ability_text": str(def.get("ability_text", "обычная атака")),
 		"is_boss": false,
@@ -118,11 +132,11 @@ func promote_encounter_to_elite(encounter: Array, loop_count: int) -> Dictionary
 
 # Returns a whole encounter. All members attack independently; the hero focuses
 # the first living member. High-threat expeditions guarantee at least a pair.
-func create_encounter(loop_count: int, danger: float, rng: RandomNumberGenerator, strength_bonus: float = 0.0, boss_encounter: bool = false, extra_group_members: int = 0) -> Array:
+func create_encounter(loop_count: int, danger: float, rng: RandomNumberGenerator, strength_bonus: float = 0.0, boss_encounter: bool = false, extra_group_members: int = 0, preferred_pool: Array = []) -> Array:
 	if boss_encounter:
 		return [create_boss(loop_count, danger + strength_bonus, rng)]
 	var members: Array = []
-	members.append(create_enemy(loop_count, danger, rng, strength_bonus))
+	members.append(create_enemy(loop_count, danger, rng, strength_bonus, preferred_pool))
 	var pack_size := 1
 	if loop_count >= 4:
 		pack_size = 2
@@ -134,7 +148,7 @@ func create_encounter(loop_count: int, danger: float, rng: RandomNumberGenerator
 		pack_size = 3
 	pack_size = mini(pack_size + maxi(0, extra_group_members), int(ContentRegistry.BALANCE.max_encounter_enemies))
 	for index in range(1, pack_size):
-		var support := create_enemy(loop_count, danger, rng, strength_bonus)
+		var support := create_enemy(loop_count, danger, rng, strength_bonus, preferred_pool)
 		# Stagger opening attacks so a fresh pack does not burst the hero instantly.
 		support["attack_timer"] = -float(support.get("attack_interval", 1.0)) * 0.42 * float(index)
 		members.append(support)

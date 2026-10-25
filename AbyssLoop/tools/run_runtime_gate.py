@@ -151,9 +151,11 @@ def main() -> int:
                     steps.append(run_step("Save-system regression", [args.godot, "--headless", "--path", str(sandbox), "res://tests/save_system_regression_runner.tscn"], sandbox, env))
                 if steps and all(step["status"] == "PASS" for step in steps):
                     steps.append(run_step("Expedition integration audit", [args.godot, "--headless", "--path", str(sandbox), "--script", "res://tests/expedition_integration_audit.gd"], sandbox, env))
-                success = bool(steps) and all(step["status"] == "PASS" for step in steps) and len(steps) == 7
+                if steps and all(step["status"] == "PASS" for step in steps):
+                    steps.append(run_step("Inventory-to-settlement runtime acceptance", [args.godot, "--headless", "--path", str(sandbox), "res://tests/inventory_settlement_runtime_acceptance_runner.tscn"], sandbox, env))
+                success = bool(steps) and all(step["status"] == "PASS" for step in steps) and len(steps) == 8
                 if success:
-                    note = "All seven runtime gates passed against a temporary copy with a distinct project name. The test harness disables legacy-profile import in this sandbox; save and expedition integration tests preserve/restore QA-owned save files. The player's real save directory was not used. Visual acceptance and a complete manual expedition remain separate requirements."
+                    note = "All eight runtime gates passed against a temporary copy with a distinct project name. The inventory-to-settlement acceptance exercises real equipment, overflow, checkpoint restore, return/defeat settlement and idempotent payout. The test harness disables legacy-profile import in this sandbox; save and expedition integration tests preserve/restore QA-owned save files. The player's real save directory was not used. Visual acceptance and a complete manual expedition remain separate requirements."
 
     text = report_text("PASS" if success else "FAIL", fingerprint, godot_version, build_version, steps, note)
     if not success:

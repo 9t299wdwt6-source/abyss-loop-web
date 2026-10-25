@@ -8,7 +8,7 @@ func _ready() -> void:
 
 # Single source of truth for temporary content and tuning values.
 const BALANCE := {
-	"route_cells": 18,
+	"route_cells": 34,
 	"safe_intro_route_nodes": 3,
 	"first_run_min_starting_tiles": 3,
 	"autosave_interval_seconds": 2.0,
@@ -28,6 +28,7 @@ const BALANCE := {
 	"max_tile_hand": 4,
 	"loot_crystal_chance": 0.22,
 	"loot_item_chance": 0.18,
+	"cache_item_drop_chance": 0.35,
 	"loot_item_bonus_cap": 0.15,
 	"loot_item_bonus_multiplier": 0.15,
 	"route_reward_scrap": 4,
@@ -160,8 +161,16 @@ const TILE_DEFS := {
 	},
 	"nursery": {
 		"name": "Питомник бездны", "short": "ПИТОМНИК", "kind": "danger", "placement_zone": "landscape",
-		"color": "#a7c96b", "description": "Редкая постройка, где опасность растёт вместе с добычей: враги сильнее, но награда заметно выше."
-	}
+		"color": "#a7c96b", "description": "Редкая постройка, где опасность растёт вместе с добычей: враги сильнее, но награда заметно выше.", "enemy_pool": ["sporeling"]
+	},
+	"echo_spring": {"name": "Источник тихого эха", "short": "ИСТОЧНИК", "kind": "support", "placement_zone": "road", "color": "#78cdbd", "description": "Дорожный источник восстанавливает здоровье и снижает риск на узле."},
+	"fault_line": {"name": "Трещина живой породы", "short": "ТРЕЩИНА", "kind": "danger", "placement_zone": "road", "color": "#d47aa7", "description": "Опасная трещина привлекает эхо-огоньков; риск выше, но растёт добыча.", "enemy_pool": ["echo_wisp"]},
+	"spore_garden": {"name": "Сад спороносных колокольчиков", "short": "СПОРЫ", "kind": "support", "placement_zone": "landscape", "color": "#91b85f", "description": "Сад медленно лечит героя, но привлекает споровиков.", "enemy_pool": ["sporeling"]},
+	"crystal_hive": {"name": "Кристальный улей", "short": "УЛЕЙ", "kind": "rare", "placement_zone": "landscape", "color": "#74b8e7", "description": "Улей приносит кристаллы, но его охраняют призматические клещи.", "enemy_pool": ["prism_mite"]},
+	"bone_orchard": {"name": "Костяной сад", "short": "КОСТИ", "kind": "danger", "placement_zone": "landscape", "color": "#c6b69a", "description": "Костяные деревья обещают богатые трофеи, но пробуждают дозорных.", "enemy_pool": ["bone_warden"]},
+	"echo_obelisk": {"name": "Обелиск немого сигнала", "short": "ОБЕЛИСК", "kind": "knowledge", "placement_zone": "landscape", "color": "#bf9be7", "description": "Обелиск усиливает редкую добычу и зовёт эхо-огоньков.", "enemy_pool": ["echo_wisp"]},
+	"lost_convoy": {"name": "Обоз забытых исследователей", "short": "ОБОЗ", "kind": "rare", "placement_zone": "road", "color": "#d4a86b", "description": "Даёт материалы и подготавливает следующую находку: выше шанс получить редкую экипировку. На маршруте остаётся опасный след."},
+	"hunter_marker": {"name": "Охотничья веха", "short": "ВЕХА", "kind": "danger", "placement_zone": "road", "color": "#d97a70", "description": "Помечает будущую встречу: повышает шанс выпадения экипировки до первой успешной находки. Противники сильнее и чаще выходят на след героя."}
 }
 
 # A synergy is evaluated when its trigger tile is visited and one or more adjacent
@@ -182,12 +191,43 @@ const TILE_SYNERGIES := [
 	{"id": "archive_ward", "name": "Тихий читальный зал", "trigger_tile": "archive", "neighbor_tile": "ward", "effects": {"heal": 3, "spawn_bonus": -0.05}, "description": "Оберег стабилизирует архив: +3 здоровья и ниже шанс столкновения."},
 	{"id": "nursery_rift", "name": "Инкубатор разлома", "trigger_tile": "nursery", "neighbor_tile": "rift", "effects": {"reward_bonus": 0.25, "enemy_bonus": 0.10}, "description": "Разлом подпитывает питомник: сильные враги несут на 25% больше награды."},
 	{"id": "nursery_snare", "name": "Сдержанный выводок", "trigger_tile": "nursery", "neighbor_tile": "snare", "effects": {"spawn_bonus": -0.10, "enemy_bonus": -0.05}, "description": "Сеть перехвата удерживает выводок: вероятность боя и сила врагов снижены."},
+	{"id": "spore_ward", "name": "Корневой симбиоз", "trigger_tile": "spore_garden", "neighbor_tile": "ward", "effects": {"heal": 5, "spawn_bonus": -0.04}, "description": "Корневой оберег стабилизирует споровый сад и возвращает 5 здоровья."},
+	{"id": "crystal_archive", "name": "Каталог улья", "trigger_tile": "crystal_hive", "neighbor_tile": "archive", "effects": {"scrap": 3, "reward_bonus": 0.12}, "description": "Архив расшифровывает кристаллы улья: +3 материала и +12% к боевой награде."},
+	{"id": "bone_rift", "name": "Кладбище разлома", "trigger_tile": "bone_orchard", "neighbor_tile": "rift", "effects": {"reward_bonus": 0.25, "enemy_bonus": 0.08}, "description": "Разлом будит костяного дозорного: добыча выше на 25%, враги сильнее на 8%."},
+	{"id": "obelisk_snare", "name": "Заглушённый маяк", "trigger_tile": "echo_obelisk", "neighbor_tile": "snare", "effects": {"spawn_bonus": -0.08, "heal": 2, "reward_bonus": 0.05}, "description": "Сеть глушит сигнал обелиска: +2 здоровья и меньше случайных встреч."},
+	{"id": "fault_hunt", "name": "Охота в трещине", "trigger_tile": "fault_line", "neighbor_tile": "hunt", "effects": {"reward_bonus": 0.16, "enemy_bonus": 0.06}, "description": "Следопыт использует трещину как ловушку: добыча выше, но цель опаснее."},
+	{"id": "convoy_ward", "name": "Сторожевой привал", "trigger_tile": "lost_convoy", "neighbor_tile": "ward", "effects": {"scrap": 2, "reward_bonus": 0.05, "enemy_bonus": -0.02}, "description": "Оберег позволяет разобрать обоз спокойнее: +2 материала и небольшой бонус добычи с ослаблением угрозы."},
+	{"id": "convoy_hunt", "name": "След контрабандистов", "trigger_tile": "lost_convoy", "neighbor_tile": "hunt", "effects": {"scrap": 2, "reward_bonus": 0.10, "enemy_bonus": 0.04}, "description": "Охота на следе обоза приносит +2 материала и +10% награды, но усиливает встречу."},
+	{"id": "marker_snare", "name": "Контролируемая охота", "trigger_tile": "hunter_marker", "neighbor_tile": "snare", "effects": {"spawn_bonus": -0.08, "reward_bonus": 0.10, "enemy_bonus": -0.04}, "description": "Сеть стабилизирует охотничью веху: меньше случайных столкновений, слабее цель, но выше награда за подготовленную охоту."},
+	{"id": "spore_hunt", "name": "Цветение приманки", "trigger_tile": "spore_garden", "neighbor_tile": "hunt", "effects": {"heal": 2, "reward_bonus": 0.10, "enemy_bonus": 0.03}, "description": "Следопыт собирает спороносные трофеи: +2 здоровья и +10% награды, но противник немного сильнее."},
+	{"id": "crystal_snare", "name": "Улей под сетью", "trigger_tile": "crystal_hive", "neighbor_tile": "snare", "effects": {"spawn_bonus": -0.06, "reward_bonus": 0.08, "enemy_bonus": -0.02}, "description": "Сеть удерживает клещей в кристальном проходе: риск и сила встреч немного снижены, награда выше на 8%."},
+	{"id": "bone_archive", "name": "Каталог костей", "trigger_tile": "bone_orchard", "neighbor_tile": "archive", "effects": {"scrap": 2, "reward_bonus": 0.10, "enemy_bonus": 0.04}, "description": "Архив расшифровывает костяные реликты: +2 материала и +10% награды за более опасный бой."},
+	{"id": "echo_ward", "name": "Тихая линза", "trigger_tile": "echo_obelisk", "neighbor_tile": "ward", "effects": {"heal": 3, "spawn_bonus": -0.05, "reward_bonus": 0.04}, "description": "Оберег глушит сигнал обелиска, сохраняя +3 здоровья и небольшую прибавку к добыче."},
+	{"id": "spore_archive", "name": "Гербарий охотника", "trigger_tile": "spore_garden", "neighbor_tile": "archive", "effects": {"scrap": 2, "reward_bonus": 0.06, "enemy_bonus": 0.02}, "description": "Архив сохраняет споры как боевой реагент: +2 материала и +6% добычи, но существа становятся чуть опаснее."},
+	{"id": "crystal_hunt", "name": "Призматическая засада", "trigger_tile": "crystal_hive", "neighbor_tile": "hunt", "effects": {"reward_bonus": 0.12, "enemy_bonus": 0.04}, "description": "Следопыт помечает уязвимые грани клещей: добыча выше на 12%, но враги сильнее на 4%."},
+	{"id": "bone_ward", "name": "Усыпальница под корнями", "trigger_tile": "bone_orchard", "neighbor_tile": "ward", "effects": {"heal": 4, "spawn_bonus": -0.02, "enemy_bonus": -0.03}, "description": "Оберег удерживает дозорных в пределах сада: +4 здоровья, немного ниже риск и сила встреч."},
+	{"id": "echo_signal", "name": "Резонансный след", "trigger_tile": "echo_obelisk", "neighbor_tile": "signal", "effects": {"reward_bonus": 0.10, "spawn_bonus": 0.03, "enemy_bonus": 0.04}, "description": "Резонатор усиливает сигнал обелиска: награда выше на 10%, но встреча вероятнее и опаснее."},
+]
+
+# Three-node road formations reward route planning beyond simple pairwise adjacency.
+# A formation resolves only when its center node is visited; the closed-loop route
+# means the last and first placeable card slots can complete a pattern without occupying the immutable start node.
+const ROAD_FORMATIONS := [
+    {"id": "supply_patrol", "name": "Маршрут снабженческого дозора", "previous_tile": "ward", "center_tile": "cache", "next_tile": "hunt", "effects": {"scrap": 4, "reward_bonus": 0.08}, "description": "Оберег направляет следопыта к тайнику: +4 материала и +8% боевой награды при посещении центра."},
+    {"id": "quiet_trap", "name": "Тихая ловушка", "previous_tile": "snare", "center_tile": "hunt", "next_tile": "snare", "effects": {"spawn_bonus": -0.12, "enemy_bonus": -0.05, "reward_bonus": 0.10}, "description": "Две сети сдерживают охоту: вероятность встречи ниже на 12 п.п., враги слабее на 5%, награда выше на 10%."},
+    {"id": "stabilized_rift", "name": "Стабилизированный разлом", "previous_tile": "ward", "center_tile": "rift", "next_tile": "ward", "effects": {"heal": 5, "enemy_bonus": -0.06, "reward_bonus": 0.08}, "description": "Обереги ограничивают разлом: +5 здоровья, сила врагов ниже на 6%, награда выше на 8%."},
+    {"id": "echo_ambush", "name": "Засада на резонансе", "previous_tile": "fault_line", "center_tile": "signal", "next_tile": "hunt", "effects": {"scrap": 2, "spawn_bonus": 0.04, "enemy_bonus": 0.04, "reward_bonus": 0.18}, "description": "Следопыт использует сигнал трещины: +2 материала и +18% награды, но риск встречи и сила врагов выше на 4%."},
+    {"id": "healing_stride", "name": "Шаги тихого источника", "previous_tile": "echo_spring", "center_tile": "ward", "next_tile": "echo_spring", "effects": {"heal": 6, "spawn_bonus": -0.06}, "description": "Два источника питают оберег: +6 здоровья и риск случайной встречи ниже на 6 п.п."},
+    {"id": "salvage_route", "name": "Разграбленный маршрут", "previous_tile": "cache", "center_tile": "lost_convoy", "next_tile": "hunt", "effects": {"scrap": 3, "reward_bonus": 0.12, "enemy_bonus": 0.05}, "description": "Тайник и охота помогают разобрать обоз: +3 материала и +12% боевой награды, но противники опаснее. Веха обоза отдельно готовит следующую редкую находку."},
+    {"id": "marked_ambush", "name": "Засада по метке", "previous_tile": "snare", "center_tile": "hunter_marker", "next_tile": "hunt", "effects": {"scrap": 1, "spawn_bonus": -0.06, "enemy_bonus": -0.04, "reward_bonus": 0.12}, "description": "Сеть позволяет выбрать момент охоты: +1 материал, риск и сила врага ниже, а награда выше на 12%. Веха усиливает шанс получить экипировку в будущей встрече."}
 ]
 
 # Discovery recipes are content data because they create flags used by one-time events.
 const LANDSCAPE_SECRET_RECIPES := [
 	{"first_tile": "archive", "second_tile": "rift", "flag": "secret_archive_rift_found", "title": "Архив и разлом", "clue": "Архивная карта сошлась с глубинным разломом."},
-	{"first_tile": "nursery", "second_tile": "snare", "flag": "secret_nursery_snare_found", "title": "Питомник и сеть", "clue": "Сеть резонанса удерживает скрытое гнездо в питомнике."}
+	{"first_tile": "nursery", "second_tile": "snare", "flag": "secret_nursery_snare_found", "title": "Питомник и сеть", "clue": "Сеть резонанса удерживает скрытое гнездо в питомнике."},
+	{"first_tile": "crystal_hive", "second_tile": "echo_obelisk", "flag": "secret_prism_echo_found", "title": "Кристальный улей и обелиск", "clue": "Внутри кристаллов проступил немой ритм — две постройки связаны древним сигналом."},
+	{"first_tile": "spore_garden", "second_tile": "bone_orchard", "flag": "secret_root_bone_found", "title": "Споровый сад и костяной сад", "clue": "Корни проросли сквозь кости и открыли след давно погибшего хранителя."}
 ]
 
 const ENEMIES := {
@@ -215,7 +255,11 @@ const ENEMIES := {
 		"name": "Глубинный выслеживатель", "hp": 21, "attack": 6, "defense": 1,
 		"attack_interval": 1.20, "xp": 10, "scrap": 6, "crystal": 1, "role": "hunter",
 		"behavior_hint": "Усиливает удар против героя с низким здоровьем", "ability_text": "добивание"
-	}
+	},
+	"sporeling": {"name": "Споровик-бубенчик", "hp": 23, "attack": 4, "defense": 1, "attack_interval": 1.38, "xp": 11, "scrap": 5, "crystal": 1, "role": "support", "landscape_only": true, "biome_tag": "spore", "tags": ["spore", "support"], "behavior_hint": "Поддерживает споровых союзников", "ability_text": "споровая поддержка"},
+	"prism_mite": {"name": "Призматический клещ", "hp": 18, "attack": 5, "defense": 0, "attack_interval": 0.82, "xp": 9, "scrap": 5, "crystal": 2, "role": "fast", "landscape_only": true, "biome_tag": "crystal", "tags": ["crystal", "insect", "fast"], "behavior_hint": "Часто атакует и несёт кристаллы", "ability_text": "частая атака"},
+	"bone_warden": {"name": "Костяной дозорный", "hp": 34, "attack": 7, "defense": 3, "attack_interval": 1.52, "xp": 14, "scrap": 8, "crystal": 1, "role": "tank", "defense_bonus_after_loop": 2, "landscape_only": true, "biome_tag": "bone", "tags": ["bone", "undead", "armored"], "behavior_hint": "Медленный и крепкий охранник сада", "ability_text": "костяная защита"},
+	"echo_wisp": {"name": "Эхо-огонёк", "hp": 20, "attack": 7, "defense": 0, "attack_interval": 1.05, "xp": 12, "scrap": 6, "crystal": 2, "role": "caster", "landscape_only": true, "biome_tag": "echo", "tags": ["echo", "spectral", "caster"], "behavior_hint": "Хрупкий, но наносит сильные импульсные удары", "ability_text": "импульс эха"}
 }
 
 # Elite abilities are role-based and data-driven. They affect the hero through
@@ -292,9 +336,10 @@ const BUILDINGS := {
 		"hp_per_level": 12, "defense_per_level": 1, "loop_scrap_per_level": 0
 	},
 	"salvage": {
-		"name": "Переработчик минералов", "description": "Повышает добычу за завершённые циклы.",
+		"name": "Переработчик минералов", "description": "Повышает добычу за завершённые циклы. Улучшения требуют пыль утраченных вещей из переполненного рюкзака.",
 		"base_scrap": 28, "base_crystal": 7, "scrap_step": 17, "crystal_step": 4,
-		"max_level": 5, "effect": "+1 материал за цикл за уровень", "attack_per_level": 0,
+		"echo_dust_base": 3, "echo_dust_step": 2,
+		"max_level": 5, "effect": "+1 материал за цикл за уровень; принимает пыль утраченных вещей", "attack_per_level": 0,
 		"hp_per_level": 0, "defense_per_level": 0, "loop_scrap_per_level": 1
 	},
 	"cartographer": {
@@ -530,6 +575,24 @@ const EXPEDITION_EVENTS := {
 			{"id": "spare_brood", "title": "Усыпить выводок", "description": "Панцирь тихого выводка, +3 редких ресурса, +4 материала и до 12 здоровья", "effects": {"crystals": 3, "scrap": 4, "heal": 12, "grant_item_id": "brood_shell", "set_flags": ["secret_brood_spared", "secret_nursery_snare_claimed"]}},
 			{"id": "hunt_brood", "title": "Использовать гнездо как приманку", "description": "Ядро приманивающего импульса, +7 материалов и +2 редких ресурса; −10 здоровья и повышенный шанс боя", "effects": {"scrap": 7, "crystals": 2, "damage": 10, "spawn_bonus": 0.16, "reward_bonus": 0.20, "grant_item_id": "snare_hunter_core", "set_flags": ["secret_brood_hunted", "secret_nursery_snare_claimed"]}}
 		]
+	},
+	"prism_echo": {
+		"name": "Сердце кристального эха",
+		"narrative": "Кристальный улей и обелиск складываются в единый резонатор. В его сердцевине бьётся призматический импульс: его можно принять или направить в бездну, усилив будущую добычу.",
+		"weight": 1.0, "min_loop": 1, "requires_flag": "secret_prism_echo_found", "excludes_flag": "secret_prism_echo_claimed", "resolved_flag": "secret_prism_echo_claimed", "guaranteed_when_flag": true,
+		"choices": [
+			{"id": "bind_prism", "title": "Закрепить сердцевину", "description": "Тайное ядро: +6% уклонения, +4% вампиризма и +8% награды; +3 кристалла и до 8 здоровья", "effects": {"crystals": 3, "heal": 8, "grant_item_id": "prism_heart", "set_flags": ["secret_prism_bound", "secret_prism_echo_claimed"]}},
+			{"id": "feed_prism", "title": "Накормить немой сигнал", "description": "Тайная вуаль эха, +8 материалов и +2 кристалла; −8 здоровья, опасность и будущая награда выше", "effects": {"scrap": 8, "crystals": 2, "damage": 8, "danger_delta": 0.10, "reward_bonus": 0.20, "grant_item_id": "echo_veil", "set_flags": ["secret_prism_fed", "secret_prism_echo_claimed"]}}
+		]
+	},
+	"root_bone_memory": {
+		"name": "Память корня и кости",
+		"narrative": "Споры проросли сквозь костяной сад и разбудили отголосок его хранителя. Можно забрать защитную мантию или превратить древний импульс в клинок, заплатив собственным здоровьем.",
+		"weight": 1.0, "min_loop": 1, "requires_flag": "secret_root_bone_found", "excludes_flag": "secret_root_bone_claimed", "resolved_flag": "secret_root_bone_claimed", "guaranteed_when_flag": true,
+		"choices": [
+			{"id": "quiet_root", "title": "Успокоить корни", "description": "Мантия хранителя, +4 материала и до 12 здоровья", "effects": {"scrap": 4, "heal": 12, "grant_item_id": "rootwatch_mantle", "set_flags": ["secret_root_restored", "secret_root_bone_claimed"]}},
+			{"id": "wake_bone_edge", "title": "Разбудить костяной импульс", "description": "Клинок дозорного, +3 кристалла и +18% награды, но −10 здоровья и больше столкновений", "effects": {"crystals": 3, "damage": 10, "spawn_bonus": 0.14, "reward_bonus": 0.18, "grant_item_id": "bone_impulse_edge", "set_flags": ["secret_root_awakened", "secret_root_bone_claimed"]}}
+		]
 	}
 }
 
@@ -580,8 +643,25 @@ func validate_content_registry() -> Array[String]:
 		for field in ["name", "short", "kind", "color", "description", "placement_zone"]:
 			if not tile.has(field) or str(tile.get(field, "")).strip_edges().is_empty():
 				issues.append("tile:%s missing %s" % [tile_id, field])
-		if str(tile.get("placement_zone", "")) not in ["any", "road", "landscape"]:
+		if str(tile.get("placement_zone", "")) not in ["any", "road", "roadside", "landscape"]:
 			issues.append("tile:%s has an unknown placement_zone" % tile_id)
+		var enemy_pool_value: Variant = tile.get("enemy_pool", [])
+		if typeof(enemy_pool_value) != TYPE_ARRAY:
+			issues.append("tile:%s has a malformed enemy_pool" % tile_id)
+		else:
+			for pooled_enemy_value in enemy_pool_value:
+				if not ENEMIES.has(str(pooled_enemy_value)):
+					issues.append("tile:%s references unknown biome enemy %s" % [tile_id, str(pooled_enemy_value)])
+	for recipe_value in LANDSCAPE_SECRET_RECIPES:
+		if typeof(recipe_value) != TYPE_DICTIONARY:
+			issues.append("landscape secret recipe is malformed")
+			continue
+		var secret_recipe: Dictionary = recipe_value
+		for tile_field in ["first_tile", "second_tile"]:
+			if not TILE_DEFS.has(str(secret_recipe.get(tile_field, ""))):
+				issues.append("landscape secret recipe references unknown tile %s" % str(secret_recipe.get(tile_field, "")))
+		if str(secret_recipe.get("flag", "")).is_empty() or str(secret_recipe.get("title", "")).is_empty():
+			issues.append("landscape secret recipe is missing its discovery flag or title")
 	for enemy_id_value in ENEMIES.keys():
 		var enemy_id := str(enemy_id_value)
 		var enemy: Dictionary = ENEMIES[enemy_id_value]
@@ -676,6 +756,52 @@ func validate_content_registry() -> Array[String]:
 			for effect_key_value in synergy_effects.keys():
 				if not supported_tile_effects.has(str(effect_key_value)):
 					issues.append("tile synergy %s uses unsupported effect %s" % [synergy_id, str(effect_key_value)])
+	var seen_road_formation_ids: Dictionary = {}
+	for formation_value in ROAD_FORMATIONS:
+		if typeof(formation_value) != TYPE_DICTIONARY:
+			issues.append("road formation entry must be a dictionary")
+			continue
+		var formation: Dictionary = formation_value
+		var formation_id := str(formation.get("id", ""))
+		for field in ["id", "name", "previous_tile", "center_tile", "next_tile", "effects", "description"]:
+			if not formation.has(field) or str(formation.get(field, "")).strip_edges().is_empty():
+				issues.append("road formation missing %s" % field)
+		if formation_id.is_empty() or seen_road_formation_ids.has(formation_id):
+			issues.append("road formation ID is empty or duplicated: %s" % formation_id)
+		seen_road_formation_ids[formation_id] = true
+		for field in ["previous_tile", "center_tile", "next_tile"]:
+			var formation_tile_id := str(formation.get(field, ""))
+			if not TILE_DEFS.has(formation_tile_id):
+				issues.append("road formation %s references unknown tile %s" % [formation_id, formation_tile_id])
+			elif str(TILE_DEFS[formation_tile_id].get("placement_zone", "any")) == "landscape":
+				issues.append("road formation %s uses landscape-only tile %s" % [formation_id, formation_tile_id])
+		var formation_effects_value: Variant = formation.get("effects", {})
+		if typeof(formation_effects_value) != TYPE_DICTIONARY or (formation_effects_value is Dictionary and formation_effects_value.is_empty()):
+			issues.append("road formation %s has invalid or empty effects" % formation_id)
+		elif typeof(formation_effects_value) == TYPE_DICTIONARY:
+			for effect_key_value in formation_effects_value.keys():
+				var effect_key := str(effect_key_value)
+				var effect_amount: Variant = formation_effects_value[effect_key_value]
+				if not supported_tile_effects.has(effect_key):
+					issues.append("road formation %s uses unsupported effect %s" % [formation_id, effect_key])
+					continue
+				if typeof(effect_amount) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(effect_amount)):
+					issues.append("road formation %s has non-numeric/non-finite effect %s" % [formation_id, effect_key])
+					continue
+				var numeric_amount := float(effect_amount)
+				match effect_key:
+					"scrap", "heal":
+						if numeric_amount < 0.0 or numeric_amount > 12.0 or not is_equal_approx(numeric_amount, round(numeric_amount)):
+							issues.append("road formation %s has unsafe integer effect %s" % [formation_id, effect_key])
+					"reward_bonus":
+						if numeric_amount < -0.50 or numeric_amount > 0.50:
+							issues.append("road formation %s reward effect is out of bounds" % formation_id)
+					"spawn_bonus":
+						if numeric_amount < -0.50 or numeric_amount > 0.75:
+							issues.append("road formation %s spawn effect is out of bounds" % formation_id)
+					"enemy_bonus":
+						if numeric_amount < -0.35 or numeric_amount > 0.75:
+							issues.append("road formation %s enemy effect is out of bounds" % formation_id)
 	for building_id_value in BUILDINGS.keys():
 		var building_id := str(building_id_value)
 		var building: Dictionary = BUILDINGS[building_id_value]

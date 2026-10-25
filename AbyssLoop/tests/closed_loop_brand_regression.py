@@ -21,7 +21,7 @@ checks = {
     "generated routes are normalized into explicit closed-loop topology": 'bind_closed_loop(ProceduralGenerationScript.generate_route' in route and '"loop_closed"] = true' in route,
     "each node stores previous and next modulo-linked node ids": '"previous_index"] = posmod(i - 1, count)' in route and '"next_index"] = posmod(i + 1, count)' in route,
     "previous snapshots are normalized when an expedition resumes": 'route = route_system.bind_closed_loop(saved_route)' in manager,
-    "map draws final node back to first node": 'cell_points[(i + 1) % count]' in view,
+    "square road draws and hit-tests the last perimeter tile back to the first": 'road_cells[(index + 1) % road_cells.size()]' in view and 'return result' in view[view.index("func _get_road_grid_coordinates()") : view.index("func _get_world_display_cell_map")],
     "map visually marks the loop as continuous": 'Localization.text("route.header")' in view and "НЕПРЕРЫВНЫЙ МАРШРУТ" in catalog.get("route.header", "") and 'func _draw_route_chevron' in view,
     "hero moves between route nodes; no tower combat implementation": 'hero_progress_for_draw' in manager and not any(token in combat_sources.lower() for token in ('tower_attack', 'tower_damage', 'turret_attack', 'tower_projectile', 'tower_combat')),
     "runtime smoke test covers wraparound and loop counters": 'route_system.is_closed_loop(live_loop)' in smoke and 'route_progress_after_wrap' in smoke,

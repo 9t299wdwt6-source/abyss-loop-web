@@ -6,12 +6,18 @@ const ResourceSystemScript = preload("res://scripts/systems/resource_system.gd")
 const InventorySystemScript = preload("res://scripts/systems/inventory_system.gd")
 const RESEARCH_RESET_REFUND_PERCENT := 80
 const MAX_EXPEDITION_HISTORY := 50
+const MAX_SETTLED_EXPEDITION_IDS := 1000
+const MAX_ECHO_DUST := 1000000
+const TROPHY_IDS: Array[String] = ["spore_pollen", "prism_fragment", "bone_fragment", "echo_residue"]
 
 const DEFAULT_BUILDINGS := {"forge": 0, "infirmary": 0, "salvage": 0, "cartographer": 0}
 var scrap: int = 60
 var crystals: int = 14
+var echo_dust: int = 0
+var settled_expedition_ids: Array = []
+var bestiary_trophies: Dictionary = {"spore_pollen": 0, "prism_fragment": 0, "bone_fragment": 0, "echo_residue": 0}
 var buildings: Dictionary = DEFAULT_BUILDINGS.duplicate(true)
-var loadout: Dictionary = {"weapon": {}, "armor": {}, "core": {}}
+var loadout: Dictionary = {"weapon": {}, "helmet": {}, "armor": {}, "shield": {}, "amulet": {}, "core": {}}
 var armory: Array = []
 var runs_started: int = 0
 var runs_completed: int = 0
@@ -45,6 +51,24 @@ var difficulty_records: Dictionary = {}
 # A bounded local journal. Records contain summaries only, never full expedition snapshots.
 var expedition_history: Array = []
 
+func _empty_trophy_counts() -> Dictionary:
+	return {"spore_pollen": 0, "prism_fragment": 0, "bone_fragment": 0, "echo_residue": 0}
+
+func _normalize_trophy_counts(value: Variant) -> Dictionary:
+	var result := _empty_trophy_counts()
+	if typeof(value) != TYPE_DICTIONARY:
+		return result
+	var source: Dictionary = value
+	for trophy_id in TROPHY_IDS:
+		result[trophy_id] = clampi(int(source.get(trophy_id, 0)), 0, 100000000)
+	return result
+
+func _subtract_trophy_counts(total: Dictionary, kept: Dictionary) -> Dictionary:
+	var result := _empty_trophy_counts()
+	for trophy_id in TROPHY_IDS:
+		result[trophy_id] = maxi(0, int(total.get(trophy_id, 0)) - int(kept.get(trophy_id, 0)))
+	return result
+
 func _ready() -> void:
 	var saved: Dictionary = SaveSystem.load_game()
 	if str(SaveSystem.last_load_status) == "recovered_backup":
@@ -62,13 +86,27 @@ func _ready() -> void:
 	if not saved.is_empty():
 		scrap = maxi(0, int(saved.get("scrap", scrap)))
 		crystals = maxi(0, int(saved.get("crystals", crystals)))
+		echo_dust = clampi(int(saved.get("echo_dust", 0)), 0, MAX_ECHO_DUST)
+		var settled_ids_value: Variant = saved.get("settled_expedition_ids", [])
+		settled_expedition_ids.clear()
+		if typeof(settled_ids_value) == TYPE_ARRAY:
+			for settled_id_value in settled_ids_value:
+				if typeof(settled_id_value) != TYPE_STRING:
+					continue
+				var settled_id := str(settled_id_value).strip_edges()
+				if not settled_id.is_empty() and not settled_expedition_ids.has(settled_id):
+					settled_expedition_ids.append(settled_id)
+		while settled_expedition_ids.size() > MAX_SETTLED_EXPEDITION_IDS:
+			settled_expedition_ids.pop_front()
+		var saved_trophies_value: Variant = saved.get("bestiary_trophies", {})
+		bestiary_trophies = _normalize_trophy_counts(saved_trophies_value)
 		var saved_buildings: Variant = saved.get("buildings", DEFAULT_BUILDINGS)
 		if typeof(saved_buildings) == TYPE_DICTIONARY:
 			for building_id in DEFAULT_BUILDINGS.keys():
 				buildings[building_id] = clampi(int(saved_buildings.get(building_id, 0)), 0, int(ContentRegistry.BUILDINGS[building_id].get("max_level", 5)))
 		var saved_loadout: Variant = saved.get("loadout", loadout)
 		if typeof(saved_loadout) == TYPE_DICTIONARY:
-			for slot in ["weapon", "armor", "core"]:
+			for slot in InventorySystemScript.EQUIPMENT_SLOTS:
 				var saved_item: Variant = saved_loadout.get(slot, {})
 				loadout[slot] = saved_item.duplicate(true) if typeof(saved_item) == TYPE_DICTIONARY else {}
 		var saved_armory: Variant = saved.get("armory", [])
@@ -398,10 +436,13 @@ func equip_item(item_id: String) -> bool:
 	for item in armory:
 		if str(item.get("id", "")) == item_id:
 			var slot := str(item.get("slot", ""))
-			if not ["weapon", "armor", "core"].has(slot):
+			if not InventorySystemScript.EQUIPMENT_SLOTS.has(slot):
 				return false
+			var old_loadout: Dictionary = loadout.duplicate(true)
 			loadout[slot] = item.duplicate(true)
-			save_now()
+			if not save_now():
+				loadout = old_loadout
+				return false
 			changed.emit()
 			return true
 	return false
@@ -453,7 +494,7 @@ func upgrade_armory_item(item_id: String) -> Dictionary:
 	scrap -= scrap_cost
 	crystals -= crystal_cost
 	armory[item_index] = upgraded.duplicate(true)
-	for slot_value in ["weapon", "armor", "core"]:
+	for slot_value in InventorySystemScript.EQUIPMENT_SLOTS:
 		var slot := str(slot_value)
 		var equipped_value: Variant = loadout.get(slot, {})
 		if typeof(equipped_value) == TYPE_DICTIONARY and str(equipped_value.get("id", "")) == item_id:
@@ -500,10 +541,13 @@ func salvage_armory_item(item_id: String) -> Dictionary:
 	return {"ok": true, "item_name": str(item.get("name", "Предмет")), "scrap_gained": int(reward.get("scrap", 0)), "crystals_gained": int(reward.get("crystals", 0)), "message": "Предмет разобран: +%d материалов и +%d кристаллов." % [int(reward.get("scrap", 0)), int(reward.get("crystals", 0))]}
 
 func unequip_slot(slot: String) -> bool:
-	if not ["weapon", "armor", "core"].has(slot):
+	if not InventorySystemScript.EQUIPMENT_SLOTS.has(slot):
 		return false
+	var old_loadout: Dictionary = loadout.duplicate(true)
 	loadout[slot] = {}
-	save_now()
+	if not save_now():
+		loadout = old_loadout
+		return false
 	changed.emit()
 	return true
 
@@ -516,12 +560,32 @@ func record_boss_victory() -> void:
 func record_elite_victory() -> void:
 	total_elites_defeated += 1
 
-func settle_expedition(earned: Dictionary, outcome: String, loops: int, hero_level: int, defeat_keep_ratio_override: float = -1.0, summary_metadata: Dictionary = {}, difficulty_record_key: String = "", challenge_score: int = 0, bosses: int = 0, elites: int = 0, final_loadout: Dictionary = {}) -> Dictionary:
+func settle_expedition(earned: Dictionary, outcome: String, loops: int, hero_level: int, defeat_keep_ratio_override: float = -1.0, summary_metadata: Dictionary = {}, difficulty_record_key: String = "", challenge_score: int = 0, bosses: int = 0, elites: int = 0, final_loadout: Dictionary = {}, retained_run_items: Array = []) -> Dictionary:
+	# A run ID is the idempotency key for every persistent reward, including dust
+	# from overflowed items. A retried settlement returns the committed summary only.
+	var requested_run_id := str(summary_metadata.get("run_id", "")).strip_edges()
+	if not requested_run_id.is_empty() and settled_expedition_ids.has(requested_run_id):
+		var already_committed: Dictionary = {}
+		if str(last_summary.get("run_id", "")) == requested_run_id:
+			already_committed = last_summary.duplicate(true)
+		else:
+			for history_value in expedition_history:
+				if typeof(history_value) == TYPE_DICTIONARY and str(history_value.get("run_id", "")) == requested_run_id:
+					already_committed = (history_value as Dictionary).duplicate(true)
+					break
+		if already_committed.is_empty():
+			already_committed = {"run_id": requested_run_id, "outcome": outcome, "loops": maxi(0, loops), "hero_level": maxi(1, hero_level)}
+		already_committed["_persistence_ok"] = true
+		already_committed["_already_settled"] = true
+		return already_committed
 	# The completion is one durable transaction: rewards, checkpoint removal, rich
 	# last-summary data, bounded history, difficulty record and loadout are committed
 	# together. A crash cannot leave a paid-out run without its replay/history row.
 	var old_scrap := scrap
 	var old_crystals := crystals
+	var old_echo_dust := echo_dust
+	var old_settled_expedition_ids: Array = settled_expedition_ids.duplicate(true)
+	var old_bestiary_trophies := bestiary_trophies.duplicate(true)
 	var old_runs_completed := runs_completed
 	var old_best_loop := best_loop
 	var old_total_events_resolved := total_events_resolved
@@ -530,13 +594,43 @@ func settle_expedition(earned: Dictionary, outcome: String, loops: int, hero_lev
 	var old_difficulty_records: Dictionary = difficulty_records.duplicate(true)
 	var old_expedition_history: Array = expedition_history.duplicate(true)
 	var old_loadout: Dictionary = loadout.duplicate(true)
+	var old_armory: Array = armory.duplicate(true)
 	var fallback_ratio := float(ContentRegistry.BALANCE.defeat_keep_ratio)
 	var configured_ratio := fallback_ratio if defeat_keep_ratio_override < 0.0 else clampf(defeat_keep_ratio_override, 0.0, 1.0)
 	var ratio: float = 1.0 if outcome == "return" else configured_ratio
+	var ejection_items_value: Variant = earned.get("inventory_ejections", [])
+	var ejection_items: Array = ejection_items_value if typeof(ejection_items_value) == TYPE_ARRAY else []
+	var ejected_item_count := maxi(0, int(earned.get("inventory_ejections_count", ejection_items.size())))
+	var raw_ejection_dust := -1
+	if earned.has("inventory_ejections_dust"):
+		raw_ejection_dust = clampi(int(earned.get("inventory_ejections_dust", 0)), 0, MAX_ECHO_DUST)
+	else:
+		# Legacy checkpoints only stored the most recent ejected item records.
+		# Derive a conservative migration value from those records instead of dropping them.
+		var ejection_inventory = InventorySystemScript.new()
+		raw_ejection_dust = 0
+		for ejected_item_value in ejection_items:
+			if typeof(ejected_item_value) == TYPE_DICTIONARY:
+				raw_ejection_dust = mini(MAX_ECHO_DUST, raw_ejection_dust + int(ejection_inventory.get_ejection_echo_dust(ejected_item_value)))
+	var retained_ejection_dust := int(floor(float(raw_ejection_dust) * ratio))
+	if outcome == "return":
+		retained_ejection_dust = raw_ejection_dust
+	elif raw_ejection_dust > 0 and ratio > 0.0:
+		# A defeat can preserve a small trace of the overflow salvage, never more than
+		# its normal retained-resource ratio. This also avoids zero dust for one common ejection.
+		retained_ejection_dust = maxi(1, retained_ejection_dust)
+	var echo_dust_before_cap := retained_ejection_dust
+	var echo_dust_awarded := mini(echo_dust_before_cap, maxi(0, MAX_ECHO_DUST - echo_dust))
+	var echo_dust_cap_lost := maxi(0, echo_dust_before_cap - echo_dust_awarded)
 	var resource_system = ResourceSystemScript.new()
 	var settled: Dictionary = resource_system.settle(earned, ratio)
 	var kept_scrap := int(settled.get("scrap", 0))
 	var kept_crystals := int(settled.get("crystals", 0))
+	var earned_trophies := _normalize_trophy_counts(earned.get("trophy_drops", {}))
+	var kept_trophies := _empty_trophy_counts()
+	for trophy_id in TROPHY_IDS:
+		kept_trophies[trophy_id] = int(floor(float(earned_trophies[trophy_id]) * ratio))
+		bestiary_trophies[trophy_id] = mini(100000000, int(bestiary_trophies.get(trophy_id, 0)) + int(kept_trophies[trophy_id]))
 	var events_resolved: int = maxi(0, int(earned.get("events_resolved", 0)))
 	var event_history_value: Variant = earned.get("event_history", [])
 	var event_history: Array = []
@@ -546,6 +640,7 @@ func settle_expedition(earned: Dictionary, outcome: String, loops: int, hero_lev
 	saved_expedition.clear()
 	scrap += kept_scrap
 	crystals += kept_crystals
+	echo_dust = clampi(echo_dust + echo_dust_awarded, 0, MAX_ECHO_DUST)
 	runs_completed += 1
 	best_loop = maxi(best_loop, loops)
 	var summary: Dictionary = {
@@ -558,6 +653,16 @@ func settle_expedition(earned: Dictionary, outcome: String, loops: int, hero_lev
 		"kept_crystals": kept_crystals,
 		"lost_scrap": maxi(0, int(earned.get("scrap", 0)) - kept_scrap),
 		"lost_crystals": maxi(0, int(earned.get("crystals", 0)) - kept_crystals),
+		"ejected_item_count": ejected_item_count,
+		"earned_echo_dust": raw_ejection_dust,
+		"kept_echo_dust": echo_dust_awarded,
+		"lost_echo_dust": maxi(0, raw_ejection_dust - retained_ejection_dust),
+		"echo_dust_cap_lost": echo_dust_cap_lost,
+		"total_echo_dust": echo_dust,
+		"earned_trophies": earned_trophies.duplicate(true),
+		"kept_trophies": kept_trophies.duplicate(true),
+		"lost_trophies": _subtract_trophy_counts(earned_trophies, kept_trophies),
+		"bestiary_trophies": bestiary_trophies.duplicate(true),
 		"victories": int(earned.get("victories", 0)),
 		"bosses_defeated": maxi(0, int(earned.get("bosses_defeated", 0))),
 		"elites_defeated": maxi(0, int(earned.get("elites_defeated", 0))),
@@ -576,6 +681,12 @@ func settle_expedition(earned: Dictionary, outcome: String, loops: int, hero_lev
 	summary["kept_crystals"] = kept_crystals
 	summary["lost_scrap"] = maxi(0, int(earned.get("scrap", 0)) - kept_scrap)
 	summary["lost_crystals"] = maxi(0, int(earned.get("crystals", 0)) - kept_crystals)
+	summary["ejected_item_count"] = ejected_item_count
+	summary["earned_echo_dust"] = raw_ejection_dust
+	summary["kept_echo_dust"] = echo_dust_awarded
+	summary["lost_echo_dust"] = maxi(0, raw_ejection_dust - retained_ejection_dust)
+	summary["echo_dust_cap_lost"] = echo_dust_cap_lost
+	summary["total_echo_dust"] = echo_dust
 	summary["retention"] = ratio
 
 	var committed_record: Dictionary = {}
@@ -609,13 +720,40 @@ func settle_expedition(earned: Dictionary, outcome: String, loops: int, hero_lev
 		if expedition_history.size() > MAX_EXPEDITION_HISTORY:
 			expedition_history = expedition_history.slice(expedition_history.size() - MAX_EXPEDITION_HISTORY)
 	summary["history_saved"] = history_saved
+	if not summary_run_id.is_empty() and not settled_expedition_ids.has(summary_run_id):
+		settled_expedition_ids.append(summary_run_id)
+	while settled_expedition_ids.size() > MAX_SETTLED_EXPEDITION_IDS:
+		settled_expedition_ids.pop_front()
 	last_summary = summary.duplicate(true)
 	if not final_loadout.is_empty():
 		loadout = final_loadout.duplicate(true)
+	# Only gear that survived to settlement enters the permanent shelter armory.
+	# Items ejected from the run backpack are intentionally absent; a later stage can
+	# convert their ledger records into a dedicated resource without duplicating loot.
+	var retained_ids: Dictionary = {}
+	for old_item_value in armory:
+		if typeof(old_item_value) == TYPE_DICTIONARY:
+			var old_item: Dictionary = old_item_value
+			retained_ids[str(old_item.get("id", ""))] = true
+	var settlement_inventory = InventorySystemScript.new()
+	for retained_value in retained_run_items:
+		if typeof(retained_value) != TYPE_DICTIONARY:
+			continue
+		var retained_item: Dictionary = retained_value
+		var retained_id := str(retained_item.get("id", ""))
+		if retained_id.is_empty() or retained_ids.has(retained_id) or not settlement_inventory.can_equip_item(retained_item):
+			continue
+		armory.append(retained_item.duplicate(true))
+		retained_ids[retained_id] = true
+	while armory.size() > 80:
+		armory.pop_front()
 
 	if not save_now():
 		scrap = old_scrap
 		crystals = old_crystals
+		echo_dust = old_echo_dust
+		settled_expedition_ids = old_settled_expedition_ids
+		bestiary_trophies = old_bestiary_trophies
 		runs_completed = old_runs_completed
 		best_loop = old_best_loop
 		total_events_resolved = old_total_events_resolved
@@ -624,6 +762,7 @@ func settle_expedition(earned: Dictionary, outcome: String, loops: int, hero_lev
 		difficulty_records = old_difficulty_records
 		expedition_history = old_expedition_history
 		loadout = old_loadout
+		armory = old_armory
 		return {"_persistence_ok": false, "reason": "Не удалось надёжно сохранить итог экспедиции."}
 	changed.emit()
 	var result: Dictionary = last_summary.duplicate(true)
@@ -666,7 +805,8 @@ func _normalize_history_entry(source: Dictionary) -> Dictionary:
 	var start_loadout_ids: Dictionary = {}
 	if typeof(source_loadout_value) == TYPE_DICTIONARY:
 		var source_loadout: Dictionary = source_loadout_value
-		for slot in ["weapon", "armor", "core"]:
+		for slot_value in InventorySystemScript.EQUIPMENT_SLOTS:
+			var slot := str(slot_value)
 			var item_id_value: Variant = source_loadout.get(slot, "")
 			if typeof(item_id_value) == TYPE_STRING:
 				start_loadout_ids[slot] = str(item_id_value).substr(0, 100)
@@ -715,6 +855,8 @@ func _normalize_history_entry(source: Dictionary) -> Dictionary:
 		"events_resolved": maxi(0, int(source.get("events_resolved", 0))),
 		"earned_scrap": maxi(0, int(source.get("earned_scrap", 0))),
 		"earned_crystals": maxi(0, int(source.get("earned_crystals", 0))),
+		"earned_trophies": _normalize_trophy_counts(source.get("earned_trophies", {})),
+		"kept_trophies": _normalize_trophy_counts(source.get("kept_trophies", {})),
 		"kept_scrap": maxi(0, int(source.get("kept_scrap", 0))),
 		"kept_crystals": maxi(0, int(source.get("kept_crystals", 0))),
 		"lost_scrap": maxi(0, int(source.get("lost_scrap", 0))),
@@ -776,6 +918,9 @@ func export_save_data() -> Dictionary:
 	return {
 		"scrap": scrap,
 		"crystals": crystals,
+		"echo_dust": echo_dust,
+		"settled_expedition_ids": settled_expedition_ids.duplicate(true),
+		"bestiary_trophies": bestiary_trophies.duplicate(true),
 		"buildings": buildings.duplicate(true),
 		"loadout": loadout.duplicate(true),
 		"armory": armory.duplicate(true),
@@ -803,8 +948,11 @@ func save_now() -> bool:
 func reset_progress() -> void:
 	scrap = 60
 	crystals = 14
+	echo_dust = 0
+	settled_expedition_ids.clear()
+	bestiary_trophies = _empty_trophy_counts()
 	buildings = DEFAULT_BUILDINGS.duplicate(true)
-	loadout = {"weapon": {}, "armor": {}, "core": {}}
+	loadout = {"weapon": {}, "helmet": {}, "armor": {}, "shield": {}, "amulet": {}, "core": {}}
 	armory.clear()
 	runs_started = 0
 	runs_completed = 0

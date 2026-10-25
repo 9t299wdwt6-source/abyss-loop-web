@@ -28,7 +28,7 @@ checks = {
     "Windows scripts have no stale Prototype 34/36/55/56/57 runtime output": all(x not in release_bat + tests_bat for x in ["Prototype_34_RUNTIME_TESTED", "Prototype_36_RUNTIME_TESTED", "AbyssLoop_Godot_Prototype_55_RUNTIME_TESTED.zip", "AbyssLoop_Godot_Prototype_56_RUNTIME_TESTED.zip", "AbyssLoop_Godot_Prototype_57_RUNTIME_TESTED.zip"]),
     "Windows test launchers set conservative deterministic worker default": all("ABYSS_LOOP_TEST_WORKERS" in t for t in [release_bat, tests_bat]),
     "runtime report validation requires the current version and fingerprint": "build_versions != [read_project_version(root)]" in packager and "runtime gate report is stale" in packager,
-    "all seven gate labels are explicitly required": all(x in packager for x in ["Static/regression suite", "Godot version", "Editor/import preflight", "Clean main-scene launch", "Gameplay smoke", "Save-system regression", "Expedition integration audit"]),
+    "all eight gate labels are explicitly required": all(x in packager for x in ["Static/regression suite", "Godot version", "Editor/import preflight", "Clean main-scene launch", "Gameplay smoke", "Save-system regression", "Expedition integration audit", "Inventory-to-settlement runtime acceptance"]),
     "symlinks are rejected before package inclusion": "path.is_symlink()" in integrity and "symbolic links are not allowed" in integrity,
     "local credential and secret artifacts are filtered from release members": "credentials.json" in integrity and "name.startswith(\".env.\")" in integrity and ".pem" in integrity,
     "stage-60 atomic gameplay-cycle regression is included": "tests/gameplay_cycle_regression.py" in packager and "GAMEPLAY_CYCLE_RUNTIME_CHECKLIST_Prototype60.md" in packager,
@@ -36,6 +36,12 @@ checks = {
     "stage-62 QA runner cleanup and both process-tree regressions ship in RC7 hotfix": "tools/test_process_runner.py" in packager and "tests/static_suite_runner_regression.py" in packager and "tests/runtime_gate_process_cleanup_regression.py" in packager and "ROADMAP_CONTINUATION_STAGES29-62_RU.md" in packager,
     "RC7 packager includes artifact-hygiene, UI and runtime-report tests": "tests/release_artifact_hygiene_regression.py" in packager and "tests/runtime_gate_report_validation_regression.py" in packager,
     "packager requires RC7 project version and manifest status": "--release-candidate" in packager and 'read_project_version(ROOT) != "0.61.0"' in packager and "RELEASE CANDIDATE 7" in packager,
+    "Stage 78 item comparison and field-cache documents/tests/report are mandatory package inputs": all(x in packager for x in ["ROADMAP_STATUS_STAGE78_RU.md", "STAGE78_EQUIPMENT_COMPARISON_AND_FIELD_CACHE_BUILD_REPORT_RU.md", "EQUIPMENT_FIELD_CACHE_RUNTIME_CHECKLIST_STAGE78_RU.md", "tests/stage78_equipment_comparison_and_overflow_cache_regression.py", "STAGE78_STATIC_TEST_REPORT.txt"]),
+    "Stage 88 discovery-mask evidence is included in release packages": all(x in packager for x in ["ROADMAP_STATUS_STAGE88_RU.md", "STAGE88_DISCOVERY_AND_PLACEMENT_FEEDBACK_BUILD_REPORT_RU.md", "DISCOVERY_MASK_RUNTIME_CHECKLIST_STAGE88_RU.md", "tests/stage88_discovery_mask_regression.py", "tests/stage88_static_test_report.txt"]),
+    "Stage 89 map runtime gate evidence is mandatory in release packages": all(x in packager for x in ["ROADMAP_STATUS_STAGE89_RU.md", "STAGE89_MAP_RUNTIME_INTEGRATION_BUILD_REPORT_RU.md", "MAP_RUNTIME_INTEGRATION_CHECKLIST_STAGE89_RU.md", "tests/stage89_map_runtime_gate_regression.py", "tests/stage89_static_test_report.txt", "tests/expedition_runtime_acceptance.gd"]),
+    "independent preflight enforces Stage 89 map runtime gate evidence": all(x in (ROOT / "tools" / "release_preflight.py").read_text(encoding="utf-8") for x in ["ROADMAP_STATUS_STAGE89_RU.md", "tests/stage89_map_runtime_gate_regression.py", "STAGE 89 MAP RUNTIME GATE REGRESSION PASSED"]),
+    "independent preflight enforces Stage 88 evidence": all(x in (ROOT / "tools" / "release_preflight.py").read_text(encoding="utf-8") for x in ["ROADMAP_STATUS_STAGE88_RU.md", "tests/stage88_discovery_mask_regression.py", "runtime не подтверждён"]),
+    "independent preflight enforces Stage 78 package evidence": all(x in (ROOT / "tools" / "release_preflight.py").read_text(encoding="utf-8") for x in ["ROADMAP_STATUS_STAGE78_RU.md", "tests/stage78_equipment_comparison_and_overflow_cache_regression.py", "STAGE78_STATIC_TEST_REPORT.txt"]),
     "Stage68A resource graph audit and acceptance documents are mandatory package inputs": all(x in packager for x in ["ROADMAP_STATUS_STAGE68A_RU.md", "STAGE68A_BUILD_REPORT_RU.md", "FINAL_REGRESSION_RUNTIME_CHECKLIST_STAGE68A_RU.md", "tests/resource_graph_regression.py", "tests/reports/RESOURCE_GRAPH_AUDIT_STAGE68A_RU.md", "tests/reports/STAGE68A_PREFLIGHT_REPORT_RU.txt"]),
     "independent preflight enforces Stage68A evidence": all(x in (ROOT / "tools" / "release_preflight.py").read_text(encoding="utf-8") for x in ["ROADMAP_STATUS_STAGE68A_RU.md", "tests/resource_graph_regression.py", "tests/reports/RESOURCE_GRAPH_AUDIT_STAGE68A_RU.md"]),
     "Stage68B local balance capture tool, tests and guide are mandatory package inputs": all(x in packager for x in ["ROADMAP_STATUS_STAGE68B_RU.md", "STAGE68B_BUILD_REPORT_RU.md", "REAL_RUN_BALANCE_CAPTURE_GUIDE_STAGE68B_RU.md", "REAL_RUN_BALANCE_RUNTIME_CHECKLIST_STAGE68B_RU.md", "tools/real_run_balance.py", "tests/real_run_balance_capture_regression.py", "tests/reports/REAL_RUN_BALANCE_CAPTURE_AUDIT_STAGE68B_RU.md", "tests/reports/STAGE68B_PREFLIGHT_REPORT_RU.txt"]),
@@ -96,6 +102,16 @@ with tempfile.TemporaryDirectory(prefix="abyssloop_rc61_repro_") as temp:
         assert "AbyssLoop/tests/release_preflight_regression.py" in names
         assert "AbyssLoop/tests/release_artifact_hygiene_regression.py" in names
         assert "AbyssLoop/tests/runtime_gate_report_validation_regression.py" in names
+        assert "AbyssLoop/ROADMAP_STATUS_STAGE88_RU.md" in names
+        assert "AbyssLoop/STAGE88_DISCOVERY_AND_PLACEMENT_FEEDBACK_BUILD_REPORT_RU.md" in names
+        assert "AbyssLoop/DISCOVERY_MASK_RUNTIME_CHECKLIST_STAGE88_RU.md" in names
+        assert "AbyssLoop/tests/stage88_discovery_mask_regression.py" in names
+        assert "AbyssLoop/tests/stage88_static_test_report.txt" in names
+        assert "AbyssLoop/ROADMAP_STATUS_STAGE78_RU.md" in names
+        assert "AbyssLoop/STAGE78_EQUIPMENT_COMPARISON_AND_FIELD_CACHE_BUILD_REPORT_RU.md" in names
+        assert "AbyssLoop/EQUIPMENT_FIELD_CACHE_RUNTIME_CHECKLIST_STAGE78_RU.md" in names
+        assert "AbyssLoop/tests/stage78_equipment_comparison_and_overflow_cache_regression.py" in names
+        assert "AbyssLoop/STAGE78_STATIC_TEST_REPORT.txt" in names
         assert "AbyssLoop/ROADMAP_STATUS_STAGE68A_RU.md" in names
         assert "AbyssLoop/STAGE68A_BUILD_REPORT_RU.md" in names
         assert "AbyssLoop/FINAL_REGRESSION_RUNTIME_CHECKLIST_STAGE68A_RU.md" in names

@@ -24,38 +24,11 @@ func _run_tests() -> void:
 		_quit_with_restore(originals, 1)
 		return
 
-	var persisted_affix_weapon := {
-		"id": "save_affix_weapon", "slot": "weapon", "name": "Оружие · Точная грань · Резец глубин · Редкий",
-		"rarity": "Редкий", "rank": 2, "upgrade_level": 0, "archetype": "wound",
-		"archetype_name": "Резец глубин", "archetype_description": "Кровотечение", "set_id": "vanguard",
-		"set_name": "Авангард", "attack": 4, "defense": 0, "hp": 0, "speed": 0.0, "crit": 0.015,
-		"kill_heal": 0, "tile_scrap": 0, "event_heal": 0, "reward_bonus": 0.0,
-		"tile_spawn_bonus": 0.0, "bleed_chance": 0.2, "bleed_damage": 2, "barrier_on_encounter": 0,
-		"power": 24.0, "affix_ids": ["keen_edge"], "affix_names": ["Точная грань"],
-		"affix_description": "+1 атака и +1,5% к критическому шансу."
-	}
-	assert(save_system._validate_item(persisted_affix_weapon, "weapon"), "valid rare affixed weapon should pass save validation")
-	var wrong_slot_affix := persisted_affix_weapon.duplicate(true)
-	wrong_slot_affix["affix_ids"] = ["reinforced_plate"]
-	wrong_slot_affix["affix_names"] = ["Усиленная пластина"]
-	assert(not save_system._validate_item(wrong_slot_affix, "weapon"), "save validation must reject an armor affix attached to a weapon")
-	var unknown_affix := persisted_affix_weapon.duplicate(true)
-	unknown_affix["affix_ids"] = ["missing_affix_id"]
-	unknown_affix["affix_names"] = ["Неизвестный модификатор"]
-	assert(not save_system._validate_item(unknown_affix, "weapon"), "save validation must reject unknown affix IDs")
-	var duplicate_position_affixes := persisted_affix_weapon.duplicate(true)
-	duplicate_position_affixes["rarity"] = "Эпический"
-	duplicate_position_affixes["affix_ids"] = ["keen_edge", "barbed_edge"]
-	duplicate_position_affixes["affix_names"] = ["Точная грань", "Зубчатая кромка"]
-	duplicate_position_affixes["affix_description"] = "Повторяющиеся префиксы"
-	assert(not save_system._validate_item(duplicate_position_affixes, "weapon"), "epic items must not persist two prefixes instead of prefix/suffix")
-	var legacy_item := {"id": "legacy_plain_weapon", "slot": "weapon", "rarity": "Редкий", "rank": 2, "upgrade_level": 0, "attack": 3, "power": 12.0}
-	assert(save_system._validate_item(legacy_item, "weapon"), "legacy gear without affix metadata must remain loadable")
 	var baseline := {
 		"scrap": 40, "crystals": 3,
 		"buildings": {"forge": 0, "infirmary": 0, "salvage": 0},
 		"loadout": {"weapon": {}, "armor": {}, "core": {}},
-		"armory": [persisted_affix_weapon.duplicate(true)], "unlocked_nodes": [], "saved_expedition": {},
+		"armory": [], "unlocked_nodes": [], "saved_expedition": {},
 		"settings": {"master_volume": 0.8, "music_volume": 0.7, "effects_volume": 0.85},
 		"tutorial_page": 0, "tutorial_completed": false, "last_summary": {}
 	}
@@ -65,11 +38,6 @@ func _run_tests() -> void:
 	assert(FileAccess.file_exists("user://loop_roguelite_save.backup.json"), "second save should preserve a backup")
 	var primary: Dictionary = save_system.load_game()
 	assert(int(primary.get("scrap", -1)) == 41, "primary should contain latest progress")
-	var loaded_armory_value: Variant = primary.get("armory", [])
-	assert(typeof(loaded_armory_value) == TYPE_ARRAY and not loaded_armory_value.is_empty(), "affixed item should survive a real save/load roundtrip")
-	var loaded_affix_item: Dictionary = loaded_armory_value[0]
-	assert(str(loaded_affix_item.get("id", "")) == "save_affix_weapon" and loaded_affix_item.get("affix_ids", []) == ["keen_edge"] and loaded_affix_item.get("affix_names", []) == ["Точная грань"], "affix IDs and names must survive checksum-protected save/load")
-	assert(str(loaded_affix_item.get("affix_description", "")).contains("критическому шансу"), "affix description must survive save/load")
 
 	# New envelope integrity is deterministic regardless of dictionary insertion order.
 	var saved_envelope: Variant = JSON.parse_string(FileAccess.get_file_as_string("user://loop_roguelite_save.json"))

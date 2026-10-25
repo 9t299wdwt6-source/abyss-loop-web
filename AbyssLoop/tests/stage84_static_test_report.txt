@@ -1,0 +1,9 @@
+ABYSS LOOP — STAGE 84 STATIC REPORT
+
+Overall static suite: 110/110 PASS.
+Stage 84 square-grid map regression: 15/15 PASS.
+Route geometry regression: PASS (19×14 grid, 34 orthogonal road cells).
+World-field geometry regression: PASS (1,920 logical-cell projection cases; 6 viewport sizes × 4 route profiles × 80 cells).
+Route topology stress regression: PASS (168 scenarios; legacy node counts through 34).
+
+The suite checks source invariants and offline geometry. It does NOT assert that GDScript compiled, that the map rendered correctly, or that real mouse/touch interaction worked. Godot 4.7.2 execution and the current Web export remain unverified.

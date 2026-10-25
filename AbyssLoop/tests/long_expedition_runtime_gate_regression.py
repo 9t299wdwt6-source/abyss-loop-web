@@ -5,7 +5,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 runner = (ROOT / "tests/long_expedition_runtime_acceptance.gd").read_text(encoding="utf-8")
 scene = (ROOT / "tests/long_expedition_runtime_acceptance_runner.tscn").read_text(encoding="utf-8")
-workflow = (ROOT.parent / ".github/workflows/abyssloop-web.yml").read_text(encoding="utf-8")
+workflow = (ROOT / ".github/workflows/abyssloop-web.yml").read_text(encoding="utf-8")
 
 checks = {
     "runtime gate starts the actual long-expedition mode": 'manager.start_run("standard", LONG_SEED, "standard", "none", "long_expedition")' in runner,

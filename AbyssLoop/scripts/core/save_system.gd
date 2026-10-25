@@ -15,7 +15,6 @@ const BACKUP_FILE_NAME := "loop_roguelite_save.backup.json"
 const LEGACY_PROFILE_PREFIXES := ["abyss loop", "looproguelite"]
 const MAX_SNAPSHOT_ROUTE_CELLS := 128
 const TileSystemScript = preload("res://scripts/systems/tile_system.gd")
-const InventorySystemScript = preload("res://scripts/systems/inventory_system.gd")
 const MAX_SNAPSHOT_LOG_LINES := 300
 
 var last_load_status: String = "not_loaded"
@@ -388,9 +387,24 @@ func _canonical_json(value: Variant) -> String:
 	return JSON.stringify(value)
 
 func _validate_save_data(data: Dictionary) -> bool:
-	for key in ["scrap", "crystals", "runs_started", "runs_completed", "best_loop", "total_victories", "total_bosses_defeated", "total_elites_defeated", "total_events_resolved"]:
+	for key in ["scrap", "crystals", "echo_dust", "runs_started", "runs_completed", "best_loop", "total_victories", "total_bosses_defeated", "total_elites_defeated", "total_events_resolved"]:
 		if data.has(key) and not _is_non_negative_integer(data[key]):
 			return false
+	if data.has("echo_dust") and int(data.get("echo_dust", 0)) > 1000000:
+		return false
+	var settled_ids_value: Variant = data.get("settled_expedition_ids", [])
+	if typeof(settled_ids_value) != TYPE_ARRAY or settled_ids_value.size() > 1000:
+		return false
+	var settled_ids_seen: Dictionary = {}
+	for settled_id_value in settled_ids_value:
+		if typeof(settled_id_value) != TYPE_STRING:
+			return false
+		var settled_id := str(settled_id_value)
+		if settled_id.is_empty() or settled_id.length() > 160 or settled_ids_seen.has(settled_id):
+			return false
+		settled_ids_seen[settled_id] = true
+	if data.has("bestiary_trophies") and not _validate_trophy_counts(data.get("bestiary_trophies", {}), 100000000):
+		return false
 
 	var buildings_value: Variant = data.get("buildings", {})
 	if typeof(buildings_value) != TYPE_DICTIONARY:
@@ -405,10 +419,10 @@ func _validate_save_data(data: Dictionary) -> bool:
 		if int(level_value) > int(ContentRegistry.BUILDINGS[building_id].get("max_level", 5)):
 			return false
 
-	var loadout_value: Variant = data.get("loadout", {"weapon": {}, "armor": {}, "core": {}})
+	var loadout_value: Variant = data.get("loadout", {"weapon": {}, "helmet": {}, "armor": {}, "shield": {}, "amulet": {}, "core": {}})
 	if typeof(loadout_value) != TYPE_DICTIONARY:
 		return false
-	for slot in ["weapon", "armor", "core"]:
+	for slot in ["weapon", "helmet", "armor", "shield", "amulet", "core"]:
 		var item_value: Variant = loadout_value.get(slot, {})
 		if typeof(item_value) != TYPE_DICTIONARY or not _validate_item(item_value, slot):
 			return false
@@ -493,13 +507,16 @@ func _validate_save_data(data: Dictionary) -> bool:
 				return false
 		if int(history_entry.get("telemetry_schema", 0)) > 1:
 			return false
+		for trophy_field in ["earned_trophies", "kept_trophies"]:
+			if history_entry.has(trophy_field) and not _validate_trophy_counts(history_entry.get(trophy_field, {}), 1000000):
+				return false
 		var loadout_ids_value: Variant = history_entry.get("start_loadout_ids", {})
 		if typeof(loadout_ids_value) != TYPE_DICTIONARY:
 			return false
-		if loadout_ids_value.size() > 3:
+		if loadout_ids_value.size() > 6:
 			return false
 		for slot_value in loadout_ids_value.keys():
-			if str(slot_value) not in ["weapon", "armor", "core"] or typeof(loadout_ids_value[slot_value]) != TYPE_STRING or str(loadout_ids_value[slot_value]).length() > 100:
+			if str(slot_value) not in ["weapon", "helmet", "armor", "shield", "amulet", "core"] or typeof(loadout_ids_value[slot_value]) != TYPE_STRING or str(loadout_ids_value[slot_value]).length() > 100:
 				return false
 	var tutorial_page_value: Variant = data.get("tutorial_page", 0)
 	if not _is_non_negative_integer(tutorial_page_value) or int(tutorial_page_value) > 5:
@@ -521,7 +538,7 @@ func _validate_item(item: Dictionary, expected_slot: String = "") -> bool:
 	if str(item.get("id", "")).is_empty():
 		return false
 	var slot := str(item.get("slot", expected_slot))
-	if not ["weapon", "armor", "core"].has(slot):
+	if not ["weapon", "helmet", "armor", "shield", "amulet", "core"].has(slot):
 		return false
 	if not expected_slot.is_empty() and slot != expected_slot:
 		return false
@@ -530,9 +547,16 @@ func _validate_item(item: Dictionary, expected_slot: String = "") -> bool:
 			return false
 	if item.has("upgrade_level") and int(item.get("upgrade_level", 0)) > 10:
 		return false
-	if not _validate_item_affixes(item, slot):
-		return false
-	for stat_key in ["speed", "crit", "reward_bonus", "tile_spawn_bonus", "power", "bleed_chance"]:
+	for metadata_key in ["landscape_affinity", "affinity_name"]:
+		if item.has(metadata_key) and (typeof(item[metadata_key]) != TYPE_STRING or str(item[metadata_key]).length() > 100):
+			return false
+	if item.has("affinity_effect"):
+		if typeof(item["affinity_effect"]) != TYPE_DICTIONARY or item["affinity_effect"].size() > 8:
+			return false
+		for effect_key in item["affinity_effect"].keys():
+			if str(effect_key) not in ["heal", "scrap", "crystals", "spawn_bonus", "enemy_bonus", "reward_bonus"] or not _is_number(item["affinity_effect"][effect_key]):
+				return false
+	for stat_key in ["speed", "crit", "reward_bonus", "tile_spawn_bonus", "power", "bleed_chance", "lifesteal", "dodge_chance", "special_damage_reduction", "elite_boss_damage_bonus", "biome_damage_bonus", "biome_resistance", "spore_damage_bonus", "crystal_damage_bonus", "bone_damage_bonus", "echo_damage_bonus", "spore_trophy_bonus", "crystal_trophy_bonus", "bone_trophy_bonus", "echo_trophy_bonus", "spore_resistance", "crystal_resistance", "bone_resistance", "echo_resistance", "trophy_find_bonus", "road_formation_bonus", "rare_find_bonus", "poison_resistance", "bleed_resistance", "wound_resistance", "distortion_resistance", "weakness_resistance"]:
 		if not item.has(stat_key):
 			continue
 		if not _is_number(item[stat_key]):
@@ -550,63 +574,39 @@ func _validate_item(item: Dictionary, expected_slot: String = "") -> bool:
 			"bleed_chance":
 				if numeric_value < 0.0 or numeric_value > 0.5:
 					return false
+			"lifesteal", "dodge_chance":
+				if numeric_value < 0.0 or numeric_value > 0.25:
+					return false
+			"special_damage_reduction":
+				if numeric_value < 0.0 or numeric_value > 0.35:
+					return false
+			"elite_boss_damage_bonus", "biome_damage_bonus", "spore_damage_bonus", "crystal_damage_bonus", "bone_damage_bonus", "echo_damage_bonus":
+				if numeric_value < 0.0 or numeric_value > 0.25:
+					return false
+			"spore_trophy_bonus", "crystal_trophy_bonus", "bone_trophy_bonus", "echo_trophy_bonus":
+				if numeric_value < 0.0 or numeric_value > 0.12:
+					return false
+			"biome_resistance", "spore_resistance", "crystal_resistance", "bone_resistance", "echo_resistance":
+				if numeric_value < 0.0 or numeric_value > 0.20:
+					return false
+			"poison_resistance", "bleed_resistance", "wound_resistance", "distortion_resistance", "weakness_resistance":
+				if numeric_value < 0.0 or numeric_value > 0.25:
+					return false
 			"reward_bonus":
 				if numeric_value < 0.0 or numeric_value > 2.0:
 					return false
 			"tile_spawn_bonus":
 				if numeric_value < -0.5 or numeric_value > 0.5:
 					return false
+			"trophy_find_bonus", "road_formation_bonus":
+				if numeric_value < 0.0 or numeric_value > 0.25:
+					return false
+			"rare_find_bonus":
+				if numeric_value < 0.0 or numeric_value > 0.12:
+					return false
 			"power":
 				if numeric_value < 0.0 or numeric_value > 1000000.0:
 					return false
-	return true
-
-func _validate_item_affixes(item: Dictionary, slot: String) -> bool:
-	# Legacy gear predating affixes remains valid when no affix metadata exists.
-	var has_affix_ids := item.has("affix_ids")
-	var has_affix_names := item.has("affix_names")
-	var has_affix_description := item.has("affix_description")
-	if not has_affix_ids and not has_affix_names and not has_affix_description:
-		return true
-	if not has_affix_ids or not has_affix_names or not has_affix_description:
-		return false
-	var ids_value: Variant = item.get("affix_ids", null)
-	var names_value: Variant = item.get("affix_names", null)
-	var description_value: Variant = item.get("affix_description", null)
-	if typeof(ids_value) != TYPE_ARRAY or typeof(names_value) != TYPE_ARRAY or typeof(description_value) != TYPE_STRING:
-		return false
-	var affix_ids: Array = ids_value
-	var affix_names: Array = names_value
-	if affix_ids.size() > 2 or affix_names.size() != affix_ids.size() or str(description_value).length() > 1000:
-		return false
-	var seen_ids: Dictionary = {}
-	var seen_positions: Dictionary = {}
-	for index in range(affix_ids.size()):
-		var affix_id_value: Variant = affix_ids[index]
-		var affix_name_value: Variant = affix_names[index]
-		if typeof(affix_id_value) != TYPE_STRING or typeof(affix_name_value) != TYPE_STRING or str(affix_name_value).strip_edges().is_empty():
-			return false
-		var affix_id := str(affix_id_value)
-		if seen_ids.has(affix_id):
-			return false
-		seen_ids[affix_id] = true
-		var definition_value: Variant = InventorySystemScript.ITEM_AFFIXES.get(affix_id, {})
-		if typeof(definition_value) != TYPE_DICTIONARY:
-			return false
-		var definition: Dictionary = definition_value
-		if str(definition.get("slot", "")) != slot:
-			return false
-		var position := str(definition.get("position", ""))
-		if position not in ["prefix", "suffix"] or seen_positions.has(position):
-			return false
-		seen_positions[position] = true
-	var rarity := str(item.get("rarity", ""))
-	if rarity == "Редкий" and (affix_ids.size() != 1 or not seen_positions.has("prefix")):
-		return false
-	if rarity == "Эпический" and (affix_ids.size() != 2 or not seen_positions.has("prefix") or not seen_positions.has("suffix")):
-		return false
-	if rarity not in ["Редкий", "Эпический"] and not affix_ids.is_empty():
-		return false
 	return true
 
 func migrate_expedition_snapshot(snapshot: Dictionary) -> Dictionary:
@@ -681,10 +681,31 @@ func _normalize_status_entity(entity_value: Dictionary) -> Dictionary:
 	entity["combat_debuff"] = {"speed_penalty": 0.0, "time_remaining": 0.0}
 	return entity
 
+func _validate_trophy_counts(value: Variant, max_count: int = 1000000) -> bool:
+	if typeof(value) != TYPE_DICTIONARY:
+		return false
+	var trophies: Dictionary = value
+	if trophies.size() > 8:
+		return false
+	for trophy_id_value in trophies.keys():
+		var trophy_id := str(trophy_id_value)
+		if trophy_id not in ["spore_pollen", "prism_fragment", "bone_fragment", "echo_residue"]:
+			return false
+		var count_value: Variant = trophies[trophy_id_value]
+		if not _is_non_negative_integer(count_value) or int(count_value) > max_count:
+			return false
+	return true
+
 func _validate_expedition_snapshot(snapshot: Dictionary) -> bool:
 	var snapshot_version := int(snapshot.get("snapshot_version", -1))
 	if not [1, 2, 3, 4].has(snapshot_version):
 		return false
+	# Inventory ordering is additive. Older snapshots remain accepted and are migrated
+	# by ExpeditionManager; malformed explicit versions are rejected.
+	if snapshot.has("inventory_order_version"):
+		var inventory_order_version: Variant = snapshot.get("inventory_order_version", null)
+		if not _is_non_negative_integer(inventory_order_version) or int(inventory_order_version) not in [1, 2]:
+			return false
 	# Stage68B telemetry is additive and optional for legacy snapshots. Validate it
 	# strictly when present so malformed measurements cannot poison profile history.
 	if snapshot.has("telemetry_schema"):
@@ -710,16 +731,16 @@ func _validate_expedition_snapshot(snapshot: Dictionary) -> bool:
 		if int(baseline.get("start_max_hp", 0)) < int(baseline.get("start_hp", 0)):
 			return false
 		var baseline_loadout_value: Variant = baseline.get("loadout_ids", {})
-		if typeof(baseline_loadout_value) != TYPE_DICTIONARY or baseline_loadout_value.size() > 3:
+		if typeof(baseline_loadout_value) != TYPE_DICTIONARY or baseline_loadout_value.size() > 6:
 			return false
 		for slot_value in baseline_loadout_value.keys():
-			if str(slot_value) not in ["weapon", "armor", "core"] or typeof(baseline_loadout_value[slot_value]) != TYPE_STRING or str(baseline_loadout_value[slot_value]).length() > 100:
+			if str(slot_value) not in ["weapon", "helmet", "armor", "shield", "amulet", "core"] or typeof(baseline_loadout_value[slot_value]) != TYPE_STRING or str(baseline_loadout_value[slot_value]).length() > 100:
 				return false
 	if snapshot_version >= 2:
 		var world_tiles_value: Variant = snapshot.get("world_tiles", null)
-		if typeof(world_tiles_value) != TYPE_DICTIONARY or world_tiles_value.size() > 80:
+		if typeof(world_tiles_value) != TYPE_DICTIONARY or world_tiles_value.size() > 232:
 			return false
-		if not [1, 2].has(int(snapshot.get("field_schema", 1))):
+		if not [1, 2, 3].has(int(snapshot.get("field_schema", 1))):
 			return false
 		for world_tile_value in world_tiles_value.values():
 			if typeof(world_tile_value) != TYPE_DICTIONARY:
@@ -737,6 +758,23 @@ func _validate_expedition_snapshot(snapshot: Dictionary) -> bool:
 			return false
 	if snapshot_version >= 2 and int(snapshot.get("field_schema", 1)) >= 2:
 		var checked_world_tiles: Dictionary = snapshot.get("world_tiles", {})
+		var modern_route_shape := "classic_ring"
+		if int(snapshot.get("field_schema", 1)) >= 3:
+			var saved_modifier: Dictionary = ContentRegistry.RUN_MODIFIERS.get(str(snapshot.get("run_modifier_id", "standard")), {})
+			modern_route_shape = str(saved_modifier.get("route_shape", "classic_ring"))
+		var modern_road_coordinates: Array[Vector2i] = TileSystemScript.get_road_grid_coordinates_for_seed(modern_route_shape, maxi(0, int(snapshot.get("route_geometry_seed", 0))))
+		if snapshot.has("discovered_world_cells"):
+			var discovery_value: Variant = snapshot.get("discovered_world_cells", null)
+			if typeof(discovery_value) != TYPE_DICTIONARY or discovery_value.size() > 232 or int(snapshot.get("field_schema", 1)) < 3:
+				return false
+			var discovery_mask: Dictionary = discovery_value
+			for discovery_key_value in discovery_mask.keys():
+				var discovery_key := str(discovery_key_value)
+				if not TileSystemScript.is_map_world_cell_id(discovery_key) or typeof(discovery_mask[discovery_key_value]) != TYPE_BOOL or not bool(discovery_mask[discovery_key_value]):
+					return false
+				var discovery_coord := TileSystemScript.world_cell_coordinates(discovery_key)
+				if modern_road_coordinates.has(discovery_coord):
+					return false
 		for world_key_value in checked_world_tiles.keys():
 			var world_key := str(world_key_value)
 			if not TileSystemScript.is_world_cell_valid(world_key):
@@ -746,7 +784,16 @@ func _validate_expedition_snapshot(snapshot: Dictionary) -> bool:
 				return false
 			var world_tile: Dictionary = tile_value
 			var parts := world_key.split(":")
-			if parts.size() != 2 or int(world_tile.get("field_x", -1)) != int(parts[0]) or int(world_tile.get("field_y", -1)) != int(parts[1]):
+			var expected_coord := Vector2i(-1, -1)
+			if parts.size() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int() and TileSystemScript.WORLD_FIELD_KEYS.has(world_key):
+				expected_coord = Vector2i(int(parts[0]), int(parts[1]))
+			elif parts.size() == 3 and parts[0] == "m" and parts[1].is_valid_int() and parts[2].is_valid_int() and int(snapshot.get("field_schema", 1)) >= 3:
+				expected_coord = Vector2i(int(parts[1]), int(parts[2]))
+				if modern_road_coordinates.has(expected_coord):
+					return false
+			else:
+				return false
+			if int(world_tile.get("field_x", -1)) != expected_coord.x or int(world_tile.get("field_y", -1)) != expected_coord.y:
 				return false
 			var route_index := int(world_tile.get("route_index", -1))
 			if route_index < 0 or route_index >= route.size():
@@ -792,6 +839,38 @@ func _validate_expedition_snapshot(snapshot: Dictionary) -> bool:
 	for key in ["scrap", "crystals", "victories", "bosses_defeated", "events_resolved"]:
 		if ledger.has(key) and not _is_non_negative_integer(ledger[key]):
 			return false
+	if ledger.has("trophy_drops") and not _validate_trophy_counts(ledger.get("trophy_drops", {}), 1000000):
+		return false
+	if ledger.has("echo_item_charges") and (not _is_non_negative_integer(ledger.get("echo_item_charges", 0)) or int(ledger.get("echo_item_charges", 0)) > 4):
+		return false
+	if ledger.has("last_tile_exchange_loop"):
+		var exchange_loop_value: Variant = ledger.get("last_tile_exchange_loop", -1)
+		if not _is_number(exchange_loop_value) or not is_finite(float(exchange_loop_value)) or floor(float(exchange_loop_value)) != float(exchange_loop_value) or int(exchange_loop_value) < -1 or int(exchange_loop_value) > 1000000:
+			return false
+	for pending_key in ["pending_item_rarity_bonus", "pending_item_drop_bonus"]:
+		if ledger.has(pending_key):
+			var pending_value: Variant = ledger[pending_key]
+			var pending_cap := 0.18 if pending_key == "pending_item_rarity_bonus" else 0.30
+			if not _is_number(pending_value) or not is_finite(float(pending_value)) or float(pending_value) < 0.0 or float(pending_value) > pending_cap:
+				return false
+	# Stage 79: bounded ledger of items ejected by the full backpack.
+	# Old saves omit this field and remain valid. The ledger is only groundwork for
+	# a later conversion-to-resource mechanic; its items must never be banked as loot.
+	var ejections_value: Variant = ledger.get("inventory_ejections", [])
+	if typeof(ejections_value) != TYPE_ARRAY or ejections_value.size() > 100:
+		return false
+	var ejection_ids: Dictionary = {}
+	for ejection_value in ejections_value:
+		if typeof(ejection_value) != TYPE_DICTIONARY or not _validate_item(ejection_value):
+			return false
+		var ejection_item: Dictionary = ejection_value
+		var ejection_id := str(ejection_item.get("id", ""))
+		if ejection_id.is_empty() or ejection_ids.has(ejection_id):
+			return false
+		ejection_ids[ejection_id] = true
+	for aggregate_key in ["inventory_ejections_dust", "inventory_ejections_count"]:
+		if ledger.has(aggregate_key) and (not _is_non_negative_integer(ledger[aggregate_key]) or int(ledger[aggregate_key]) > 1000000):
+			return false
 	for key in ["placed_tiles", "equipment", "enemy", "combat_timers", "pending_event"]:
 		var expected_type := TYPE_DICTIONARY
 		if typeof(snapshot.get(key, {})) != expected_type:
@@ -801,6 +880,37 @@ func _validate_expedition_snapshot(snapshot: Dictionary) -> bool:
 			return false
 	if snapshot.get("event_log", []).size() > MAX_SNAPSHOT_LOG_LINES:
 		return false
+	var backpack_value: Variant = snapshot.get("bag", [])
+	if typeof(backpack_value) != TYPE_ARRAY or backpack_value.size() > 12:
+		return false
+	var run_item_ids: Dictionary = {}
+	for backpack_item_value in backpack_value:
+		if typeof(backpack_item_value) != TYPE_DICTIONARY or not _validate_item(backpack_item_value):
+			return false
+		var backpack_item: Dictionary = backpack_item_value
+		var backpack_item_id := str(backpack_item.get("id", ""))
+		if run_item_ids.has(backpack_item_id):
+			return false
+		run_item_ids[backpack_item_id] = true
+	# Legacy-only field retained for loading Stage 78 snapshots. Stage 79 writes it empty.
+	var field_cache_value: Variant = snapshot.get("field_cache", [])
+	if typeof(field_cache_value) != TYPE_ARRAY or field_cache_value.size() > 6:
+		return false
+	for field_item_value in field_cache_value:
+		if typeof(field_item_value) != TYPE_DICTIONARY or not _validate_item(field_item_value):
+			return false
+		var field_item: Dictionary = field_item_value
+		var field_item_id := str(field_item.get("id", ""))
+		if run_item_ids.has(field_item_id):
+			return false
+		run_item_ids[field_item_id] = true
+	var run_equipment_value: Variant = snapshot.get("equipment", {})
+	if typeof(run_equipment_value) != TYPE_DICTIONARY:
+		return false
+	for slot in ["weapon", "helmet", "armor", "shield", "amulet", "core"]:
+		var run_item_value: Variant = run_equipment_value.get(slot, {})
+		if typeof(run_item_value) != TYPE_DICTIONARY or not _validate_item(run_item_value, slot):
+			return false
 	for enemy_value in snapshot.get("encounter_enemies", []):
 		if typeof(enemy_value) != TYPE_DICTIONARY:
 			return false

@@ -139,7 +139,7 @@ def validate_catalogs(catalogs: dict[str, Any]) -> list[str]:
         for f in ["name", "short", "kind", "color", "description", "placement_zone"]:
             if not str(tile.get(f, "")).strip(): issues.append(f"tile:{tile_id} missing {f}")
         if not re.fullmatch(r"#[0-9a-fA-F]{6}", str(tile.get("color", ""))): issues.append(f"tile:{tile_id} invalid color")
-        if tile.get("placement_zone") not in {"any", "road", "landscape"}: issues.append(f"tile:{tile_id} invalid placement zone")
+        if tile.get("placement_zone") not in {"any", "road", "roadside", "landscape"}: issues.append(f"tile:{tile_id} invalid placement zone")
     tile_effects = {"scrap", "heal", "reward_bonus", "spawn_bonus", "enemy_bonus"}
     seen_synergies: set[str] = set()
     for synergy in r["TILE_SYNERGIES"]:
@@ -283,7 +283,7 @@ def validate_catalogs(catalogs: dict[str, Any]) -> list[str]:
         if not re.fullmatch(r"#[0-9a-fA-F]{6}", str(route_cell.get("color", ""))): issues.append(f"route cell:{route_id} has invalid color")
 
     for slot, archetypes in inv["ARCHETYPES"].items():
-        if slot not in {"weapon", "armor", "core"}: issues.append(f"equipment archetype unknown slot:{slot}")
+        if slot not in {"weapon", "helmet", "armor", "shield", "amulet", "core"}: issues.append(f"equipment archetype unknown slot:{slot}")
         ids = [str(x.get("id", "")) for x in archetypes]
         if any(not ID_RE.fullmatch(x) for x in ids) or len(ids) != len(set(ids)): issues.append(f"equipment archetypes:{slot} IDs empty/duplicate/invalid")
         for archetype in archetypes:
@@ -294,11 +294,11 @@ def validate_catalogs(catalogs: dict[str, Any]) -> list[str]:
         if _nonempty(set_def, ["name", "description", "threshold", "effects"]): issues.append(f"equipment set:{sid} missing required metadata")
         if int(set_def.get("threshold", 0)) < 2 or not isinstance(set_def.get("effects"), dict) or not set_def.get("effects"): issues.append(f"equipment set:{sid} invalid threshold/effects")
     archetype_ids = {slot: {str(item["id"]) for item in items} for slot, items in inv["ARCHETYPES"].items()}
-    affix_stat_keys = {"attack", "defense", "hp", "speed", "crit", "kill_heal", "tile_scrap", "event_heal", "reward_bonus", "tile_spawn_bonus", "bleed_chance", "bleed_damage", "barrier_on_encounter"}
+    affix_stat_keys = {"attack", "defense", "hp", "speed", "crit", "lifesteal", "dodge_chance", "kill_heal", "tile_scrap", "event_heal", "reward_bonus", "tile_spawn_bonus", "bleed_chance", "bleed_damage", "barrier_on_encounter", "special_damage_reduction", "elite_boss_damage_bonus", "biome_damage_bonus", "biome_resistance", "spore_damage_bonus", "crystal_damage_bonus", "bone_damage_bonus", "echo_damage_bonus", "spore_trophy_bonus", "crystal_trophy_bonus", "bone_trophy_bonus", "echo_trophy_bonus", "spore_resistance", "crystal_resistance", "bone_resistance", "echo_resistance", "trophy_find_bonus", "road_formation_bonus", "rare_find_bonus", "poison_resistance", "bleed_resistance", "wound_resistance", "distortion_resistance", "weakness_resistance"}
     for affix_id, affix in inv["ITEM_AFFIXES"].items():
         if not ID_RE.fullmatch(str(affix_id)): issues.append(f"equipment affix:{affix_id} has invalid stable ID")
         if _nonempty(affix, ["name", "description", "slot", "position", "stats"]): issues.append(f"equipment affix:{affix_id} missing metadata")
-        if affix.get("slot") not in {"weapon", "armor", "core"} or affix.get("position") not in {"prefix", "suffix"}:
+        if affix.get("slot") not in {"weapon", "helmet", "armor", "shield", "amulet", "core"} or affix.get("position") not in {"prefix", "suffix"}:
             issues.append(f"equipment affix:{affix_id} has invalid slot/position")
         stats = affix.get("stats", {})
         if not isinstance(stats, dict) or not stats:

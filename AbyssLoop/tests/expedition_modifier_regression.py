@@ -17,7 +17,7 @@ checks = {
     "modifier affects route danger, event damage and encounter chance": all(x in manager for x in ['get_run_modifier().get("danger_growth_multiplier", 1.0)', 'get_run_modifier().get("event_damage_multiplier", 1.0)', '_get_modifier_chance_delta()']),
     "challenge reward is flagged before being added to temporary loot": 'run_challenge["rewarded"] = true' in manager and 'resource_system.add(run_ledger, "scrap", scrap_reward)' in manager and 'resource_system.add(run_ledger, "crystals", crystal_reward)' in manager,
     "modifier and challenge are restored from expedition snapshots": '"run_modifier_id": run_modifier_id' in manager and '"run_challenge": run_challenge.duplicate(true)' in manager and 'snapshot.get("run_challenge"' in manager,
-    "map view has distinct closed-loop shape profiles": all(x in route_view for x in ['"classic_ring"', '"deep_descent"', '"narrow_ring"', '"fractured_loop"']) and 'cell_points[(i + 1) % count]' in route_view,
+    "map view has distinct closed-loop shape profiles": all(x in route_view for x in ['"classic_ring"', '"deep_descent"', '"narrow_ring"', '"fractured_loop"']) and 'posmod(whole_slot + 1, road_cells.size())' in route_view and 'func _get_road_grid_coordinates() -> Array[Vector2i]:' in route_view,
     "UI displays active challenge and final result": 'challenge_label.text = "ИСПЫТАНИЕ:' in ui and 'summary.get("challenge", {})' in ui,
     "project does not implement enemy-attacking tower gameplay": 'tower_attack' not in manager and 'turret_attack' not in manager and 'func _tower_attack' not in manager,
 }

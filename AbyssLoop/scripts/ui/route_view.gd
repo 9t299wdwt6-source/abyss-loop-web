@@ -5,6 +5,10 @@ const ABYSS_BACKDROP: Texture2D = preload("res://assets/background/abyss_pixel_b
 const TileSystemScript = preload("res://scripts/systems/tile_system.gd")
 const FIELD_COLUMNS := 10
 const FIELD_ROWS := 8
+# Expedition map: square-cell grid with a 34-cell perimeter road, sized like a tactical board.
+const MAP_COLUMNS := 19
+const MAP_ROWS := 14
+const ROAD_CELL_COUNT := 34
 
 signal cell_clicked(cell_index: int)
 signal cell_hovered(cell_index: int)
@@ -15,10 +19,12 @@ var route_cells: Array = []
 var hero_progress: float = 0.0
 var placed_tiles: Dictionary = {}
 var world_tiles: Dictionary = {}
+var discovered_world_cells: Dictionary = {}
 var combat_cell: int = -1
 var boss_encounter: bool = false
 var elite_encounter: bool = false
 var route_shape_id: String = "classic_ring"
+var route_geometry_seed: int = 0
 var placement_enabled: bool = false
 var placement_action_allowed: bool = true
 var selected_tile_id: String = ""
@@ -33,6 +39,9 @@ var high_contrast: bool = false
 var animation_speed: float = 1.0
 var _last_static_signature: String = ""
 var _placement_rules = TileSystemScript.new()
+var _world_display_cache_shape_id: String = ""
+var _world_display_cache_signature: String = ""
+var _world_display_cache: Dictionary = {}
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -84,15 +93,17 @@ func _on_mouse_exited() -> void:
 	if changed_state:
 		queue_redraw()
 
-func configure(cells: Array, progress: float, tiles: Dictionary, fighting_cell: int, allow_placement: bool, tile_id: String, is_boss: bool = false, next_route_shape_id: String = "classic_ring", landscape_tiles: Dictionary = {}, is_elite: bool = false, placement_allowed: bool = true) -> void:
+func configure(cells: Array, progress: float, tiles: Dictionary, fighting_cell: int, allow_placement: bool, tile_id: String, is_boss: bool = false, next_route_shape_id: String = "classic_ring", landscape_tiles: Dictionary = {}, is_elite: bool = false, placement_allowed: bool = true, next_route_geometry_seed: int = 0, discovered_cells: Dictionary = {}) -> void:
 	var next_progress := maxf(0.0, progress)
 	var safe_shape := next_route_shape_id if ["classic_ring", "deep_descent", "narrow_ring", "fractured_loop"].has(next_route_shape_id) else "classic_ring"
-	var static_signature := str(cells.size()) + "|" + str(tiles.keys()) + "|" + str(landscape_tiles) + "|" + str(fighting_cell) + "|" + str(is_boss) + "|" + str(is_elite) + "|" + str(allow_placement) + "|" + str(placement_allowed) + "|" + tile_id + "|" + safe_shape
+	var safe_geometry_seed := maxi(0, next_route_geometry_seed)
+	var static_signature := str(cells.size()) + "|" + str(tiles.keys()) + "|" + str(landscape_tiles) + "|" + str(discovered_cells.keys()) + "|" + str(fighting_cell) + "|" + str(is_boss) + "|" + str(is_elite) + "|" + str(allow_placement) + "|" + str(placement_allowed) + "|" + tile_id + "|" + safe_shape + "|" + str(safe_geometry_seed)
 	var needs_redraw := static_signature != _last_static_signature or not is_equal_approx(next_progress, hero_progress)
 	route_cells = cells
 	hero_progress = next_progress
 	placed_tiles = tiles
 	world_tiles = landscape_tiles
+	discovered_world_cells = discovered_cells
 	combat_cell = fighting_cell
 	boss_encounter = is_boss
 	elite_encounter = is_elite
@@ -100,58 +111,32 @@ func configure(cells: Array, progress: float, tiles: Dictionary, fighting_cell: 
 	placement_action_allowed = placement_allowed
 	selected_tile_id = tile_id
 	route_shape_id = safe_shape
+	route_geometry_seed = safe_geometry_seed
 	_last_static_signature = static_signature
 	if needs_redraw:
 		queue_redraw()
 
 func _draw() -> void:
-	# Keep the art aspect ratio and crop around the map viewport instead of stretching pixel clusters.
+	# Retain the abyss artwork as a textured underpainting, then build the playable
+	# map from square cells. Terrain and road are no longer stretched over an ellipse.
 	var texture_size := Vector2(ABYSS_BACKDROP.get_width(), ABYSS_BACKDROP.get_height())
 	var backdrop_scale := maxf(size.x / texture_size.x, size.y / texture_size.y)
 	var backdrop_size := texture_size * backdrop_scale
 	var backdrop_position := (size - backdrop_size) * 0.5
 	draw_texture_rect(ABYSS_BACKDROP, Rect2(backdrop_position, backdrop_size), false, Color(0.86, 0.92, 0.83, 1.0))
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.01, 0.025, 0.03, 0.58 if high_contrast else 0.44), true)
-	# Sparse, blocky guide lines evoke a survey map without the old technical-grid look.
-	var grid_gap := 32.0
-	var x := 0.0
-	while x < size.x:
-		draw_line(Vector2(x, 0), Vector2(x, size.y), Color(0.55, 0.72, 0.57, 0.045), 1.0)
-		x += grid_gap
-	var y := 0.0
-	while y < size.y:
-		draw_line(Vector2(0, y), Vector2(size.x, y), Color(0.55, 0.72, 0.57, 0.045), 1.0)
-		y += grid_gap
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.01, 0.025, 0.03, 0.62 if high_contrast else 0.54), true)
 	if route_cells.is_empty():
 		draw_string(ThemeDB.fallback_font, Vector2(30, 40), Localization.text("route.empty"), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#c6d7d7"))
 		return
 	var count := route_cells.size()
-	# Drawing, hover and clicking must use the exact same per-profile geometry.
-	# Otherwise shaped routes can be drawn in one place and select another cell.
 	var route_geometry: Dictionary = _get_route_geometry()
-	var center: Vector2 = route_geometry["center"]
-	var radius_x: float = route_geometry["radius_x"]
-	var radius_y: float = route_geometry["radius_y"]
 	var cell_points: Array = route_geometry["points"]
-	_draw_world_field()
-	# Ambient rings.
-	for ring in range(3):
-		var points: PackedVector2Array = PackedVector2Array()
-		for j in range(65):
-			var a := TAU * float(j) / 64.0
-			points.append(center + Vector2(cos(a) * (radius_x + 28.0 + ring * 13.0), sin(a) * (radius_y + 24.0 + ring * 10.0)))
-		draw_polyline(points, Color(0.40, 0.62, 0.58, 0.06 + float(2 - ring) * 0.025), 1.0, true)
-	# A continuous stone-and-earth trail explicitly connects every node, including
-	# the last-to-first segment. This is always the battle map's closed loop.
-	for i in range(count):
-		var from_point: Vector2 = cell_points[i]
-		var to_point: Vector2 = cell_points[(i + 1) % count]
-		draw_line(from_point + Vector2(0, 4), to_point + Vector2(0, 4), Color(0.02, 0.035, 0.04, 0.62), 15.0, false)
-		draw_line(from_point, to_point, Color("#493d2e"), 14.0, false)
-		draw_line(from_point, to_point, Color("#b99a6d"), 9.0, false)
-		draw_line(from_point, to_point, Color("#d8bd8a"), 2.0, false)
-		if i % 3 == 1:
-			_draw_route_chevron(from_point.lerp(to_point, 0.56), to_point - from_point)
+	_draw_map_grid(route_geometry)
+	_draw_world_field(route_geometry)
+	# Draw a continuous square-tile road under its node markers. The perimeter has
+	# exactly 34 cells for current runs; old snapshots with fewer nodes sample the
+	# same physical loop without changing their saved route indices.
+	_draw_road_tiles(route_geometry)
 	for i in range(count):
 		var cell: Dictionary = route_cells[i]
 		var point: Vector2 = cell_points[i]
@@ -166,26 +151,26 @@ func _draw() -> void:
 		var marker_size := _route_marker_size()
 		var marker_half := marker_size * 0.5
 		var marker_rect := Rect2(point - Vector2(marker_half, marker_half), Vector2(marker_size, marker_size))
-		draw_rect(Rect2(marker_rect.position + Vector2(3, 4), marker_rect.size), Color(0.0, 0.0, 0.0, 0.40), true)
+		draw_rect(Rect2(marker_rect.position + Vector2(2, 3), marker_rect.size), Color(0.0, 0.0, 0.0, 0.40), true)
 		draw_rect(marker_rect, Color("#101f25"), true)
-		draw_rect(marker_rect.grow(-3), fill, true)
-		draw_rect(Rect2(marker_rect.position + Vector2(4, 4), Vector2(5, 3)), Color(0.92, 0.96, 0.76, 0.52), true)
+		draw_rect(marker_rect.grow(-2), fill, true)
+		draw_rect(Rect2(marker_rect.position + Vector2(3, 3), Vector2(maxf(2.0, marker_size * 0.20), 2.0)), Color(0.92, 0.96, 0.76, 0.52), true)
 		if high_contrast:
-			draw_rect(marker_rect.grow(5.0), Color("#f4f8ee"), false, 3.0)
-			draw_rect(marker_rect.grow(2.0), Color("#081319"), false, 2.0)
-		draw_rect(marker_rect, Color("#f1f5e9") if high_contrast else Color("#263b37"), false, 3.0 if high_contrast else 2.0)
+			draw_rect(marker_rect.grow(3.0), Color("#f4f8ee"), false, 2.0)
+			draw_rect(marker_rect.grow(1.0), Color("#081319"), false, 1.5)
+		draw_rect(marker_rect, Color("#f1f5e9") if high_contrast else Color("#263b37"), false, 2.0)
 		var symbol_id := str(placed.get("id", base_kind))
-		_draw_pixel_symbol(point + Vector2(0, -8), symbol_id)
-		var outline_growth := 3.0 if count >= 18 else 6.0
+		_draw_pixel_symbol(point + Vector2(0, -marker_size * 0.18), symbol_id)
 		var route_target_is_valid := false
 		if placement_enabled:
 			var route_check: Dictionary = _placement_rules.can_place(route_cells, placed_tiles, i)
 			route_target_is_valid = bool(route_check.get("ok", false)) and placement_action_allowed
+		var outline_growth := 2.0 if count >= 30 else 4.0
 		if i == hovered_cell_index:
 			var hover_color := Color("#b4eb8b")
 			if placement_enabled:
 				hover_color = Color("#8fe3a5") if route_target_is_valid else Color("#ec8a7d")
-			draw_rect(marker_rect.grow(outline_growth), Color("#f7fff3") if high_contrast else hover_color, false, 3.0 if high_contrast else (2.0 if count >= 18 else 3.0))
+			draw_rect(marker_rect.grow(outline_growth), Color("#f7fff3") if high_contrast else hover_color, false, 2.0)
 			if placement_enabled:
 				var status_text := Localization.text("tile.route.status.valid") if route_target_is_valid else Localization.text("tile.route.status.invalid")
 				var status_color := Color("#173c27") if route_target_is_valid else Color("#701f26")
@@ -195,38 +180,36 @@ func _draw() -> void:
 				draw_string(ThemeDB.fallback_font, status_rect.position + Vector2(2, 9), status_text, HORIZONTAL_ALIGNMENT_CENTER, 7.0, 9, Color("#071217") if high_contrast else Color("#f4f8ee"))
 		if i == combat_cell:
 			var combat_color := Color("#c2a1ed") if boss_encounter else (Color("#e7c66f") if elite_encounter else Color("#f18a64"))
-			draw_rect(marker_rect.grow(outline_growth), combat_color, false, 2.0 if not boss_encounter or count >= 18 else 4.0)
-			var badge_size := 10.0 if count >= 19 else 13.0
-			var badge_position := point + Vector2(marker_half - badge_size * 0.55, -marker_half - badge_size * 0.4)
+			draw_rect(marker_rect.grow(outline_growth), combat_color, false, 2.0)
+			var badge_size := clampf(_map_cell_size() * 0.26, 6.0, 12.0)
+			var badge_position := point + Vector2(marker_half - badge_size * 0.55, -marker_half - badge_size * 0.30)
 			draw_rect(Rect2(badge_position, Vector2(badge_size, badge_size)), combat_color, true)
 			var badge_text := "Б" if boss_encounter else ("Э" if elite_encounter else "!")
-			draw_string(ThemeDB.fallback_font, badge_position + Vector2(2, badge_size - 2), badge_text, HORIZONTAL_ALIGNMENT_CENTER, badge_size - 2, 8, Color("#172329"))
+			draw_string(ThemeDB.fallback_font, badge_position + Vector2(1, badge_size - 1), badge_text, HORIZONTAL_ALIGNMENT_CENTER, badge_size - 1, 8, Color("#172329"))
 		var label := str(placed.get("short", i + 1)) if not placed.is_empty() else str(i + 1)
-		var label_width := minf(marker_size - 6.0, 28.0 if count >= 19 else 30.0)
-		var label_font_size := 8 if count >= 19 else (9 if not placed.is_empty() else 10)
-		var label_rect := Rect2(Vector2(point.x - label_width * 0.5, point.y + 1.0), Vector2(label_width, 11.0))
-		draw_rect(label_rect, Color("#f4f8ee") if high_contrast else Color("#09191d", 0.84), true)
+		var label_width := minf(marker_size - 3.0, 24.0 if count >= 30 else 30.0)
+		var label_font_size := 5 if _map_cell_size() < 18.0 else (6 if _map_cell_size() < 26.0 else (7 if count >= 30 else (8 if not placed.is_empty() else 9)))
+		var label_height := clampf(_map_cell_size() * 0.34, 5.0, 10.0)
+		var label_rect := Rect2(Vector2(point.x - label_width * 0.5, point.y + _map_cell_size() * 0.05), Vector2(label_width, label_height))
+		draw_rect(label_rect, Color("#f4f8ee") if high_contrast else Color("#09191d", 0.86), true)
 		if high_contrast:
 			draw_rect(label_rect, Color("#081319"), false, 1.0)
 		var label_color := Color("#10191c") if high_contrast else Color("#f5f4e6")
-		draw_string(ThemeDB.fallback_font, Vector2(label_rect.position.x, point.y + 9.0), label, HORIZONTAL_ALIGNMENT_CENTER, label_width, label_font_size, label_color)
-	# Hero is interpolated along the ring, so logic and presentation share one route value.
-	var whole_step := int(floor(hero_progress))
-	var fraction := 0.0 if reduced_motion else clampf(hero_progress - floor(hero_progress), 0.0, 1.0)
-	var from_index := posmod(whole_step, count)
-	var to_index := posmod(from_index + 1, count)
-	var hero_point: Vector2 = cell_points[from_index].lerp(cell_points[to_index], fraction)
-	# Tiny block-built explorer marker: pack, coat, hood and lantern. No licensed characters or copied silhouettes.
-	draw_rect(Rect2(hero_point + Vector2(-8, 4), Vector2(17, 4)), Color(0.0, 0.0, 0.0, 0.42), true)
-	draw_rect(Rect2(hero_point + Vector2(-7, -5), Vector2(5, 8)), Color("#8b6646"), true)
-	draw_rect(Rect2(hero_point + Vector2(-3, -7), Vector2(7, 11)), Color("#a6c66e"), true)
-	draw_rect(Rect2(hero_point + Vector2(-4, -13), Vector2(9, 7)), Color("#dfbd73"), true)
-	draw_rect(Rect2(hero_point + Vector2(-1, -11), Vector2(3, 3)), Color("#253e42"), true)
-	draw_rect(Rect2(hero_point + Vector2(6, -10), Vector2(2, 14)), Color("#c7b48a"), true)
-	draw_rect(Rect2(hero_point + Vector2(5, -11), Vector2(4, 4)), Color("#f4d27e"), true)
-	draw_rect(Rect2(hero_point + Vector2(6, -10), Vector2(2, 2)), Color("#fff3b0"), true)
+		draw_string(ThemeDB.fallback_font, Vector2(label_rect.position.x, label_rect.position.y + minf(label_height - 1.0, float(label_font_size))), label, HORIZONTAL_ALIGNMENT_CENTER, label_width, label_font_size, label_color)
+	# Hero interpolation still follows the same route indices that drive combat.
+	var hero_point: Vector2 = _get_hero_grid_position(hero_progress, route_geometry)
+	var hero_scale := clampf(_map_cell_size() / 30.0, 0.62, 1.15)
+	# Original block-built explorer stays custom and is scaled with grid size.
+	draw_rect(Rect2(hero_point + Vector2(-8, 4) * hero_scale, Vector2(17, 4) * hero_scale), Color(0.0, 0.0, 0.0, 0.42), true)
+	draw_rect(Rect2(hero_point + Vector2(-7, -5) * hero_scale, Vector2(5, 8) * hero_scale), Color("#8b6646"), true)
+	draw_rect(Rect2(hero_point + Vector2(-3, -7) * hero_scale, Vector2(7, 11) * hero_scale), Color("#a6c66e"), true)
+	draw_rect(Rect2(hero_point + Vector2(-4, -13) * hero_scale, Vector2(9, 7) * hero_scale), Color("#dfbd73"), true)
+	draw_rect(Rect2(hero_point + Vector2(-1, -11) * hero_scale, Vector2(3, 3) * hero_scale), Color("#253e42"), true)
+	draw_rect(Rect2(hero_point + Vector2(6, -10) * hero_scale, Vector2(2, 14) * hero_scale), Color("#c7b48a"), true)
+	draw_rect(Rect2(hero_point + Vector2(5, -11) * hero_scale, Vector2(4, 4) * hero_scale), Color("#f4d27e"), true)
+	draw_rect(Rect2(hero_point + Vector2(6, -10) * hero_scale, Vector2(2, 2) * hero_scale), Color("#fff3b0"), true)
 	var header_position := Vector2(14, 24)
-	var header_text := Localization.text("route.header") % count
+	var header_text := (Localization.text("route.header.compact") if size.x < 680.0 else Localization.text("route.header")) % count
 	var header_color := Color("#ffffff") if high_contrast else Color("#d2d9af")
 	if high_contrast:
 		draw_string(ThemeDB.fallback_font, header_position + Vector2(1, 1), header_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#071217"))
@@ -237,6 +220,7 @@ func _draw() -> void:
 	if high_contrast:
 		draw_string(ThemeDB.fallback_font, footer_position + Vector2(1, 1), selected_text, HORIZONTAL_ALIGNMENT_LEFT, size.x - 28, 12, Color("#071217"))
 	draw_string(ThemeDB.fallback_font, footer_position, selected_text, HORIZONTAL_ALIGNMENT_LEFT, size.x - 28, 12, footer_color)
+	_draw_discovery_status_hud(route_geometry)
 	if feedback_time > 0.0 and not feedback_text.is_empty():
 		var toast_width := minf(size.x - 24.0, 420.0)
 		var toast_rect := Rect2(Vector2(size.x - toast_width - 12.0, 12.0), Vector2(toast_width, 34.0))
@@ -254,6 +238,143 @@ func _draw() -> void:
 		if high_contrast:
 			draw_rect(toast_rect, Color("#f0f6ef", alpha), false, 2.0)
 		draw_string(ThemeDB.fallback_font, toast_rect.position + Vector2(10, 22), feedback_text.substr(0, 48), HORIZONTAL_ALIGNMENT_LEFT, toast_width - 20.0, 12 if not high_contrast else 13, Color("#f0f5ef", alpha))
+
+func _draw_map_grid(route_geometry: Dictionary) -> void:
+	var map_rect: Rect2 = route_geometry["map_rect"]
+	var cell_size: float = route_geometry["cell_size"]
+	var road_lookup: Dictionary = {}
+	var roadside_lookup: Dictionary = {}
+	var road_cells: Array = route_geometry.get("road_cells", [])
+	for road_coord_value in road_cells:
+		var road_coord: Vector2i = road_coord_value
+		road_lookup["%d:%d" % [road_coord.x, road_coord.y]] = true
+	for road_coord_value in road_cells:
+		var road_coord: Vector2i = road_coord_value
+		for offset in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var adjacent: Vector2i = road_coord + offset
+			if adjacent.x < 0 or adjacent.x >= MAP_COLUMNS or adjacent.y < 0 or adjacent.y >= MAP_ROWS:
+				continue
+			var adjacent_id := "%d:%d" % [adjacent.x, adjacent.y]
+			if not road_lookup.has(adjacent_id):
+				roadside_lookup[adjacent_id] = true
+	for row in range(MAP_ROWS):
+		for col in range(MAP_COLUMNS):
+			var coord := Vector2i(col, row)
+			var coord_id := "%d:%d" % [col, row]
+			var cell_rect := Rect2(map_rect.position + Vector2(float(col), float(row)) * cell_size, Vector2.ONE * cell_size)
+			var biome_index := _visual_biome_for_cell(col, row)
+			var base := _terrain_color_for_biome(biome_index)
+			# Subtle deterministic value variation breaks uniform blocks without introducing noisy flicker.
+			var noise_value := float(posmod(col * 7 + row * 11 + posmod(route_geometry_seed, 31), 7) - 3) / 3.0
+			base = base.lerp(Color("#10191b") if noise_value < 0.0 else Color("#d7dfbf"), absf(noise_value) * 0.055)
+			if roadside_lookup.has(coord_id):
+				base = base.lerp(Color("#c5b98c"), 0.08)
+			base.a = 0.94
+			draw_rect(cell_rect, base, true)
+			_draw_terrain_cell_details(cell_rect, biome_index, col, row)
+			if roadside_lookup.has(coord_id):
+				_draw_roadside_edge(cell_rect, coord, road_lookup, cell_size)
+			var tone := 0.0 if (col + row) % 2 == 0 else 0.025
+			draw_rect(cell_rect, Color("#9bb59a", 0.10 + tone) if not high_contrast else Color("#e3f1dc", 0.36), false, 1.0)
+
+func _visual_biome_for_cell(col: int, row: int) -> int:
+	# Cosmetic biome regions only: gameplay placement and combat continue to use tile definitions.
+	# A tiny seed-driven perturbation changes region boundaries while keeping the terrain deterministic.
+	var centers := [Vector2(2.5, 2.3), Vector2(15.7, 2.6), Vector2(15.8, 10.7), Vector2(2.8, 10.4)]
+	var best_index := 0
+	var best_score := INF
+	var point := Vector2(float(col), float(row))
+	var small_seed := posmod(route_geometry_seed, 97)
+	for candidate_index in range(centers.size()):
+		var seed_shift := Vector2(
+			float(posmod(small_seed + candidate_index * 3, 5) - 2) * 0.45,
+			float(posmod(small_seed * 3 + candidate_index * 7, 5) - 2) * 0.32
+		)
+		var center: Vector2 = centers[candidate_index] + seed_shift
+		var jitter := float(posmod(col * 17 + row * 29 + candidate_index * 13 + small_seed * 7, 11)) * 0.055
+		var score := point.distance_squared_to(center) + jitter
+		if score < best_score:
+			best_score = score
+			best_index = candidate_index
+	return best_index
+
+func _terrain_color_for_biome(biome_index: int) -> Color:
+	match posmod(biome_index, 4):
+		0: # Sporewood — damp moss, lichen and fungal earth.
+			return Color("#314b39")
+		1: # Crystal flats — cooler slate and teal minerals.
+			return Color("#2f4850")
+		2: # Bonefield — pale mineral soil and old remains.
+			return Color("#4a493b")
+		_: # Echo marsh — muted blue-violet ground.
+			return Color("#38384d")
+
+func _draw_terrain_cell_details(cell_rect: Rect2, biome_index: int, col: int, row: int) -> void:
+	var cell_size := cell_rect.size.x
+	if cell_size < 7.0:
+		return
+	var mark := posmod(col * 17 + row * 31 + posmod(route_geometry_seed, 97) * 7, 16)
+	var origin := cell_rect.position
+	var pixel := maxf(1.0, cell_size * 0.055)
+	match posmod(biome_index, 4):
+		0:
+			if mark % 3 == 0:
+				draw_circle(origin + Vector2(cell_size * 0.28, cell_size * 0.34), maxf(1.0, cell_size * 0.045), Color("#a0bd76", 0.28))
+			if mark % 7 == 2:
+				draw_rect(Rect2(origin + Vector2(cell_size * 0.61, cell_size * 0.66), Vector2(pixel * 2.4, pixel)), Color("#8aab6b", 0.24), true)
+		1:
+			if mark % 3 == 1:
+				draw_line(origin + Vector2(cell_size * 0.30, cell_size * 0.66), origin + Vector2(cell_size * 0.43, cell_size * 0.42), Color("#85c6ca", 0.38), maxf(1.0, cell_size * 0.035))
+			if mark % 5 == 0:
+				draw_rect(Rect2(origin + Vector2(cell_size * 0.68, cell_size * 0.26), Vector2(pixel * 1.5, pixel * 2.0)), Color("#91c9cf", 0.28), true)
+		2:
+			if mark % 4 == 2:
+				draw_rect(Rect2(origin + Vector2(cell_size * 0.24, cell_size * 0.62), Vector2(pixel * 2.5, pixel)), Color("#d5c8a4", 0.30), true)
+			if mark % 7 == 3:
+				draw_line(origin + Vector2(cell_size * 0.62, cell_size * 0.30), origin + Vector2(cell_size * 0.70, cell_size * 0.42), Color("#c7bb99", 0.25), pixel)
+		_:
+			if mark % 3 == 2:
+				draw_circle(origin + Vector2(cell_size * 0.68, cell_size * 0.34), maxf(1.0, pixel * 1.1), Color("#8983bd", 0.30))
+			if mark % 5 == 2:
+				draw_line(origin + Vector2(cell_size * 0.23, cell_size * 0.70), origin + Vector2(cell_size * 0.34, cell_size * 0.62), Color("#7775a7", 0.28), pixel)
+
+func _draw_roadside_edge(cell_rect: Rect2, coord: Vector2i, road_lookup: Dictionary, cell_size: float) -> void:
+	# Mark only the edge touching the road. This communicates roadside eligibility without outlining every field tile.
+	var inset := maxf(1.0, cell_size * 0.07)
+	var line_width := maxf(1.0, cell_size * 0.035)
+	var color := Color("#d6c48c", 0.44) if not high_contrast else Color("#f4f8ee", 0.78)
+	var left_id := "%d:%d" % [coord.x - 1, coord.y]
+	var right_id := "%d:%d" % [coord.x + 1, coord.y]
+	var up_id := "%d:%d" % [coord.x, coord.y - 1]
+	var down_id := "%d:%d" % [coord.x, coord.y + 1]
+	if road_lookup.has(left_id):
+		draw_line(cell_rect.position + Vector2(inset, inset), cell_rect.position + Vector2(inset, cell_size - inset), color, line_width)
+	if road_lookup.has(right_id):
+		draw_line(cell_rect.position + Vector2(cell_size - inset, inset), cell_rect.position + Vector2(cell_size - inset, cell_size - inset), color, line_width)
+	if road_lookup.has(up_id):
+		draw_line(cell_rect.position + Vector2(inset, inset), cell_rect.position + Vector2(cell_size - inset, inset), color, line_width)
+	if road_lookup.has(down_id):
+		draw_line(cell_rect.position + Vector2(inset, cell_size - inset), cell_rect.position + Vector2(cell_size - inset, cell_size - inset), color, line_width)
+
+func _draw_road_tiles(route_geometry: Dictionary) -> void:
+	var map_rect: Rect2 = route_geometry["map_rect"]
+	var cell_size: float = route_geometry["cell_size"]
+	var road_cells: Array = route_geometry["road_cells"]
+	for slot in range(road_cells.size()):
+		var coord: Vector2i = road_cells[slot]
+		var tile_rect := Rect2(map_rect.position + Vector2(coord) * cell_size, Vector2.ONE * cell_size)
+		draw_rect(Rect2(tile_rect.position + Vector2(cell_size * 0.08, cell_size * 0.10), tile_rect.size), Color(0.0, 0.0, 0.0, 0.30), true)
+		draw_rect(tile_rect, Color("#182629"), true)
+		var stone_rect := tile_rect.grow(-maxf(1.0, cell_size * 0.055))
+		var stone := Color("#796d59") if slot % 4 == 0 else (Color("#887963") if slot % 3 == 0 else Color("#726956"))
+		draw_rect(stone_rect, stone, true)
+		draw_rect(stone_rect.grow(-maxf(1.0, cell_size * 0.10)), Color("#9d896b", 0.92), true)
+		# Pixel cracks and moss stay aligned to the square tile, not a round path.
+		if slot % 3 == 1:
+			draw_rect(Rect2(tile_rect.position + Vector2(cell_size * 0.24, cell_size * 0.28), Vector2(maxf(2.0, cell_size * 0.22), maxf(1.0, cell_size * 0.06))), Color("#4d5b42"), true)
+		if slot % 4 == 2:
+			draw_rect(Rect2(tile_rect.position + Vector2(cell_size * 0.65, cell_size * 0.67), Vector2(maxf(1.0, cell_size * 0.08), maxf(1.0, cell_size * 0.08))), Color("#b7a17b", 0.65), true)
+		draw_rect(tile_rect, Color("#d0b78d", 0.62) if high_contrast else Color("#473e32"), false, 1.5 if high_contrast else 1.0)
 
 func _draw_route_chevron(raw_center: Vector2, raw_direction: Vector2) -> void:
 	if raw_direction.length_squared() < 0.001:
@@ -313,143 +434,358 @@ func _handle_click_position(local_position: Vector2) -> void:
 	if closest_index >= 0:
 		cell_clicked.emit(closest_index)
 
-func _get_field_rect() -> Rect2:
-	return Rect2(Vector2(18.0, 34.0), Vector2(maxf(1.0, size.x - 36.0), maxf(1.0, size.y - 68.0)))
+func _get_map_rect() -> Rect2:
+	var usable := Vector2(maxf(1.0, size.x - 28.0), maxf(1.0, size.y - 64.0))
+	var cell_size := minf(usable.x / float(MAP_COLUMNS), usable.y / float(MAP_ROWS))
+	var map_size := Vector2(float(MAP_COLUMNS), float(MAP_ROWS)) * cell_size
+	return Rect2((size - map_size) * 0.5, map_size)
 
+func _map_cell_size() -> float:
+	var usable := Vector2(maxf(1.0, size.x - 28.0), maxf(1.0, size.y - 64.0))
+	return maxf(1.0, minf(usable.x / float(MAP_COLUMNS), usable.y / float(MAP_ROWS)))
+
+func _get_road_grid_coordinates() -> Array[Vector2i]:
+	# All map systems query TileSystem's shared contour. The seed is deterministic
+	# for new runs and zero for legacy snapshots that must keep their old geometry.
+	var result: Array[Vector2i] = TileSystemScript.get_road_grid_coordinates_for_seed(route_shape_id, route_geometry_seed)
+	return result
+
+func _get_world_display_cell_map(road_cells: Array) -> Dictionary:
+	# Preserve positions of old saved tiles, but expose the full modern board as
+	# 232 distinct off-road cells. New IDs use m:col:row; legacy IDs remain valid.
+	var legacy_occupied: Array[String] = []
+	for legacy_id_value in TileSystemScript.WORLD_FIELD_KEYS:
+		var legacy_id := str(legacy_id_value)
+		if world_tiles.has(legacy_id):
+			legacy_occupied.append(legacy_id)
+	var signature_parts: Array[String] = [route_shape_id, str(route_geometry_seed)]
+	signature_parts.append_array(legacy_occupied)
+	var cache_signature := "|".join(signature_parts)
+	if _world_display_cache_signature == cache_signature and not _world_display_cache.is_empty():
+		return _world_display_cache
+
+	var blocked: Dictionary = {}
+	for road_coord_value in road_cells:
+		var road_coord: Vector2i = road_coord_value
+		blocked["%d:%d" % [road_coord.x, road_coord.y]] = true
+
+	# Recreate the Stage 84 nearest-free projection in its original stable order.
+	# The projection is computed for all legacy keys so their old relative positions
+	# do not shift when a save contains only some of the former 80 placements.
+	var used: Dictionary = {}
+	var legacy_projection: Dictionary = {}
+	for key_value in TileSystemScript.WORLD_FIELD_KEYS:
+		var key := str(key_value)
+		var parts := key.split(":")
+		if parts.size() != 2 or not parts[0].is_valid_int() or not parts[1].is_valid_int():
+			continue
+		var col := int(parts[0])
+		var row := int(parts[1])
+		var preferred := Vector2(
+			clampf((float(col) + 0.5) * float(MAP_COLUMNS) / float(FIELD_COLUMNS) - 0.5, 0.0, float(MAP_COLUMNS - 1)),
+			clampf((float(row) + 0.5) * float(MAP_ROWS) / float(FIELD_ROWS) - 0.5, 0.0, float(MAP_ROWS - 1))
+		)
+		var best_coord := Vector2i(-1, -1)
+		var best_cost := INF
+		for candidate_row in range(MAP_ROWS):
+			for candidate_col in range(MAP_COLUMNS):
+				var candidate := Vector2i(candidate_col, candidate_row)
+				var candidate_id := "%d:%d" % [candidate.x, candidate.y]
+				if blocked.has(candidate_id) or used.has(candidate_id):
+					continue
+				var cost := Vector2(candidate).distance_squared_to(preferred)
+				cost += float((candidate_row * MAP_COLUMNS + candidate_col) % 7) * 0.0001
+				if cost < best_cost:
+					best_cost = cost
+					best_coord = candidate
+		if best_coord.x >= 0:
+			var best_id := "%d:%d" % [best_coord.x, best_coord.y]
+			used[best_id] = true
+			legacy_projection[key] = best_coord
+
+	var result: Dictionary = {}
+	var occupied_legacy_positions: Dictionary = {}
+	for legacy_id in legacy_occupied:
+		if legacy_projection.has(legacy_id):
+			var legacy_coord: Vector2i = legacy_projection[legacy_id]
+			var pos_id := "%d:%d" % [legacy_coord.x, legacy_coord.y]
+			occupied_legacy_positions[pos_id] = true
+			result[legacy_id] = legacy_coord
+
+	for row in range(MAP_ROWS):
+		for col in range(MAP_COLUMNS):
+			var coord := Vector2i(col, row)
+			var coord_id := "%d:%d" % [col, row]
+			if blocked.has(coord_id) or occupied_legacy_positions.has(coord_id):
+				continue
+			result[TileSystemScript.map_world_cell_id(col, row)] = coord
+
+	_world_display_cache_shape_id = route_shape_id
+	_world_display_cache_signature = cache_signature
+	_world_display_cache = result.duplicate(true)
+	return _world_display_cache
 func _field_cell_rect(cell_id: String) -> Rect2:
-	var parts := cell_id.split(":")
-	if parts.size() != 2 or not parts[0].is_valid_int() or not parts[1].is_valid_int():
+	var geometry: Dictionary = _get_route_geometry()
+	var display_map: Dictionary = geometry.get("world_display_cells", {})
+	if not display_map.has(cell_id):
 		return Rect2()
-	var col := int(parts[0])
-	var row := int(parts[1])
-	var field := _get_field_rect()
-	var cell_size := Vector2(field.size.x / float(FIELD_COLUMNS), field.size.y / float(FIELD_ROWS))
-	return Rect2(field.position + Vector2(float(col), float(row)) * cell_size, cell_size)
+	var coord: Vector2i = display_map[cell_id]
+	var map_rect: Rect2 = geometry["map_rect"]
+	var cell_size: float = geometry["cell_size"]
+	return Rect2(map_rect.position + Vector2(coord) * cell_size, Vector2.ONE * cell_size)
 
 func _find_world_cell(position: Vector2) -> String:
-	# Route hit-testing has priority over landscape placement. The world field is a
-	# separate interaction layer, never a way to place a card on the visible road.
+	# Road placement has priority. A square road tile cannot accidentally be
+	# interpreted as a landscape target, even when its visual bounds touch.
 	if _find_closest_cell(position) >= 0 or _is_near_route_line(position):
 		return ""
-	for cell_id_value in TileSystemScript.WORLD_FIELD_KEYS:
+	var geometry: Dictionary = _get_route_geometry()
+	var display_map: Dictionary = geometry.get("world_display_cells", {})
+	for cell_id_value in display_map.keys():
 		var cell_id := str(cell_id_value)
-		if _field_cell_rect(cell_id).grow(-4.0).has_point(position):
+		if _field_cell_rect_from_geometry(cell_id, geometry).grow(-2.0).has_point(position):
 			return cell_id
 	return ""
 
+func _field_cell_rect_from_geometry(cell_id: String, geometry: Dictionary) -> Rect2:
+	var display_map: Dictionary = geometry.get("world_display_cells", {})
+	if not display_map.has(cell_id):
+		return Rect2()
+	var coord: Vector2i = display_map[cell_id]
+	var map_rect: Rect2 = geometry["map_rect"]
+	var cell_size: float = geometry["cell_size"]
+	return Rect2(map_rect.position + Vector2(coord) * cell_size, Vector2.ONE * cell_size)
+
 func _is_near_route_line(position: Vector2) -> bool:
-	if route_cells.size() < 2:
-		return false
-	var route_geometry: Dictionary = _get_route_geometry()
-	var points: Array = route_geometry.get("points", [])
-	if points.size() < 2:
-		return false
-	for index in range(points.size()):
-		var from_point: Vector2 = points[index]
-		var to_point: Vector2 = points[(index + 1) % points.size()]
+	var geometry: Dictionary = _get_route_geometry()
+	var map_rect: Rect2 = geometry["map_rect"]
+	var cell_size: float = geometry["cell_size"]
+	var road_cells: Array = geometry["road_cells"]
+	for index in range(road_cells.size()):
+		var from_coord: Vector2i = road_cells[index]
+		var to_coord: Vector2i = road_cells[(index + 1) % road_cells.size()]
+		var from_point := map_rect.position + (Vector2(from_coord) + Vector2(0.5, 0.5)) * cell_size
+		var to_point := map_rect.position + (Vector2(to_coord) + Vector2(0.5, 0.5)) * cell_size
 		var nearest_point: Vector2 = Geometry2D.get_closest_point_to_segment(position, from_point, to_point)
-		if nearest_point.distance_to(position) <= 9.0:
+		if nearest_point.distance_to(position) <= cell_size * 0.46:
 			return true
 	return false
 
-func _draw_world_field() -> void:
-	for cell_id_value in TileSystemScript.WORLD_FIELD_KEYS:
+func _get_hero_grid_position(progress: float, geometry: Dictionary) -> Vector2:
+	# For older saves whose logical route has fewer than 34 nodes, walk along the
+	# intervening square road tiles instead of cutting diagonally across the board.
+	var road_cells: Array = geometry["road_cells"]
+	var map_rect: Rect2 = geometry["map_rect"]
+	var cell_size: float = geometry["cell_size"]
+	if road_cells.is_empty() or route_cells.is_empty():
+		return size * 0.5
+	var physical_progress := maxf(0.0, progress) * float(road_cells.size()) / float(route_cells.size())
+	var whole_slot := int(floor(physical_progress))
+	var fraction := 0.0 if reduced_motion else clampf(physical_progress - floor(physical_progress), 0.0, 1.0)
+	var from_coord: Vector2i = road_cells[posmod(whole_slot, road_cells.size())]
+	var to_coord: Vector2i = road_cells[posmod(whole_slot + 1, road_cells.size())]
+	var from_point := map_rect.position + (Vector2(from_coord) + Vector2(0.5, 0.5)) * cell_size
+	var to_point := map_rect.position + (Vector2(to_coord) + Vector2(0.5, 0.5)) * cell_size
+	return from_point.lerp(to_point, fraction)
+
+func _draw_world_field(route_geometry: Dictionary) -> void:
+	var map_rect: Rect2 = route_geometry["map_rect"]
+	var cell_size: float = route_geometry["cell_size"]
+	var display_map: Dictionary = route_geometry.get("world_display_cells", {})
+	for cell_id_value in display_map.keys():
 		var cell_id := str(cell_id_value)
-		var rect := _field_cell_rect(cell_id)
+		var coord: Vector2i = display_map[cell_id]
+		var cell_rect := Rect2(map_rect.position + Vector2(coord) * cell_size, Vector2.ONE * cell_size)
+		var inset := maxf(2.0, cell_size * 0.08)
+		var tile_rect := cell_rect.grow(-inset)
 		var tile: Dictionary = world_tiles.get(cell_id, {})
-		# Keep terrain markers compact. The logical field cell is larger for input,
-		# but drawing a full cell could visually cover the loop on narrow profiles.
-		var footprint_size := Vector2(minf(28.0, rect.size.x - 10.0), minf(22.0, rect.size.y - 10.0))
-		var tile_rect := Rect2(rect.get_center() - footprint_size * 0.5, footprint_size)
 		if tile.is_empty():
-			var world_check: Dictionary = _placement_rules.can_place_world(route_cells, world_tiles, cell_id) if placement_enabled else {"ok": true}
+			var map_cell_id := TileSystemScript.map_world_cell_id(coord.x, coord.y)
+			var is_discovered := discovered_world_cells.has(map_cell_id)
+			var placement_probe: Dictionary = {"id": selected_tile_id} if not selected_tile_id.is_empty() else {}
+			var world_check: Dictionary = _placement_rules.can_place_world(route_cells, world_tiles, cell_id, placement_probe, route_shape_id, route_geometry_seed) if placement_enabled else {"ok": true}
 			var world_target_is_valid := placement_enabled and placement_action_allowed and bool(world_check.get("ok", false))
-			var base := Color("#1d332d", 0.30)
-			var outline := Color("#bed59c", 0.24)
+			var base := Color("#253c32", 0.30)
+			var outline := Color("#b6d2a0", 0.18)
 			if placement_enabled and world_target_is_valid:
-				base = Color("#82b96e", 0.22)
-				outline = Color("#c1e89b", 0.95)
+				base = Color("#82b96e", 0.36)
+				outline = Color("#c1e89b", 0.98)
 			elif placement_enabled:
 				base = Color("#c96562", 0.18)
-				outline = Color("#ed9d91", 0.86)
+				outline = Color("#ed9d91", 0.82)
+			if not is_discovered:
+				if placement_enabled:
+					# Preserve readable valid/invalid preview while strongly muting the unknown biome.
+					base = base.lerp(Color("#101b20"), 0.58)
+					outline = Color("#b3c6b6", 0.72) if not high_contrast else Color("#f4f8ee", 0.92)
+				else:
+					# The fog is nearly opaque so hidden terrain details cannot leak through.
+					base = Color("#09161b", 0.98)
+					outline = Color("#71847e", 0.92) if not high_contrast else Color("#f4f8ee", 0.96)
 			if cell_id == hovered_world_cell_id:
 				if placement_enabled and not world_target_is_valid:
-					base = Color("#c96562", 0.34)
+					base = Color("#c96562", 0.42)
 					outline = Color("#ed9d91", 1.0)
 				else:
-					base = Color("#a5d98b", 0.42)
+					base = Color("#a5d98b", 0.48)
 					outline = Color("#e3f4b6", 1.0)
 			draw_rect(tile_rect, base, true)
-			draw_rect(tile_rect, Color("#f4f8ee") if high_contrast else outline, false, 2.5 if high_contrast else (2.0 if placement_enabled else 1.0))
-			if high_contrast:
-				draw_rect(tile_rect.grow(2.0), Color("#081319"), false, 1.0)
+			if not is_discovered:
+				_draw_unknown_cell_fog(tile_rect, coord, cell_size, cell_id == hovered_world_cell_id)
+			draw_rect(tile_rect, Color("#f4f8ee") if high_contrast else outline, false, 2.0 if placement_enabled else 1.0)
 			var center := tile_rect.get_center()
+			if cell_id == hovered_world_cell_id and placement_enabled:
+				_draw_placement_preview_corners(tile_rect.grow(-1.0), Color("#f4f8ee") if high_contrast else outline)
 			if placement_enabled:
 				var status_text := Localization.text("tile.route.status.valid") if world_target_is_valid else Localization.text("tile.route.status.invalid")
 				var status_color := Color("#173c27") if world_target_is_valid else Color("#701f26")
-				draw_rect(Rect2(center - Vector2(5, 5), Vector2(10, 10)), Color("#f4f8ee") if high_contrast else status_color, true)
-				draw_string(ThemeDB.fallback_font, center + Vector2(-4, 3), status_text, HORIZONTAL_ALIGNMENT_CENTER, 8.0, 8, Color("#071217") if high_contrast else Color("#f4f8ee"))
-			else:
-				draw_rect(Rect2(center - Vector2(3, 1), Vector2(6, 2)), Color("#d1e5ad", 0.42 if placement_enabled else 0.14), true)
+				var status_size := clampf(cell_size * 0.48, 8.0, 12.0)
+				var status_rect := Rect2(center - Vector2.ONE * status_size * 0.5, Vector2.ONE * status_size)
+				draw_rect(status_rect, Color("#f4f8ee") if high_contrast else status_color, true)
+				draw_rect(status_rect, Color("#071217") if high_contrast else Color("#f4f8ee", 0.94), false, 1.0)
+				var compact_status := ("+" if world_target_is_valid else "X") if cell_size < 20.0 else status_text
+				var status_font_size := 7 if cell_size < 20.0 else (8 if cell_size < 28.0 else 9)
+				draw_string(ThemeDB.fallback_font, center + Vector2(-status_size * 0.45, status_font_size * 0.34), compact_status, HORIZONTAL_ALIGNMENT_CENTER, status_size * 0.9, status_font_size, Color("#071217") if high_contrast else Color("#f4f8ee"))
 		else:
 			var fill := Color(str(tile.get("color", "#788a67")))
 			draw_rect(Rect2(tile_rect.position + Vector2(2, 3), tile_rect.size), Color(0.0, 0.0, 0.0, 0.38), true)
 			draw_rect(tile_rect, fill, true)
 			if high_contrast:
-				draw_rect(tile_rect.grow(3.0), Color("#f4f8ee"), false, 2.0)
+				draw_rect(tile_rect.grow(2.0), Color("#f4f8ee"), false, 2.0)
 				draw_rect(tile_rect.grow(1.0), Color("#081319"), false, 1.5)
-			draw_rect(tile_rect, Color("#f4f8ee") if high_contrast else Color("#172a25"), false, 2.5 if high_contrast else 2.0)
-			_draw_pixel_symbol(tile_rect.get_center() + Vector2(0, -3), str(tile.get("id", "")))
-			var world_label_rect := Rect2(tile_rect.position + Vector2(1.0, tile_rect.size.y - 8.0), Vector2(maxf(1.0, tile_rect.size.x - 2.0), 7.0))
+			else:
+				draw_rect(tile_rect, Color("#172a25"), false, 2.0)
+			_draw_pixel_symbol(tile_rect.get_center() + Vector2(0, -cell_size * 0.10), str(tile.get("id", "")))
+			var label_height := clampf(cell_size * 0.22, 6.0, 10.0)
+			var world_label_rect := Rect2(tile_rect.position + Vector2(1.0, tile_rect.size.y - label_height), Vector2(maxf(1.0, tile_rect.size.x - 2.0), label_height))
 			draw_rect(world_label_rect, Color("#f4f8ee") if high_contrast else Color("#071619", 0.88), true)
-			if high_contrast:
-				draw_rect(world_label_rect, Color("#081319"), false, 1.0)
-			draw_string(ThemeDB.fallback_font, Vector2(world_label_rect.position.x, world_label_rect.end.y - 1.0), str(tile.get("short", Localization.text("route.tile.short"))), HORIZONTAL_ALIGNMENT_CENTER, world_label_rect.size.x, 6 if high_contrast else 7, Color("#10191c") if high_contrast else Color("#f5f4e6"))
+			draw_string(ThemeDB.fallback_font, Vector2(world_label_rect.position.x, world_label_rect.end.y - 1.0), str(tile.get("short", Localization.text("route.tile.short"))), HORIZONTAL_ALIGNMENT_CENTER, world_label_rect.size.x, 6 if cell_size < 24.0 else 7, Color("#10191c") if high_contrast else Color("#f5f4e6"))
 			if cell_id == hovered_world_cell_id and placement_enabled:
-				draw_rect(tile_rect.grow(3.0), Color("#ec8a7d"), false, 2.0)
+				draw_rect(tile_rect.grow(2.0), Color("#ec8a7d"), false, 2.0)
+
+func _draw_discovery_status_hud(route_geometry: Dictionary) -> void:
+	# A compact map status is kept outside the tile board so that it never covers
+	# road/landscape hit targets, including phone-sized layouts.
+	var road_lookup: Dictionary = {}
+	var road_cells: Array = route_geometry.get("road_cells", [])
+	for road_value in road_cells:
+		var road_coord: Vector2i = road_value
+		road_lookup["%d:%d" % [road_coord.x, road_coord.y]] = true
+	var discovered_count := 0
+	for key_value in discovered_world_cells.keys():
+		var cell_id := str(key_value)
+		if not bool(discovered_world_cells[key_value]) or not TileSystemScript.is_map_world_cell_id(cell_id):
+			continue
+		var coord: Vector2i = TileSystemScript.world_cell_coordinates(cell_id)
+		if not road_lookup.has("%d:%d" % [coord.x, coord.y]):
+			discovered_count += 1
+	var total_world_cells := maxi(0, MAP_COLUMNS * MAP_ROWS - road_cells.size())
+	var label := Localization.text("route.discovery.count") % [mini(discovered_count, total_world_cells), total_world_cells]
+	var pill_width := minf(148.0, maxf(112.0, size.x - 24.0))
+	var pill_rect := Rect2(Vector2(size.x - pill_width - 12.0, 9.0), Vector2(pill_width, 18.0))
+	draw_rect(pill_rect, Color("#071419", 0.96), true)
+	draw_rect(pill_rect, Color("#f4f8ee", 0.95) if high_contrast else Color("#9eafa1", 0.92), false, 1.0)
+	var font_size := 8 if size.x < 480.0 else 9
+	var text_color := Color("#071217") if high_contrast else Color("#e4eddd")
+	draw_string(ThemeDB.fallback_font, Vector2(pill_rect.position.x + 4.0, pill_rect.position.y + 10.5), label, HORIZONTAL_ALIGNMENT_CENTER, pill_width - 8.0, font_size, text_color)
+
+func _draw_unknown_cell_fog(tile_rect: Rect2, coord: Vector2i, cell_size: float, emphasized: bool) -> void:
+	# Opaque fog hides biome texture; deterministic sparse marks keep the unknown
+	# state perceptible at tiny sizes without making every cell visually noisy.
+	var color := Color("#82958e", 0.28) if not high_contrast else Color("#eef7eb", 0.62)
+	var origin := tile_rect.position
+	var mark := posmod(coord.x * 13 + coord.y * 17 + posmod(route_geometry_seed, 97), 5)
+	var pixel := maxf(1.0, cell_size * 0.055)
+	if mark % 2 == 0:
+		draw_line(origin + Vector2(cell_size * 0.22, cell_size * 0.24), origin + Vector2(cell_size * 0.39, cell_size * 0.41), color, pixel, true)
+	if mark % 3 == 1:
+		draw_rect(Rect2(origin + Vector2(cell_size * 0.62, cell_size * 0.65), Vector2(pixel * 1.8, pixel)), color, true)
+	if not placement_enabled and cell_size >= 13.0:
+		var font_size := 6 if cell_size < 16.0 else (7 if cell_size < 24.0 else 10)
+		var glyph_color := Color("#eef7eb") if high_contrast else Color("#a3b6ac")
+		if emphasized:
+			glyph_color = Color("#ffffff") if high_contrast else Color("#d5e5da")
+		var center := tile_rect.get_center()
+		draw_string(ThemeDB.fallback_font, center + Vector2(-3.0, font_size * 0.36), "?", HORIZONTAL_ALIGNMENT_CENTER, 7.0, font_size, glyph_color)
+	elif placement_enabled and cell_size >= 20.0:
+		draw_string(ThemeDB.fallback_font, origin + Vector2(2.0, 8.0), "?", HORIZONTAL_ALIGNMENT_LEFT, 7.0, 7, Color("#c8d6ce", 0.88))
+
+func _draw_placement_preview_corners(rect: Rect2, color: Color) -> void:
+	# Preview targets use corner brackets; a committed tile is a solid filled square.
+	var length := minf(6.0, minf(rect.size.x, rect.size.y) * 0.28)
+	if length < 2.0:
+		return
+	var p := rect.position
+	var e := rect.end
+	draw_line(p, p + Vector2(length, 0), color, 2.0, true)
+	draw_line(p, p + Vector2(0, length), color, 2.0, true)
+	draw_line(Vector2(e.x, p.y), Vector2(e.x - length, p.y), color, 2.0, true)
+	draw_line(Vector2(e.x, p.y), Vector2(e.x, p.y + length), color, 2.0, true)
+	draw_line(Vector2(p.x, e.y), Vector2(p.x + length, e.y), color, 2.0, true)
+	draw_line(Vector2(p.x, e.y), Vector2(p.x, e.y - length), color, 2.0, true)
+	draw_line(e, e - Vector2(length, 0), color, 2.0, true)
+	draw_line(e, e - Vector2(0, length), color, 2.0, true)
 
 func _get_route_geometry() -> Dictionary:
-	# Single source of truth for all displayed/clickable route nodes.
-	# Keep profile deformation and base ellipse in this helper only.
+	# The map uses a discrete square-cell perimeter. Drawing, hover, clicking and
+	# landscape placement all consume this same geometry object.
+	var road_cells := _get_road_grid_coordinates()
+	var cell_size := _map_cell_size()
+	var map_rect := _get_map_rect()
+	var points: Array[Vector2] = []
+	var slot_indices: Array[int] = []
 	var count := route_cells.size()
-	var center := Vector2(size.x * 0.5, size.y * 0.51)
-	var radius_x := minf(size.x * 0.385, size.y * 0.78)
-	var radius_y := size.y * 0.34
-	match route_shape_id:
-		"narrow_ring":
-			radius_x *= 0.78
-			radius_y *= 0.77
-		"deep_descent":
-			radius_x *= 0.92
-			radius_y *= 0.88
-		"fractured_loop":
-			radius_x *= 1.04
-			radius_y *= 0.94
-	var cell_points: Array[Vector2] = []
 	if count > 0:
 		for i in range(count):
-			var angle := -PI * 0.5 + TAU * float(i) / float(count)
-			var point := center + Vector2(cos(angle) * radius_x, sin(angle) * radius_y)
-			# Profiles modify the contour but preserve a periodic closed route.
-			if route_shape_id == "deep_descent":
-				point += Vector2(cos(angle * 2.0) * radius_x * 0.055, sin(angle * 2.0 + 0.4) * radius_y * 0.07)
-			elif route_shape_id == "fractured_loop":
-				point += Vector2(cos(angle * 3.0) * radius_x * 0.095, sin(angle * 2.0) * radius_y * 0.09)
-			cell_points.append(point)
-	return {"center": center, "radius_x": radius_x, "radius_y": radius_y, "points": cell_points}
+			var slot := posmod(roundi(float(i) * float(road_cells.size()) / float(count)), road_cells.size())
+			var coord: Vector2i = road_cells[slot]
+			points.append(map_rect.position + (Vector2(coord) + Vector2(0.5, 0.5)) * cell_size)
+			slot_indices.append(slot)
+	var min_x := map_rect.end.x
+	var max_x := map_rect.position.x
+	var min_y := map_rect.end.y
+	var max_y := map_rect.position.y
+	for point in points:
+		min_x = minf(min_x, point.x)
+		max_x = maxf(max_x, point.x)
+		min_y = minf(min_y, point.y)
+		max_y = maxf(max_y, point.y)
+	var center := (Vector2(min_x, min_y) + Vector2(max_x, max_y)) * 0.5
+	var display_map := _get_world_display_cell_map(road_cells)
+	return {"center": center, "radius_x": (max_x - min_x) * 0.5, "radius_y": (max_y - min_y) * 0.5, "points": points, "road_cells": road_cells, "slot_indices": slot_indices, "map_rect": map_rect, "cell_size": cell_size, "world_display_cells": display_map}
 
 func _route_marker_size() -> float:
-	# Dense generated routes get smaller clickable/drawn markers so labels and hit
-	# targets do not merge in the minimum supported viewport.
-	return clampf(30.0 - maxf(0.0, float(route_cells.size() - 16)) * 1.2, 22.0, 30.0)
+	# Keep the placement/encounter badge inset in its square road cell.
+	return clampf(_map_cell_size() * 0.74, 12.0, 34.0)
 
 func _route_hit_radius() -> float:
-	return _route_marker_size() * 0.5 + 3.0
+	return clampf(_map_cell_size() * 0.38, 5.0, 18.0)
 
 func _find_closest_cell(position: Vector2) -> int:
 	if route_cells.is_empty():
 		return -1
 	var geometry: Dictionary = _get_route_geometry()
+	var map_rect: Rect2 = geometry["map_rect"]
+	var cell_size: float = geometry["cell_size"]
+	# Any click inside a square road tile selects the logical route node mapped to
+	# that tile. This is the whole-tile hitbox, not only a circular marker center.
+	if map_rect.has_point(position):
+		var col := clampi(int(floor((position.x - map_rect.position.x) / cell_size)), 0, MAP_COLUMNS - 1)
+		var row := clampi(int(floor((position.y - map_rect.position.y) / cell_size)), 0, MAP_ROWS - 1)
+		var coord := Vector2i(col, row)
+		var road_cells: Array = geometry["road_cells"]
+		var slot := road_cells.find(coord)
+		if slot >= 0:
+			var slot_indices: Array = geometry["slot_indices"]
+			var best_index := -1
+			var best_gap := 999999
+			for route_index in range(slot_indices.size()):
+				var gap := absi(int(slot_indices[route_index]) - slot)
+				gap = mini(gap, road_cells.size() - gap)
+				if gap < best_gap:
+					best_gap = gap
+					best_index = route_index
+			return best_index
 	var cell_points: Array = geometry["points"]
 	var closest_index := -1
 	var closest_distance := INF
@@ -487,6 +823,28 @@ func _draw_pixel_symbol(center: Vector2, symbol_id: String) -> void:
 			draw_rect(Rect2(center + Vector2(-1, -6), Vector2(3, 3)), Color("#f1e4ff"), true)
 			draw_rect(Rect2(center + Vector2(-3, -3), Vector2(7, 3)), Color("#d8b4ee"), true)
 			draw_rect(Rect2(center + Vector2(-2, 0), Vector2(5, 3)), Color("#9b83d5"), true)
+		"echo_spring":
+			draw_rect(Rect2(center + Vector2(-3, -5), Vector2(6, 10)), Color("#d9fff0"), true)
+			draw_rect(Rect2(center + Vector2(-5, -1), Vector2(10, 3)), Color("#438e89"), true)
+		"fault_line":
+			draw_rect(Rect2(center + Vector2(-4, -5), Vector2(3, 4)), Color("#ffd3e8"), true)
+			draw_rect(Rect2(center + Vector2(-1, -1), Vector2(3, 4)), Color("#ffd3e8"), true)
+			draw_rect(Rect2(center + Vector2(2, 2), Vector2(3, 3)), Color("#7c3b65"), true)
+		"spore_garden":
+			for spore_x in [-4.0, 0.0, 4.0]:
+				draw_rect(Rect2(center + Vector2(spore_x - 1.0, -4.0), Vector2(3, 4)), Color("#dcf6a3"), true)
+				draw_rect(Rect2(center + Vector2(spore_x, 0), Vector2(2, 5)), Color("#507b48"), true)
+		"crystal_hive":
+			draw_rect(Rect2(center + Vector2(-5, -2), Vector2(4, 6)), Color("#d6f3ff"), true)
+			draw_rect(Rect2(center + Vector2(-1, -6), Vector2(4, 10)), Color("#91d7ef"), true)
+			draw_rect(Rect2(center + Vector2(3, -1), Vector2(3, 5)), Color("#d6f3ff"), true)
+		"bone_orchard":
+			draw_rect(Rect2(center + Vector2(-1, -5), Vector2(3, 10)), Color("#f7e7c9"), true)
+			draw_rect(Rect2(center + Vector2(-4, -4), Vector2(8, 3)), Color("#f7e7c9"), true)
+			draw_rect(Rect2(center + Vector2(-4, 2), Vector2(8, 3)), Color("#a89a80"), true)
+		"echo_obelisk":
+			draw_rect(Rect2(center + Vector2(-3, -5), Vector2(6, 10)), Color("#eaddff"), true)
+			draw_rect(Rect2(center + Vector2(-1, -7), Vector2(2, 2)), Color("#ac8bd7"), true)
 		"event":
 			draw_rect(Rect2(center + Vector2(-4, -4), Vector2(8, 8)), Color("#c0eef0"), true)
 			draw_rect(Rect2(center + Vector2(-1, -1), Vector2(2, 2)), Color("#397d8a"), true)

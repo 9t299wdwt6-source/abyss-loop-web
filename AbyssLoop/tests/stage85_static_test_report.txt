@@ -1,0 +1,12 @@
+ABYSS LOOP — STAGE 85 STATIC TEST REPORT
+
+Targeted regression evidence:
+- tests/stage85_full_landscape_regression.py: 17/17 PASS
+- tests/stage84_square_grid_map_regression.py: 15/15 PASS
+- tests/placement_zone_regression.py: 6/6 PASS
+- tests/cross_system_interaction_regression.py: 14/14 PASS
+- tests/dual_placement_regression.py: 20/20 PASS
+- tests/landscape_secret_regression.py: 9/9 PASS
+- tests/world_field_regression.py: PASS (18 source checks + geometry)
+
+Scope is static/source/numerical only. The complete current Python suite: 111/111 PASS, recorded in tests/reports/STATIC_TEST_REPORT.txt. Godot 4.7.2 compilation/runtime, rendering, pointer/touch interaction and Web export remain unverified.

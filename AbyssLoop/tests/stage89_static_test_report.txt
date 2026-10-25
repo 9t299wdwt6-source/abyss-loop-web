@@ -1,0 +1,15 @@
+PASS: Godot runtime acceptance imports the real TileSystem
+PASS: new expedition asserts a positive persisted geometry seed
+PASS: runtime acceptance checks initial discovery coverage
+PASS: runtime acceptance validates discovery IDs and road exclusion
+PASS: runtime acceptance checks visit-driven reveal expands the mask
+PASS: save checkpoint stores discovery mask and active contour seed
+PASS: save/restore compares discovery mask and geometry seed exactly
+PASS: legacy snapshot migration is tested through real manager restore
+PASS: legacy migration expects every off-road cell
+PASS: manager restores missing discovery mask as fully discovered off-road map
+PASS: map snapshot validator still bounds discovery mask and rejects invalid cells
+PASS: CI runs the autoload-aware real gameplay acceptance runner
+PASS: runner scene points to the acceptance script
+STAGE 89 MAP RUNTIME GATE REGRESSION PASSED: 13/13 source contracts
+Source-level contracts only; runtime not confirmed: actual Godot acceptance still must execute the runner in CI.

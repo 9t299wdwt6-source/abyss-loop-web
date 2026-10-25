@@ -4,11 +4,13 @@ const ExpeditionManagerScript = preload("res://scripts/systems/expedition_manage
 const RouteViewScript = preload("res://scripts/ui/route_view.gd")
 const BaseSystemScript = preload("res://scripts/systems/base_system.gd")
 const InventorySystemScript = preload("res://scripts/systems/inventory_system.gd")
+const TileSystemScript = preload("res://scripts/systems/tile_system.gd")
 const FeedbackSystemScript = preload("res://scripts/systems/feedback_system.gd")
 const DeveloperDiagnosticsReportScript = preload("res://scripts/ui/developer_diagnostics_report.gd")
 const StatusEffectPresenterScript = preload("res://scripts/ui/status_effect_presenter.gd")
 const ItemTextPresenterScript = preload("res://scripts/ui/item_text_presenter.gd")
 const RunDebriefPresenterScript = preload("res://scripts/ui/run_debrief_presenter.gd")
+const InventoryDragButtonScript = preload("res://scripts/ui/inventory_drag_button.gd")
 
 # Original pixel-art abyss palette: basalt, moss, jade light, lantern amber, and rare crystal.
 const C_BG := Color("#0a1821")
@@ -71,8 +73,12 @@ var pause_button: Button
 var return_button: Button
 var speed_label: Label
 var equipment_label: Label
+var backpack_button: Button
+var armory_page_index: int = 0
 var log_label: Label
 var tile_hand_grid: GridContainer
+var tile_exchange_button: Button
+var loot_preparation_label: Label
 var tile_preview_label: Label
 var tile_hand_signature := ""
 var selected_tile_hand_index := -1
@@ -350,8 +356,10 @@ func _apply_keyboard_focus_outline(control: Control) -> void:
 	focus_style.set_corner_radius_all(3)
 	control.add_theme_stylebox_override("focus", focus_style)
 
-func _button(text_value: String, callback: Callable, accent: bool = false) -> Button:
+func _button(text_value: String, callback: Callable, accent: bool = false, script_override: Script = null) -> Button:
 	var button := Button.new()
+	if script_override != null:
+		button.set_script(script_override)
 	button.text = text_value
 	button.custom_minimum_size = Vector2(0, 40)
 	button.focus_mode = Control.FOCUS_ALL
@@ -424,6 +432,8 @@ func _clear_screen() -> void:
 	log_scroll = null
 	tile_hand_grid = null
 	tile_preview_label = null
+	tile_exchange_button = null
+	loot_preparation_label = null
 	tile_hand_signature = ""
 	exp_metrics.clear()
 	selected_tile_hand_index = -1
@@ -632,6 +642,7 @@ func _render_base() -> void:
 	facility_column.add_theme_constant_override("separation", 8)
 	top_row.add_child(facility_column)
 	facility_column.add_child(_label(_t("base.infrastructure.title"), 12, C_MUTED, true))
+	facility_column.add_child(_label("Пыль утраченных вещей: %d · добывается при вытеснении предметов из полного рюкзака; улучшает Переработчик минералов." % GameState.echo_dust, 11, C_GOLD, true))
 	for building_id in ContentRegistry.BUILDINGS.keys():
 		_build_building_card(facility_column, str(building_id))
 	var bottom_panel := _make_panel(base_content, C_PANEL, 16)
@@ -655,6 +666,9 @@ func _render_base() -> void:
 	stats.add_child(_label(_t("base.statistics.best_loop") % GameState.best_loop, 13, C_TEXT, true))
 	stats.add_child(_label(_t("base.statistics.buildings") % _total_building_levels(), 13, C_TEXT, true))
 	stats.add_child(_label(_t("base.statistics.research") % [GameState.unlocked_nodes.size(), ContentRegistry.BASE_RESEARCH.size()], 13, C_TEXT, true))
+	var trophies: Dictionary = GameState.bestiary_trophies
+	bottom_box.add_child(_label("Бестиарий трофеев · пыльца %d · призма %d · кости %d · эхо %d" % [int(trophies.get("spore_pollen", 0)), int(trophies.get("prism_fragment", 0)), int(trophies.get("bone_fragment", 0)), int(trophies.get("echo_residue", 0))], 11, C_MUTED))
+	bottom_box.add_child(_label("Постоянный ресурс · пыль утраченных вещей: %d / %d" % [GameState.echo_dust, GameState.MAX_ECHO_DUST], 11, C_GOLD, true))
 	if not GameState.last_summary.is_empty():
 		var last: Dictionary = GameState.last_summary
 		var outcome_text := "успешное возвращение" if str(last.get("outcome", "")) == "return" else "поражение"
@@ -781,12 +795,18 @@ func _build_building_card(parent: Node, building_id: String) -> void:
 	description.add_child(_label("Уровень %d / %d" % [level, int(def.max_level)], 11, C_ACCENT))
 	description.add_child(_label(str(def.effect), 11, C_MUTED))
 	var run_checkpoint_active: bool = GameState.has_saved_expedition()
-	var button_text := "ПОСЛЕ ЗАБЕГА" if run_checkpoint_active else ("МАКСИМУМ" if level >= int(def.max_level) else "Улучшить\n%d мат. · %d ред." % [int(cost.scrap), int(cost.crystals)])
+	var cost_text := "%d мат. · %d ред." % [int(cost.scrap), int(cost.crystals)]
+	var echo_dust_cost := int(cost.get("echo_dust", 0))
+	if echo_dust_cost > 0:
+		cost_text += " · %d пыли" % echo_dust_cost
+	var button_text := "ПОСЛЕ ЗАБЕГА" if run_checkpoint_active else ("МАКСИМУМ" if level >= int(def.max_level) else "Улучшить\n" + cost_text)
 	var upgrade_button := _button(button_text, Callable(self, "_on_upgrade_pressed").bind(building_id), level < int(def.max_level) and not run_checkpoint_active)
 	upgrade_button.custom_minimum_size = Vector2(132, 58)
 	upgrade_button.disabled = level >= int(def.max_level) or run_checkpoint_active
 	if run_checkpoint_active:
 		upgrade_button.tooltip_text = "Сначала завершите или отмените сохранённую экспедицию."
+	elif echo_dust_cost > GameState.echo_dust:
+		upgrade_button.tooltip_text = "Не хватает пыли утраченных вещей: нужно %d, доступно %d. Вытесненные предметы конвертируются после завершения экспедиции." % [echo_dust_cost, GameState.echo_dust]
 	row.add_child(upgrade_button)
 
 func _resume_expedition() -> void:
@@ -964,53 +984,66 @@ func _confirm_research_reset() -> void:
 	_open_research_tree(str(result.get("message", "Перераспределение завершено.")))
 
 func _open_armory() -> void:
-	var slot_names := {"weapon": "Оружие", "armor": "Броня", "core": "Ядро"}
+	var slot_names: Dictionary = InventorySystemScript.SLOT_NAMES
 	var equipped_lines: Array[String] = []
-	for slot in ["weapon", "armor", "core"]:
-		var item: Dictionary = GameState.loadout.get(slot, {})
+	for slot_value in InventorySystemScript.EQUIPMENT_SLOTS:
+		var slot := str(slot_value)
+		var item_value: Variant = GameState.loadout.get(slot, {})
+		var item: Dictionary = item_value if typeof(item_value) == TYPE_DICTIONARY else {}
 		var item_level := int(item.get("upgrade_level", 0))
 		var level_suffix := " +%d" % item_level if item_level > 0 else ""
-		equipped_lines.append("%s: %s%s" % [slot_names[slot], str(item.get("name", "пусто")) if not item.is_empty() else "пусто", level_suffix])
-	var body_text := "Материалы: %d · кристаллы: %d\n\nТекущая экипировка:\n%s\n\nВыберите предмет для экипировки, улучшения или разбора. Разбор требует отдельного подтверждения; экипированный предмет разобрать нельзя." % [GameState.scrap, GameState.crystals, "\n".join(equipped_lines)]
+		equipped_lines.append("%s: %s%s" % [slot_names.get(slot, slot), str(item.get("name", "пусто")) if not item.is_empty() else "пусто", level_suffix])
+	var page_size := 12
+	var page_count := maxi(1, ceili(float(GameState.armory.size()) / float(page_size)))
+	armory_page_index = clampi(armory_page_index, 0, page_count - 1)
+	var first_item := armory_page_index * page_size
+	var last_item := mini(GameState.armory.size(), first_item + page_size)
+	var body_text := "Материалы: %d · кристаллы: %d\n\nШесть слотов экипировки:\n%s\n\nАрсенал хранит постоянную коллекцию. Выберите предмет, чтобы надеть его, улучшить или разобрать. Страница %d/%d." % [GameState.scrap, GameState.crystals, "\n".join(equipped_lines), armory_page_index + 1, page_count]
 	var buttons: Array = []
-	var first_item := maxi(0, GameState.armory.size() - 5)
 	var comparison_lines: Array[String] = []
-	for i in range(first_item, GameState.armory.size()):
-		var item: Dictionary = GameState.armory[i]
+	for i in range(first_item, last_item):
+		var item_value: Variant = GameState.armory[i]
+		if typeof(item_value) != TYPE_DICTIONARY:
+			continue
+		var item: Dictionary = item_value
 		var comparison := _format_item_comparison(item)
 		var upgrade_level := int(item.get("upgrade_level", 0))
 		var level_suffix := " · +%d" % upgrade_level if upgrade_level > 0 else ""
-		var affix_detail := str(item.get("affix_description", ""))
-		if i >= maxi(first_item, GameState.armory.size() - 3):
-			var recent_item_line := "%s%s — %s; набор %s." % [str(item.get("name", "Предмет")), level_suffix, _format_item_bonus(item), str(item.get("set_name", "без набора"))]
-			if not affix_detail.is_empty():
-				recent_item_line += " Модификаторы: " + affix_detail
-			comparison_lines.append(recent_item_line)
-		var text_value := "Управлять: %s%s · %s" % [str(item.get("name", "Предмет")), level_suffix, comparison]
-		var item_tooltip := str(item.get("archetype_description", ""))
-		if not affix_detail.is_empty():
-			item_tooltip = (item_tooltip + "\n" if not item_tooltip.is_empty() else "") + affix_detail
-		buttons.append({"text": text_value, "callback": Callable(self, "_open_armory_item").bind(str(item.get("id", ""))), "accent": false, "tooltip": item_tooltip})
+		if i >= maxi(first_item, last_item - 3):
+			comparison_lines.append("%s%s — %s; набор %s." % [str(item.get("name", "Предмет")), level_suffix, _format_item_bonus(item), str(item.get("set_name", "без набора"))])
+		var text_value := "%02d · %s%s · %s" % [i + 1, str(item.get("name", "Предмет")), level_suffix, comparison]
+		buttons.append({"text": text_value, "callback": Callable(self, "_open_armory_item").bind(str(item.get("id", ""))), "accent": false})
 	if not comparison_lines.is_empty():
-		body_text += "\n\nПоследние предметы и эффекты:\n" + "\n".join(comparison_lines)
-	body_text += "\n\nНаборы экипировки (активные отмечены ✓):\n" + "\n".join(inventory_system.set_summary(GameState.loadout))
+		body_text += "\n\nНесколько предметов этой страницы:\n" + "\n".join(comparison_lines)
+	body_text += "\n\nНаборы: " + " · ".join(inventory_system.set_summary(GameState.loadout))
 	var current_gear_stats: Dictionary = inventory_system.total_equipment_stats(GameState.loadout)
 	var active_gear_synergies: Array = current_gear_stats.get("active_synergies", [])
-	body_text += "\n\nАрхетипные синергии:\n" + (_format_value_list(active_gear_synergies) if not active_gear_synergies.is_empty() else "Нет активной синергии — попробуйте сочетать профиль оружия, брони и ядра.")
-	for slot in ["weapon", "armor", "core"]:
-		if not GameState.loadout.get(slot, {}).is_empty():
-			buttons.append({"text": "Снять: %s" % slot_names[slot], "callback": Callable(self, "_unequip_armory_slot").bind(slot), "accent": false})
+	body_text += "\nСинергии: " + (_format_value_list(active_gear_synergies) if not active_gear_synergies.is_empty() else "пока нет — сочетайте архетипы разных слотов")
+	for slot_value in InventorySystemScript.EQUIPMENT_SLOTS:
+		var slot := str(slot_value)
+		var equipped_value: Variant = GameState.loadout.get(slot, {})
+		if typeof(equipped_value) == TYPE_DICTIONARY and not equipped_value.is_empty():
+			buttons.append({"text": "Снять: %s" % slot_names.get(slot, slot), "callback": Callable(self, "_unequip_armory_slot").bind(slot), "accent": false})
+	if page_count > 1:
+		buttons.append({"text": "← Предыдущая страница", "callback": Callable(self, "_change_armory_page").bind(-1), "accent": false, "disabled": armory_page_index <= 0})
+		buttons.append({"text": "Следующая страница →", "callback": Callable(self, "_change_armory_page").bind(1), "accent": false, "disabled": armory_page_index >= page_count - 1})
 	buttons.append({"text": "Закрыть", "callback": Callable(self, "_close_overlay"), "accent": true})
 	if GameState.armory.is_empty():
-		body_text += "\n\nАрсенал пока пуст. Предметы могут выпасть с противников."
+		body_text += "\n\nАрсенал пока пуст. Предметы выпадают с противников; найденное в экспедиции сначала попадает в рюкзак и не надевается автоматически."
 	_show_modal("Арсенал убежища", body_text, buttons, "armory")
+
+func _change_armory_page(delta: int) -> void:
+	var page_count := maxi(1, ceili(float(GameState.armory.size()) / 12.0))
+	armory_page_index = clampi(armory_page_index + delta, 0, page_count - 1)
+	_open_armory()
+
 
 func _open_armory_item(item_id: String) -> void:
 	var item: Dictionary = GameState.get_armory_item(item_id)
 	if item.is_empty():
 		_open_message("Предмет не найден", "Он мог быть уже разобран или удалён из арсенала.")
 		return
-	var slot_names := {"weapon": "Оружие", "armor": "Броня", "core": "Ядро"}
+	var slot_names: Dictionary = InventorySystemScript.SLOT_NAMES
 	var upgrade_level := int(item.get("upgrade_level", 0))
 	var equipped: bool = GameState.is_item_equipped(item_id)
 	var upgrade_cost: Dictionary = inventory_system.get_upgrade_cost(item)
@@ -1025,6 +1058,8 @@ func _open_armory_item(item_id: String) -> void:
 		body_text += "\n\nМодификаторы предмета: " + affix_detail
 	if bool(item.get("is_secret_relic", false)):
 		body_text += "\n\nТайная реликвия: получена за раскрытие скрытого события. Её набор и бонусы сохраняются в арсенале между экспедициями."
+	if not str(item.get("landscape_affinity", "")).is_empty():
+		body_text += "\n\nСвязь с ландшафтом: %s. При проходе через этот участок активируется эффект %s." % [str(item.get("affinity_name", item.get("landscape_affinity", ""))), str(item.get("affinity_effect", {}))]
 	var buttons: Array = []
 	buttons.append({"text": "Надеть предмет", "callback": Callable(self, "_equip_armory_item").bind(item_id), "accent": true, "disabled": equipped})
 	if bool(upgrade_cost.get("available", false)):
@@ -1045,7 +1080,7 @@ func _format_value_list(values: Array) -> String:
 
 func _format_loadout_synergy_preview(candidate_item: Dictionary) -> String:
 	var slot := str(candidate_item.get("slot", ""))
-	if not ["weapon", "armor", "core"].has(slot):
+	if not InventorySystemScript.EQUIPMENT_SLOTS.has(slot):
 		return "Синергия: неизвестный слот предмета."
 	var current_stats: Dictionary = inventory_system.total_equipment_stats(GameState.loadout)
 	var candidate_loadout: Dictionary = GameState.loadout.duplicate(true)
@@ -1366,6 +1401,15 @@ func _render_expedition() -> void:
 	tile_hand_grid.add_theme_constant_override("h_separation", 6)
 	tile_hand_grid.add_theme_constant_override("v_separation", 6)
 	tile_box.add_child(tile_hand_grid)
+	tile_exchange_button = _button("ПЕРЕПИСАТЬ КАРТУ · 1 КРИСТАЛЛ", Callable(self, "_on_exchange_selected_tile"), false)
+	tile_exchange_button.custom_minimum_size.y = 36
+	tile_exchange_button.tooltip_text = "Выберите карту в руке: за 1 кристалл можно заменить её другой картой один раз за цикл. Во время боя и события недоступно."
+	tile_box.add_child(tile_exchange_button)
+	loot_preparation_label = _label("Подготовка добычи: нет активных бонусов.", 11, C_GOLD)
+	loot_preparation_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	loot_preparation_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	loot_preparation_label.tooltip_text = "Подготовленные бонусы выпадают только после успешной обычной или элитной находки. Боссовые реликвии не расходуют эту подготовку."
+	tile_box.add_child(loot_preparation_label)
 	tile_preview_label = _label(_t("expedition.tiles.preview_title") + "\n" + _t("expedition.tiles.preview_description"), 12, C_MUTED)
 	tile_preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tile_preview_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1381,6 +1425,10 @@ func _render_expedition() -> void:
 	equipment_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	equipment_label.tooltip_text = "Сводка текущих предметов, характеристик, наборов и активных синергий. Прокрутите правую панель, если текст не помещается по высоте."
 	gear_box.add_child(equipment_label)
+	backpack_button = _button("РЮКЗАК · 0/12", Callable(self, "_open_run_backpack"), true)
+	backpack_button.custom_minimum_size.y = 40
+	backpack_button.tooltip_text = "Открыть 12 ячеек рюкзака, 6 ячеек походного тайника и шесть слотов экипировки. Переполнение не теряется: предметы сохраняются в походном тайнике или постоянном арсенале. Открытие приостанавливает экспедицию."
+	gear_box.add_child(backpack_button)
 	var log_panel := _make_panel(right_column, C_PANEL, 12)
 	var log_box := VBoxContainer.new()
 	log_box.add_theme_constant_override("separation", 4)
@@ -1431,7 +1479,7 @@ func _sync_expedition_view(rebuild_tiles: bool) -> void:
 		selected_tile_id = str(manager.tile_hand[selected_tile_hand_index].get("name", "тайл"))
 	var current_is_boss: bool = not manager.enemy.is_empty() and bool(manager.enemy.get("is_boss", false))
 	var current_is_elite: bool = not manager.enemy.is_empty() and bool(manager.enemy.get("is_elite", false))
-	route_view.configure(manager.route, manager.hero_progress_for_draw(), manager.placed_tiles, int(manager.combat_cell), selected_tile_hand_index >= 0, selected_tile_id, current_is_boss, manager.get_route_shape_id(), manager.world_tiles, current_is_elite, _get_tile_placement_block_reason().is_empty())
+	route_view.configure(manager.route, manager.hero_progress_for_draw(), manager.placed_tiles, int(manager.combat_cell), selected_tile_hand_index >= 0, selected_tile_id, current_is_boss, manager.get_route_shape_id(), manager.world_tiles, current_is_elite, _get_tile_placement_block_reason().is_empty(), manager.get_route_geometry_seed(), manager.discovered_world_cells)
 	if objective_label != null:
 		var objective: Dictionary = manager.run_objective
 		if not objective.is_empty():
@@ -1509,6 +1557,27 @@ func _sync_expedition_view(rebuild_tiles: bool) -> void:
 		speed_label.text = _t("expedition.controls.speed") % float(manager.speed)
 	if equipment_label != null:
 		equipment_label.text = "\n".join(manager.get_equipment_summary())
+	if loot_preparation_label != null:
+		var pending_rarity: float = clampf(float(manager.run_ledger.get("pending_item_rarity_bonus", 0.0)), 0.0, 0.18)
+		var pending_drop: float = clampf(float(manager.run_ledger.get("pending_item_drop_bonus", 0.0)), 0.0, 0.30)
+		var worn_rarity: float = clampf(float(manager.hero.get("equipped_rare_find_bonus", 0.0)), 0.0, 0.12)
+		var loot_lines: Array[String] = []
+		if pending_rarity > 0.0:
+			loot_lines.append("Подготовка редкости +%d п.п." % int(round(pending_rarity * 100.0)))
+		if pending_drop > 0.0:
+			loot_lines.append("Подготовка шанса предмета +%d п.п." % int(round(pending_drop * 100.0)))
+		if worn_rarity > 0.0:
+			loot_lines.append("Надетый комплект: редкость +%d п.п." % int(round(worn_rarity * 100.0)))
+		var preparation_text := "ДОБЫЧА: " + (" · ".join(loot_lines) if not loot_lines.is_empty() else "нет активной подготовки")
+		loot_preparation_label.text = preparation_text + "\n" + _format_live_loot_forecast()
+		loot_preparation_label.tooltip_text = _format_live_loot_forecast(true) + "\n\nШанс предмета сначала проверяется отдельно; редкость бросается только после успешной находки. Именная экипировка зарегистрированного босса — отдельная гарантированная награда."
+	if tile_exchange_button != null:
+		var exchange_preview: Dictionary = manager.get_tile_exchange_preview(selected_tile_hand_index)
+		tile_exchange_button.disabled = not bool(exchange_preview.get("ok", false))
+		tile_exchange_button.tooltip_text = str(exchange_preview.get("reason", "Выберите карту в руке."))
+	if backpack_button != null:
+		backpack_button.text = "РЮКЗАК · %d/%d" % [manager.bag.size(), manager.BACKPACK_CAPACITY]
+		backpack_button.disabled = not manager.pending_event.is_empty() or int(manager.pending_perk_count) > 0 or not manager.pending_end_outcome.is_empty()
 	if log_label != null:
 		var recent: Array[String] = []
 		for i in range(mini(12, manager.event_log.size())):
@@ -1528,6 +1597,28 @@ func _sync_expedition_view(rebuild_tiles: bool) -> void:
 		_show_event_choices()
 	elif int(manager.pending_perk_count) > 0 and modal_kind != "perk":
 		_show_perk_choices()
+
+func _format_live_loot_forecast(detailed: bool = false) -> String:
+	if manager == null or not is_instance_valid(manager):
+		return "Шансы добычи появятся после начала экспедиции."
+	var ledger: Dictionary = manager.run_ledger
+	var echo_charges := clampi(int(ledger.get("echo_item_charges", 0)), 0, 4)
+	var pending_drop := clampf(float(ledger.get("pending_item_drop_bonus", 0.0)), 0.0, 0.30)
+	var pending_rarity := clampf(float(ledger.get("pending_item_rarity_bonus", 0.0)), 0.0, 0.18)
+	var equipped_rarity := clampf(float(manager.hero.get("equipped_rare_find_bonus", 0.0)), 0.0, 0.12)
+	var reward_bonus := manager.combat_reward_bonus if not manager.enemy.is_empty() else 0.0
+	var enemy_chance: float = manager.loot_system.get_equipment_drop_chance("enemy", reward_bonus, echo_charges, pending_drop)
+	var elite_chance: float = manager.loot_system.get_equipment_drop_chance("elite", reward_bonus, echo_charges, pending_drop)
+	var cache_chance: float = manager.loot_system.get_equipment_drop_chance("cache", 0.0, echo_charges, pending_drop)
+	var enemy_bias: float = inventory_system.get_effective_rarity_bonus(equipped_rarity, pending_rarity, manager.loot_system.get_source_rarity_bonus("enemy"))
+	var elite_bias: float = inventory_system.get_effective_rarity_bonus(equipped_rarity, pending_rarity, manager.loot_system.get_source_rarity_bonus("elite"))
+	var cache_bias: float = inventory_system.get_effective_rarity_bonus(equipped_rarity, pending_rarity, manager.loot_system.get_source_rarity_bonus("cache"))
+	var enemy_distribution: Dictionary = inventory_system.get_rarity_distribution(enemy_bias)
+	var elite_distribution: Dictionary = inventory_system.get_rarity_distribution(elite_bias)
+	var cache_distribution: Dictionary = inventory_system.get_rarity_distribution(cache_bias)
+	if not detailed:
+		return "ШАНС ПРЕДМЕТА: враг %d%% · элита %d%% · тайник %d%% · босс 100%%\nКАЧЕСТВО (если предмет выпал): %s. Элита +4 п.п.; тайник +2 п.п. к шкале редкости." % [int(round(enemy_chance * 100.0)), int(round(elite_chance * 100.0)), int(round(cache_chance * 100.0)), manager.loot_system.format_rarity_distribution(enemy_distribution)]
+	return "ШАНС ПОЛУЧИТЬ ПРЕДМЕТ\nОбычный враг: %d%%\nЭлита: %d%%\nТайник: %d%%\nБосс: 100%% — именная награда по отдельным правилам\n\nКАЧЕСТВО ПРИ УСПЕШНОМ ДРОПЕ\nВраг: %s\nЭлита (+4 п.п.): %s\nТайник (+2 п.п.): %s\n\nВлияние экипировки и подготовки ограничено общим бонусом +25 п.п.; более редкие качества остаются менее вероятными." % [int(round(enemy_chance * 100.0)), int(round(elite_chance * 100.0)), int(round(cache_chance * 100.0)), manager.loot_system.format_rarity_distribution(enemy_distribution), manager.loot_system.format_rarity_distribution(elite_distribution), manager.loot_system.format_rarity_distribution(cache_distribution)]
 
 func _refresh_first_hour_guide() -> void:
 	if first_hour_guide_panel == null or not is_instance_valid(first_hour_guide_panel):
@@ -1608,11 +1699,11 @@ func _build_tile_hand() -> void:
 			tile_short = "%s · %d/%d" % [tile_short, copy_index, int(copies_by_tile_id[tile_id])]
 		var tile_definition: Dictionary = ContentRegistry.TILE_DEFS.get(tile_id, {})
 		var placement_zone := str(tile.get("placement_zone", tile_definition.get("placement_zone", "any")))
-		var zone_hint := " · ПОЛЕ" if placement_zone == "landscape" else (" · ДОРОГА" if placement_zone == "road" else "")
+		var zone_hint := " · ПОЛЕ" if placement_zone == "landscape" else (" · ПРИДОРОЖЬЕ" if placement_zone == "roadside" else (" · ДОРОГА" if placement_zone == "road" else ""))
 		var tile_label := "%s%s\n%s" % [tile_short, zone_hint, str(tile.get("name", tile_definition.get("name", "Тайл")))]
 		var button := _button(tile_label, Callable(self, "_on_tile_selected").bind(i), selected)
 		button.custom_minimum_size = Vector2(148, 64)
-		button.tooltip_text = ("Размещение: только ландшафт. " if placement_zone == "landscape" else ("Размещение: только дорога. " if placement_zone == "road" else "")) + str(tile.get("description", ""))
+		button.tooltip_text = ("Размещение: только ландшафт. " if placement_zone == "landscape" else ("Размещение: только рядом с дорогой. " if placement_zone == "roadside" else ("Размещение: только дорога. " if placement_zone == "road" else ""))) + str(tile.get("description", ""))
 		button.add_theme_font_size_override("font_size", 12)
 		tile_hand_grid.add_child(button)
 
@@ -1620,6 +1711,17 @@ func _on_manager_changed() -> void:
 	_refresh_header()
 	if screen_mode == "expedition":
 		_sync_expedition_view(false)
+
+func _on_exchange_selected_tile() -> void:
+	if manager == null or not is_instance_valid(manager):
+		return
+	var result: Dictionary = manager.exchange_tile(selected_tile_hand_index)
+	if notice_label != null:
+		notice_label.text = str(result.get("reason", "Обмен карты не выполнен."))
+	if bool(result.get("ok", false)):
+		_sync_expedition_view(true)
+		if route_view != null and is_instance_valid(route_view):
+			_on_world_cell_hovered(str(route_view.get("hovered_world_cell_id")))
 
 func _on_tile_selected(index: int) -> void:
 	if index < 0 or index >= manager.tile_hand.size():
@@ -1666,7 +1768,7 @@ func _on_route_cell_hovered(cell_index: int) -> void:
 			tile_preview_label.add_theme_color_override("font_color", C_RED)
 			return
 		var selected_tile: Dictionary = manager.tile_hand[selected_tile_hand_index]
-		var preview: Dictionary = manager.tile_system.get_placement_preview(manager.route, manager.placed_tiles, cell_index, selected_tile)
+		var preview: Dictionary = manager.tile_system.get_placement_preview(manager.route, manager.placed_tiles, cell_index, selected_tile, manager.equipment)
 		tile_preview_label.text = str(preview.get("text", preview.get("reason", "Прогноз недоступен.")))
 		tile_preview_label.add_theme_color_override("font_color", C_TEXT if bool(preview.get("ok", false)) else C_RED)
 		return
@@ -1717,7 +1819,10 @@ func _on_world_cell_hovered(cell_id: String) -> void:
 	if selected_tile_hand_index < 0 or selected_tile_hand_index >= manager.tile_hand.size():
 		var placed: Dictionary = manager.world_tiles.get(cell_id, {})
 		if placed.is_empty():
-			tile_preview_label.text = _t("tile.preview.empty.world") % cell_id
+			if TileSystemScript.is_map_world_cell_id(cell_id) and not manager.discovered_world_cells.has(cell_id):
+				tile_preview_label.text = _t("tile.preview.unknown.world")
+			else:
+				tile_preview_label.text = _t("tile.preview.empty.world") % cell_id
 		else:
 			tile_preview_label.text = _t("tile.preview.placed.world") % [str(placed.get("name", "Тайл")), str(placed.get("description", "")), int(placed.get("route_index", -1)) + 1]
 		tile_preview_label.add_theme_color_override("font_color", C_MUTED)
@@ -1728,7 +1833,7 @@ func _on_world_cell_hovered(cell_id: String) -> void:
 		tile_preview_label.add_theme_color_override("font_color", C_RED)
 		return
 	var selected_tile: Dictionary = manager.tile_hand[selected_tile_hand_index]
-	var preview: Dictionary = manager.tile_system.get_world_placement_preview(manager.route, manager.world_tiles, cell_id, selected_tile)
+	var preview: Dictionary = manager.tile_system.get_world_placement_preview(manager.route, manager.world_tiles, cell_id, selected_tile, manager.equipment, manager.get_route_shape_id(), manager.get_route_geometry_seed())
 	tile_preview_label.text = str(preview.get("text", preview.get("reason", "Прогноз недоступен.")))
 	tile_preview_label.add_theme_color_override("font_color", C_TEXT if bool(preview.get("ok", false)) else C_RED)
 
@@ -1870,8 +1975,20 @@ func _render_summary(summary: Dictionary) -> void:
 	_add_summary_metric(stats, "Материалы в забеге", str(summary.get("earned_scrap", 0)))
 	_add_summary_metric(stats, "Материалы сохранены", str(summary.get("kept_scrap", 0)))
 	_add_summary_metric(stats, "Редкий ресурс сохранён", str(summary.get("kept_crystals", 0)))
+	_add_summary_metric(stats, "Пыль утраченных вещей", "+%d · всего %d" % [int(summary.get("kept_echo_dust", 0)), int(summary.get("total_echo_dust", GameState.echo_dust))])
+	if int(summary.get("ejected_item_count", 0)) > 0:
+		_add_summary_metric(stats, "Вытеснено предметов", "%d · начисление зависит от редкости" % int(summary.get("ejected_item_count", 0)))
 	_add_summary_metric(stats, "Потеряно материалов", str(summary.get("lost_scrap", 0)))
 	_add_summary_metric(stats, "Потеряно редкого ресурса", str(summary.get("lost_crystals", 0)))
+	var earned_trophies_value: Variant = summary.get("earned_trophies", {})
+	var earned_trophies: Dictionary = earned_trophies_value if typeof(earned_trophies_value) == TYPE_DICTIONARY else {}
+	var kept_trophies_value: Variant = summary.get("kept_trophies", {})
+	var kept_trophies: Dictionary = kept_trophies_value if typeof(kept_trophies_value) == TYPE_DICTIONARY else {}
+	box.add_child(_label("Трофеи за экспедицию · собрано: пыльца %d, призма %d, кости %d, эхо %d · сохранено в бестиарии: %d, %d, %d, %d" % [int(earned_trophies.get("spore_pollen", 0)), int(earned_trophies.get("prism_fragment", 0)), int(earned_trophies.get("bone_fragment", 0)), int(earned_trophies.get("echo_residue", 0)), int(kept_trophies.get("spore_pollen", 0)), int(kept_trophies.get("prism_fragment", 0)), int(kept_trophies.get("bone_fragment", 0)), int(kept_trophies.get("echo_residue", 0))], 11, C_GOLD, true))
+	var cache_names_value: Variant = summary.get("field_cache_item_names", [])
+	var cache_names: Array = cache_names_value if typeof(cache_names_value) == TYPE_ARRAY else []
+	if not cache_names.is_empty():
+		box.add_child(_label("ПРЕДМЕТЫ В ПОХОДНОМ ТАЙНИКЕ (%d) · все уже сохранены в постоянном арсенале\n%s" % [cache_names.size(), "\n".join(PackedStringArray(cache_names))], 12, C_ACCENT, true))
 	var debrief: Dictionary = RunDebriefPresenterScript.build(summary)
 	var debrief_panel := _make_panel(box, C_PANEL_ALT, 12)
 	var debrief_layout := VBoxContainer.new()
@@ -2002,10 +2119,50 @@ func _show_modal(title_text: String, body_text: String, buttons: Array, kind: St
 	overlay.add_child(center)
 	var viewport_size: Vector2 = get_viewport_rect().size
 	var panel := _make_panel(center, Color("#1a2a31"), 22)
-	panel.custom_minimum_size = Vector2(minf(640.0, viewport_size.x - 48.0), minf(590.0, viewport_size.y - 48.0)) if kind == "settings" else Vector2(minf(560.0, viewport_size.x - 48.0), 0)
+	panel.custom_minimum_size = Vector2(minf(640.0, viewport_size.x - 48.0), minf(620.0, viewport_size.y - 48.0)) if kind in ["settings", "backpack"] else Vector2(minf(560.0, viewport_size.x - 48.0), 0)
 	panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var backpack_has_slot_grids := false
+	var backpack_footer: VBoxContainer = null
+	if kind == "backpack":
+		for button_value in buttons:
+			if typeof(button_value) == TYPE_DICTIONARY and not str(button_value.get("group", "")).is_empty():
+				backpack_has_slot_grids = true
+				break
 	var button_parent: VBoxContainer
-	if kind == "settings":
+	if kind == "backpack":
+		var backpack_layout := VBoxContainer.new()
+		backpack_layout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		backpack_layout.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		backpack_layout.add_theme_constant_override("separation", 8)
+		panel.add_child(backpack_layout)
+		backpack_layout.add_child(_label(title_text, 20, C_TEXT, true))
+		var backpack_info_scroll := ScrollContainer.new()
+		backpack_info_scroll.custom_minimum_size.y = minf(118.0, viewport_size.y * 0.17) if backpack_has_slot_grids else minf(305.0, viewport_size.y * 0.42)
+		backpack_info_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		backpack_info_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		backpack_layout.add_child(backpack_info_scroll)
+		var backpack_info := _label(body_text, 12, C_MUTED)
+		backpack_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		backpack_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		backpack_info_scroll.add_child(backpack_info)
+		button_parent = VBoxContainer.new()
+		button_parent.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button_parent.add_theme_constant_override("separation", 6)
+		if backpack_has_slot_grids:
+			var slots_scroll := ScrollContainer.new()
+			slots_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			slots_scroll.custom_minimum_size.y = minf(260.0, viewport_size.y * 0.36)
+			slots_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+			slots_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+			backpack_layout.add_child(slots_scroll)
+			slots_scroll.add_child(button_parent)
+			backpack_footer = VBoxContainer.new()
+			backpack_footer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			backpack_footer.add_theme_constant_override("separation", 6)
+			backpack_layout.add_child(backpack_footer)
+		else:
+			backpack_layout.add_child(button_parent)
+	elif kind == "settings":
 		# Settings remain one scrollable form; this child order is used by _open_settings().
 		var settings_box := VBoxContainer.new()
 		settings_box.add_theme_constant_override("separation", 12)
@@ -2048,14 +2205,44 @@ func _show_modal(title_text: String, body_text: String, buttons: Array, kind: St
 		button_parent.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button_parent.add_theme_constant_override("separation", 8)
 		modal_layout.add_child(button_parent)
+	var current_grid: GridContainer = null
+	var current_group := ""
 	for button_data in buttons:
+		var button_group := str(button_data.get("group", "")) if kind == "backpack" else ""
+		if not button_group.is_empty() and button_group != current_group:
+			current_grid = GridContainer.new()
+			current_grid.columns = 3
+			current_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			current_grid.add_theme_constant_override("h_separation", 8)
+			current_grid.add_theme_constant_override("v_separation", 8)
+			button_parent.add_child(current_grid)
+			current_group = button_group
+		elif button_group.is_empty():
+			current_grid = null
+			current_group = ""
 		var text_value := str(button_data.get("text", "Продолжить"))
 		var callback: Callable = button_data.get("callback", Callable(self, "_close_overlay"))
-		var button := _button(text_value, callback, bool(button_data.get("accent", false)))
+		var attach_inventory_behavior := kind == "backpack" and button_group in ["equipment_grid", "backpack_grid"]
+		var behavior_script: Script = InventoryDragButtonScript if attach_inventory_behavior else null
+		var button := _button(text_value, callback, bool(button_data.get("accent", false)), behavior_script)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.custom_minimum_size = Vector2(0, 64 if kind == "event" else (48 if kind == "perk" else 42))
+		button.custom_minimum_size = Vector2(0, 76 if not button_group.is_empty() else (64 if kind == "event" else (48 if kind == "perk" else 42)))
+		button.clip_text = false
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if not button_group.is_empty() else TextServer.AUTOWRAP_OFF
 		button.disabled = bool(button_data.get("disabled", false))
 		button.tooltip_text = str(button_data.get("tooltip", ""))
+		if attach_inventory_behavior and button.has_method("configure_inventory_control"):
+			button.call("configure_inventory_control", self, str(button_data.get("item_id", "")), str(button_data.get("equipment_slot", "")), int(button_data.get("inventory_cell_index", -1)), bool(button_data.get("draggable", false)))
+		var item_rarity := str(button_data.get("rarity", ""))
+		if not item_rarity.is_empty() and not button.disabled:
+			var rarity_colors := {"Обычный": Color("#7f9c95"), "Редкий": Color("#63b8e8"), "Эпический": Color("#bb8af5"), "Реликтовый": Color("#f3c86b"), "Элитная": Color("#ed9b75"), "Боссовая": Color("#f4b856"), "Тайная": Color("#81dca4")}
+			var rarity_border: Color = rarity_colors.get(item_rarity, Color("#7f9c95"))
+			for style_name in ["normal", "hover", "pressed", "focus"]:
+				var style_value: StyleBox = button.get_theme_stylebox(style_name).duplicate()
+				if style_value is StyleBoxFlat:
+					(style_value as StyleBoxFlat).border_color = rarity_border
+					(style_value as StyleBoxFlat).set_border_width_all(3)
+					button.add_theme_stylebox_override(style_name, style_value)
 		if button.disabled:
 			var disabled_style := StyleBoxFlat.new()
 			disabled_style.bg_color = Color("#1b292f")
@@ -2064,7 +2251,12 @@ func _show_modal(title_text: String, body_text: String, buttons: Array, kind: St
 			disabled_style.set_corner_radius_all(9)
 			button.add_theme_stylebox_override("disabled", disabled_style)
 			button.add_theme_color_override("font_disabled_color", C_MUTED)
-		button_parent.add_child(button)
+		if not button_group.is_empty() and current_grid != null:
+			current_grid.add_child(button)
+		elif kind == "backpack" and backpack_has_slot_grids and backpack_footer != null:
+			backpack_footer.add_child(button)
+		else:
+			button_parent.add_child(button)
 	call_deferred("_configure_overlay_focus", true, kind)
 
 func _prepare_overlay() -> void:
@@ -2150,6 +2342,141 @@ func _configure_overlay_focus(focus_initial: bool = false, kind_override: String
 					focus_target = target
 					break
 	call_deferred("_focus_control_if_valid", focus_target)
+
+func _open_run_backpack() -> void:
+	if manager == null or not is_instance_valid(manager) or not manager.active:
+		return
+	if not manager.pending_event.is_empty() or int(manager.pending_perk_count) > 0 or not manager.pending_end_outcome.is_empty():
+		_open_message("Рюкзак недоступен", "Сначала завершите событие, выбор улучшения или сохранение результата.")
+		return
+	manager.set_pause(true)
+	var lines: Array[String] = ["Экспедиция приостановлена. Левый клик — сравнить предмет. Правый клик — быстро надеть. Перетащите предмет в совместимый слот или другую ячейку.", "Новые находки появляются в начале рюкзака. При заполнении 12 ячеек старейшая вещь в ячейке 12 вытесняется. Перетаскивание меняет порядок будущего вытеснения.", "Рюкзак: %d/%d · 6 слотов экипировки." % [manager.bag.size(), manager.BACKPACK_CAPACITY]]
+	var active_loadout_stats: Dictionary = inventory_system.total_equipment_stats(manager.equipment)
+	var active_synergies: Array = active_loadout_stats.get("active_synergies", [])
+	var active_sets: Array = active_loadout_stats.get("active_sets", [])
+	lines.append("Синергии: %s" % (", ".join(active_synergies) if not active_synergies.is_empty() else "пока нет — попробуйте сочетать типы экипировки"))
+	lines.append("Комплекты: %s" % (", ".join(active_sets) if not active_sets.is_empty() else "не активны"))
+	var buttons: Array = []
+	for slot_value in InventorySystemScript.EQUIPMENT_SLOTS:
+		var slot := str(slot_value)
+		var item_value: Variant = manager.equipment.get(slot, {})
+		var item: Dictionary = item_value if typeof(item_value) == TYPE_DICTIONARY else {}
+		var slot_label := str(InventorySystemScript.SLOT_NAMES.get(slot, slot))
+		var item_name := str(item.get("name", "ПУСТО")) if not item.is_empty() else "ПУСТО"
+		var short_name := item_name.left(15) + ("…" if item_name.length() > 15 else "")
+		buttons.append({"text": "%s\n%s" % [slot_label, short_name], "callback": Callable(self, "_open_equipped_run_item").bind(slot), "accent": false, "disabled": false, "tooltip": "%s: %s\n%s\nПеретащите подходящий предмет сюда, чтобы экипировать." % [slot_label, item_name, _format_item_bonus(item) if not item.is_empty() else "Слот пуст"], "group": "equipment_grid", "equipment_slot": slot, "item_id": str(item.get("id", "")), "rarity": str(item.get("rarity", ""))})
+	for index in range(manager.BACKPACK_CAPACITY):
+		if index < manager.bag.size() and typeof(manager.bag[index]) == TYPE_DICTIONARY:
+			var bag_item: Dictionary = manager.bag[index]
+			var bag_name := str(bag_item.get("name", "Предмет"))
+			var bag_name_short := bag_name.left(14) + ("…" if bag_name.length() > 14 else "")
+			var slot_label := str(InventorySystemScript.SLOT_NAMES.get(str(bag_item.get("slot", "")), "Неизвестный слот"))
+			buttons.append({"text": "%02d · %s\n%s · %.0f" % [index + 1, bag_name_short, slot_label, inventory_system.item_power(bag_item)], "callback": Callable(self, "_open_run_backpack_item").bind(str(bag_item.get("id", ""))), "accent": false, "tooltip": "%s · %s\nСлот: %s\n%s\nПравый клик — быстро надеть; перетащите для сортировки." % [bag_name, str(bag_item.get("rarity", "Обычный")), slot_label, _format_item_bonus(bag_item)], "group": "backpack_grid", "item_id": str(bag_item.get("id", "")), "inventory_cell_index": index, "draggable": true, "rarity": str(bag_item.get("rarity", "Обычный"))})
+		else:
+			buttons.append({"text": "%02d\nПУСТО" % (index + 1), "callback": Callable(self, "_open_run_backpack"), "accent": false, "disabled": false, "tooltip": "Свободная ячейка. Перетащите предмет сюда, чтобы поменять очередь вытеснения.", "group": "backpack_grid", "inventory_cell_index": index, "draggable": false})
+	buttons.append({"text": "Закрыть рюкзак", "callback": Callable(self, "_close_overlay"), "accent": false})
+	buttons.append({"text": "Продолжить экспедицию", "callback": Callable(self, "_resume_after_backpack"), "accent": true})
+	_show_modal("Экипировка и рюкзак", "\n".join(lines), buttons, "backpack")
+
+func _open_equipped_run_item(slot: String) -> void:
+	if manager == null:
+		return
+	var item_value: Variant = manager.equipment.get(slot, {})
+	var item: Dictionary = item_value if typeof(item_value) == TYPE_DICTIONARY else {}
+	if item.is_empty():
+		_open_run_backpack()
+		return
+	var body := "%s\nРедкость: %s · уровень %d · улучшение +%d\nСлот: %s · сила %.1f\n\n%s" % [str(item.get("name", "Экипировка")), str(item.get("rarity", "Обычный")), int(item.get("rank", 1)), int(item.get("upgrade_level", 0)), InventorySystemScript.SLOT_NAMES.get(slot, slot), inventory_system.item_power(item), _format_item_bonus(item)]
+	var buttons: Array = [
+		{"text": "Снять в начало рюкзака", "callback": Callable(self, "_on_run_unequip").bind(slot), "accent": true},
+		{"text": "← К рюкзаку", "callback": Callable(self, "_open_run_backpack"), "accent": false}
+	]
+	_show_modal("Надетая экипировка", body, buttons, "backpack")
+
+func _open_run_backpack_item(item_id: String) -> void:
+	var item: Dictionary = manager.find_run_item(item_id) if manager != null else {}
+	if item.is_empty():
+		_open_run_backpack()
+		return
+	var slot := str(item.get("slot", ""))
+	var current_value: Variant = manager.equipment.get(slot, {})
+	var current: Dictionary = current_value if typeof(current_value) == TYPE_DICTIONARY else {}
+	var body := "%s · %s\nСлот: %s · ранг %d · улучшение +%d\nСила: %.1f\n\nСвойство: %s\nНабор: %s\n\nБонусы: %s" % [str(item.get("name", "Предмет")), str(item.get("rarity", "Обычный")), InventorySystemScript.SLOT_NAMES.get(slot, slot), int(item.get("rank", 1)), int(item.get("upgrade_level", 0)), inventory_system.item_power(item), str(item.get("archetype_description", "Базовые характеристики")), str(item.get("set_name", "без набора")), _format_item_bonus(item)]
+	if not str(item.get("landscape_affinity", "")).is_empty():
+		body += "\n\nЛандшафтная связь: %s. При проходе действует эффект %s. Если на том же секторе встретится соответствующее существо биома, реликвия дополнительно усиливает урон на %d%%." % [str(item.get("affinity_name", item.get("landscape_affinity", ""))), str(item.get("affinity_effect", {})), int(round(clampf(float(item.get("affinity_combat_bonus", 0.06)), 0.0, 0.12) * 100.0))]
+	body += "\n\nСейчас надето: %s" % (str(current.get("name", "ничего")) if not current.is_empty() else "слот пуст")
+	if not current.is_empty():
+		body += " · сила %.1f · бонусы %s" % [inventory_system.item_power(current), _format_item_bonus(current)]
+	var power_delta := inventory_system.item_power(item) - inventory_system.item_power(current) if not current.is_empty() else 0.0
+	body += "\nСравнение силы: %s" % ItemTextPresenterScript.format_item_comparison(not current.is_empty(), power_delta)
+	body += "\n\nСРАВНЕНИЕ БОНУСОВ\n" + ItemTextPresenterScript.format_stat_comparison(item, current)
+	var current_stats: Dictionary = inventory_system.total_equipment_stats(manager.equipment)
+	var candidate_loadout: Dictionary = manager.equipment.duplicate(true)
+	candidate_loadout[slot] = item.duplicate(true)
+	var candidate_stats: Dictionary = inventory_system.total_equipment_stats(candidate_loadout)
+	body += "\n\n" + ItemTextPresenterScript.format_loadout_synergy_preview(current_stats, candidate_stats, InventorySystemScript.SYNERGY_DEFS)
+	var buttons: Array = []
+	buttons.append({"text": "Надеть в слот · %s" % InventorySystemScript.SLOT_NAMES.get(slot, slot), "callback": Callable(self, "_on_run_equip").bind(item_id), "accent": true, "disabled": not inventory_system.can_equip_item(item, slot), "tooltip": "Правый клик по ячейке выполняет то же действие."})
+	buttons.append({"text": "← Назад к ячейкам", "callback": Callable(self, "_open_run_backpack"), "accent": false})
+	_show_modal("Предмет рюкзака", body, buttons, "backpack")
+
+func can_inventory_item_equip(item_id: String, slot: String) -> bool:
+	if manager == null or not InventorySystemScript.EQUIPMENT_SLOTS.has(slot):
+		return false
+	var item: Dictionary = manager.find_run_item(item_id)
+	return not item.is_empty() and inventory_system.can_equip_item(item, slot)
+
+func can_reorder_inventory_item(item_id: String, target_index: int) -> bool:
+	return manager != null and manager.can_reorder_run_bag_item(item_id, target_index)
+
+func on_inventory_quick_equip(item_id: String) -> void:
+	_on_run_equip(item_id)
+
+func on_inventory_drag_drop(item_id: String, slot: String, target_index: int) -> void:
+	if not slot.is_empty():
+		if not can_inventory_item_equip(item_id, slot):
+			_open_message("Несовместимый слот", "Этот предмет нельзя надеть в выбранный слот. Другие типы слотов останутся недоступны.")
+			return
+		_on_run_equip(item_id)
+		return
+	var result: Dictionary = manager.reorder_run_bag_item(item_id, target_index) if manager != null else {"ok": false, "message": "Экспедиция недоступна."}
+	if not bool(result.get("ok", false)):
+		_open_message("Порядок не изменён", str(result.get("message", "Не удалось переместить предмет.")))
+		return
+	_sync_expedition_view(false)
+	_open_run_backpack()
+
+func _on_run_equip(item_id: String) -> void:
+	var result: Dictionary = manager.equip_bag_item(item_id)
+	if not bool(result.get("ok", false)):
+		_open_message("Экипировка не изменена", str(result.get("message", "Не удалось надеть предмет.")))
+		return
+	_sync_expedition_view(false)
+	_open_run_backpack()
+
+func _on_run_unequip(slot: String) -> void:
+	var result: Dictionary = manager.unequip_run_slot(slot)
+	if not bool(result.get("ok", false)):
+		_open_message("Не удалось снять предмет", str(result.get("message", "Не удалось снять предмет.")))
+		return
+	_sync_expedition_view(false)
+	_open_run_backpack()
+
+func _on_run_discard(item_id: String) -> void:
+	var result: Dictionary = manager.discard_run_bag_item(item_id)
+	if not bool(result.get("ok", false)):
+		_open_message("Рюкзак не изменён", str(result.get("message", "Не удалось убрать предмет.")))
+		return
+	_sync_expedition_view(false)
+	_open_run_backpack()
+
+func _resume_after_backpack() -> void:
+	_close_overlay(false)
+	if manager != null and manager.active:
+		manager.set_pause(false)
+		_sync_expedition_view(false)
+		if pause_button != null:
+			call_deferred("_focus_control_if_valid", pause_button)
 
 func _open_message(title_text: String, body_text: String) -> void:
 	_show_modal(title_text, body_text, [{"text": "Понятно", "callback": Callable(self, "_close_overlay"), "accent": true}], "message")

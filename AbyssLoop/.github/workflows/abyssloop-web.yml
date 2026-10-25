@@ -120,6 +120,31 @@ jobs:
             --label "Automated engine QA (not human playtest)" \
             --godot-version "4.7.2.stable" --minimum-repeats 5
 
+      - name: Run 12-loop long expedition runtime acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_root="${RUNNER_TEMP}/AbyssLoopRuntimeAcceptance"
+          timeout 90s "$GODOT_BIN" --headless --path "$test_root" res://tests/long_expedition_runtime_acceptance_runner.tscn
+
+      - name: Capture Stage71 real-engine balance matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_root="${RUNNER_TEMP}/AbyssLoopRuntimeAcceptance"
+          mkdir -p "$RUNNER_TEMP/web-qa"
+          profile_data="$HOME/.local/share/godot/app_userdata/Abyss Loop CI Acceptance"
+          rm -f "$profile_data/STAGE71_BALANCE_MATRIX.json"
+          timeout 900s "$GODOT_BIN" --headless --path "$test_root" res://tests/stage71_balance_matrix_runner.tscn
+          capture="$profile_data/STAGE71_BALANCE_MATRIX.json"
+          test -s "$capture"
+          cp "$capture" "$RUNNER_TEMP/web-qa/STAGE71_BALANCE_MATRIX.json"
+          python3 tools/real_run_balance.py \
+            --input "$RUNNER_TEMP/web-qa/STAGE71_BALANCE_MATRIX.json" \
+            --output "$RUNNER_TEMP/web-qa/STAGE71_BALANCE_MATRIX_REPORT.md" \
+            --label "Automated engine QA — Stage71 matrix (not human playtest)" \
+            --godot-version "4.7.2.stable" --minimum-repeats 3
+
       - name: Export Godot Web build
         run: |
           set -euo pipefail

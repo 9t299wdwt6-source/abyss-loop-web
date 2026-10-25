@@ -1,7 +1,12 @@
 extends RefCounted
 class_name InventorySystem
 
-const SLOT_NAMES := {"weapon": "Оружие", "armor": "Броня", "core": "Ядро"}
+const SLOT_NAMES := {
+	"weapon": "Оружие", "helmet": "Шлем", "armor": "Броня",
+	"shield": "Щит", "amulet": "Амулет", "core": "Ядро бездны"
+}
+const EQUIPMENT_SLOTS: Array[String] = ["weapon", "helmet", "armor", "shield", "amulet", "core"]
+const BACKPACK_CAPACITY := 12
 const MAX_UPGRADE_LEVEL := 10
 
 # Affixes are data-driven: their numeric fields are aggregated centrally and
@@ -11,24 +16,46 @@ const ARCHETYPES := {
 		{"id": "assault", "name": "Штурм", "description": "Дополнительный урон", "stats": {"attack": 2}},
 		{"id": "precision", "name": "Точность", "description": "Повышенный шанс критического удара", "stats": {"crit": 0.035}},
 		{"id": "siphon", "name": "Сифон", "description": "Восстанавливает здоровье после победы", "stats": {"kill_heal": 3}},
-		{"id": "wound", "name": "Резец глубин", "description": "Шанс вызвать кровотечение при ударе", "stats": {"bleed_chance": 0.20, "bleed_damage": 2}}
+		{"id": "wound", "name": "Резец глубин", "description": "Шанс вызвать кровотечение при ударе", "stats": {"bleed_chance": 0.20, "bleed_damage": 2}},
+		{"id": "leech", "name": "Живой клинок", "description": "Возвращает часть нанесённого урона в здоровье героя", "stats": {"lifesteal": 0.08, "attack": 1}}
 	],
 	"armor": [
 		{"id": "bastion", "name": "Бастион", "description": "Усиленная защита и барьер в начале боя", "stats": {"defense": 1, "hp": 5, "barrier_on_encounter": 6}},
 		{"id": "scavenger", "name": "Сборщик", "description": "Дополнительные материалы при посещении тайлов", "stats": {"tile_scrap": 1}},
-		{"id": "field_medic", "name": "Полевой медик", "description": "Небольшое лечение после решения события", "stats": {"event_heal": 3}}
+		{"id": "field_medic", "name": "Полевой медик", "description": "Небольшое лечение после решения события", "stats": {"event_heal": 3}},
+		{"id": "phaseweave", "name": "Фазовая ткань", "description": "Шанс уклониться от атаки, не получив урон или негативный эффект", "stats": {"dodge_chance": 0.07, "hp": 3}}
+	],
+	"helmet": [
+		{"id": "observer", "name": "Наблюдатель", "description": "Считывает телеграфы: снижает урон особых атак элиты и боссов", "stats": {"crit": 0.025, "dodge_chance": 0.015, "special_damage_reduction": 0.07}},
+		{"id": "echo_hood", "name": "Глушитель эха", "description": "Снижает риск опасных встреч на ландшафте", "stats": {"tile_spawn_bonus": -0.035, "hp": 3}},
+		{"id": "deep_sight", "name": "Глубинное зрение", "description": "Находит слабые места элиты и боссов", "stats": {"crit": 0.04, "reward_bonus": 0.025, "elite_boss_damage_bonus": 0.06}}
+	],
+	"shield": [
+		{"id": "bulwark", "name": "Оплот", "description": "Щит гасит первые импульсы и особые атаки врага", "stats": {"defense": 1, "hp": 6, "barrier_on_encounter": 4, "special_damage_reduction": 0.03}},
+		{"id": "reflector", "name": "Призматический отражатель", "description": "Рассеивает усиленный телеграфированный удар", "stats": {"defense": 1, "dodge_chance": 0.025, "special_damage_reduction": 0.08}},
+		{"id": "rootguard", "name": "Корневой заслон", "description": "Защита помогает восстановиться после схватки", "stats": {"defense": 2, "kill_heal": 1}}
+	],
+	"amulet": [
+		{"id": "wayfinder", "name": "Нить проводника", "description": "Находит безопасные развилки и запасы", "stats": {"tile_scrap": 1, "tile_spawn_bonus": -0.02}},
+		{"id": "pulse_charm", "name": "Талисман импульса", "description": "Резонирует с героем и ускоряет атаки", "stats": {"speed": 0.035, "lifesteal": 0.02}},
+		{"id": "event_reader", "name": "Слухач событий", "description": "Читает повадки элиты и извлекает больше трофеев", "stats": {"event_heal": 3, "reward_bonus": 0.035, "elite_boss_damage_bonus": 0.04}},
+		{"id": "route_scribe", "name": "Чертёжник дороги", "description": "Увеличивает на 10% полезную боевую награду от трёхузловых формаций дороги", "stats": {"road_formation_bonus": 0.10}},
+		{"id": "relic_scout", "name": "Собиратель реликвий", "description": "Повышает шкалу редкости найденной экипировки на 5 п.п., но немного чаще привлекает встречи", "stats": {"rare_find_bonus": 0.05, "tile_spawn_bonus": 0.02}}
 	],
 	"core": [
 		{"id": "tempo", "name": "Темп", "description": "Ускоренные атаки", "stats": {"speed": 0.045}},
 		{"id": "resonance", "name": "Резонанс", "description": "Повышенная добыча за победу", "stats": {"reward_bonus": 0.08}},
-		{"id": "pathfinder", "name": "Разведчик", "description": "Снижает шанс встречи на узлах маршрута", "stats": {"tile_spawn_bonus": -0.04}}
+		{"id": "pathfinder", "name": "Разведчик", "description": "Снижает шанс встречи на узлах маршрута", "stats": {"tile_spawn_bonus": -0.04}},
+		{"id": "reflex", "name": "Рефлекс бездны", "description": "Уклонение и небольшое восстановление от атак", "stats": {"dodge_chance": 0.045, "lifesteal": 0.025}}
 	]
 }
 
 const SET_DEFS := {
 	"vanguard": {"name": "Авангард", "threshold": 2, "effects": {"defense": 2, "hp": 8}, "description": "2 предмета: +2 защиты и +8 здоровья."},
 	"scavenger": {"name": "Снабжение", "threshold": 2, "effects": {"tile_scrap": 2}, "description": "2 предмета: +2 материала при посещении тайлов."},
-	"resonance": {"name": "Резонанс", "threshold": 2, "effects": {"reward_bonus": 0.12, "crit": 0.025}, "description": "2 предмета: +12% награды и +2,5% критического шанса."}
+	"resonance": {"name": "Резонанс", "threshold": 2, "effects": {"reward_bonus": 0.12, "crit": 0.025}, "description": "2 предмета: +12% награды и +2,5% критического шанса."},
+	"phasebound": {"name": "Фазоход", "threshold": 2, "effects": {"dodge_chance": 0.04, "lifesteal": 0.03}, "description": "2 предмета: +4% уклонения и +3% вампиризма."},
+	"abyss_tracker": {"name": "Следопыт Бездны", "threshold": 2, "effects": {"biome_damage_bonus": 0.05, "biome_resistance": 0.025, "reward_bonus": 0.03}, "description": "2 предмета: +5% урона и 2,5% защиты против существ ландшафта, +3% добычи."}
 }
 
 # Archetype synergies are intentionally small, mutually exclusive bonuses.
@@ -42,7 +69,7 @@ const BOSS_RELIC_TABLES := {
 	],
 	"harvester": [
 		{"id": "harvester_needle", "name": "Игла Светожора", "slot": "weapon", "archetype": "wound", "archetype_name": "Резец глубин", "archetype_description": "Реликвия Светожора: импульсный клинок, вызывающий глубокие раны.", "set_id": "resonance", "stats": {"attack": 3, "crit": 0.025, "bleed_chance": 0.18, "bleed_damage": 3}},
-		{"id": "harvester_heart", "name": "Сердце импульсов", "slot": "core", "archetype": "resonance", "archetype_name": "Резонанс", "archetype_description": "Реликвия Светожора: усиливает импульс героя, добычу и восстановление после побед.", "set_id": "resonance", "stats": {"hp": 8, "speed": 0.06, "reward_bonus": 0.15, "kill_heal": 1}}
+		{"id": "harvester_heart", "name": "Сердце импульсов", "slot": "core", "archetype": "resonance", "archetype_name": "Резонанс", "archetype_description": "Реликвия Светожора: усиливает импульс героя, добычу и восстановление после побед.", "set_id": "resonance", "stats": {"hp": 8, "speed": 0.06, "reward_bonus": 0.15, "kill_heal": 1, "lifesteal": 0.04}}
 	],
 	"matriarch": [
 		{"id": "matriarch_scythe", "name": "Серп мшистой королевы", "slot": "weapon", "archetype": "siphon", "archetype_name": "Сифон", "archetype_description": "Реликвия Матриарха: высасывает силы у противников и улучшает снабжение.", "set_id": "scavenger", "stats": {"attack": 3, "kill_heal": 2, "tile_scrap": 1, "bleed_chance": 0.10}},
@@ -50,17 +77,21 @@ const BOSS_RELIC_TABLES := {
 	],
 	"bellkeeper": [
 		{"id": "bell_tuning_fork", "name": "Калибратор последнего звона", "slot": "weapon", "archetype": "precision", "archetype_name": "Точность", "archetype_description": "Реликвия Глашатая: концентрирует импульс в критический точный удар.", "set_id": "resonance", "stats": {"attack": 4, "crit": 0.055, "reward_bonus": 0.06}},
-		{"id": "bell_veil", "name": "Вуаль немого резонанса", "slot": "core", "archetype": "pathfinder", "archetype_name": "Разведчик", "archetype_description": "Реликвия Глашатая: гасит часть сигнала встречи и ускоряет атаки.", "set_id": "resonance", "stats": {"speed": 0.07, "crit": 0.035, "tile_spawn_bonus": -0.04, "reward_bonus": 0.08}}
+		{"id": "bell_veil", "name": "Вуаль немого резонанса", "slot": "core", "archetype": "pathfinder", "archetype_name": "Разведчик", "archetype_description": "Реликвия Глашатая: гасит часть сигнала встречи и ускоряет атаки.", "set_id": "resonance", "stats": {"speed": 0.07, "crit": 0.035, "tile_spawn_bonus": -0.04, "reward_bonus": 0.08, "dodge_chance": 0.055}}
 	],
 }
 
 # Secret discoveries award named relics instead of generic random drops.
 # Each choice leads to a different equipment profile and encourages a real build decision.
 const SECRET_RELIC_TEMPLATES := {
-	"echo_chart_core": {"name": "Компас за закрытой картой", "slot": "core", "archetype": "pathfinder", "archetype_name": "Разведчик", "archetype_description": "Тайная реликвия Архива: предсказывает безопасные участки и усиливает добычу.", "set_id": "resonance", "stats": {"hp": 8, "speed": 0.05, "reward_bonus": 0.10, "tile_spawn_bonus": -0.02}},
-	"riftwalker_edge": {"name": "Клинок незамкнутого разлома", "slot": "weapon", "archetype": "wound", "archetype_name": "Резец глубин", "archetype_description": "Тайная реликвия Разлома: оружие для точных ударов и кровоточащих ран.", "set_id": "vanguard", "stats": {"attack": 4, "crit": 0.04, "bleed_chance": 0.12, "bleed_damage": 2}},
-	"brood_shell": {"name": "Панцирь тихого выводка", "slot": "armor", "archetype": "bastion", "archetype_name": "Бастион", "archetype_description": "Тайная реликвия Питомника: переживает первые атаки, приносит материалы и лечит после побед.", "set_id": "scavenger", "stats": {"defense": 2, "hp": 14, "kill_heal": 2, "tile_scrap": 1, "barrier_on_encounter": 5}},
-	"snare_hunter_core": {"name": "Ядро приманивающего импульса", "slot": "core", "archetype": "resonance", "archetype_name": "Резонанс", "archetype_description": "Тайная реликвия Сети: увеличивает награду и слегка повышает шанс новой встречи.", "set_id": "resonance", "stats": {"speed": 0.07, "crit": 0.03, "reward_bonus": 0.18, "tile_spawn_bonus": 0.06}}
+	"echo_chart_core": {"name": "Компас за закрытой картой", "slot": "core", "archetype": "pathfinder", "archetype_name": "Разведчик", "archetype_description": "Тайная реликвия Архива: предсказывает безопасные участки и усиливает добычу.", "set_id": "resonance", "stats": {"hp": 8, "speed": 0.05, "reward_bonus": 0.10, "tile_spawn_bonus": -0.02, "dodge_chance": 0.04}},
+	"riftwalker_edge": {"name": "Клинок незамкнутого разлома", "slot": "weapon", "landscape_affinity": "fault_line", "affinity_name": "Трещина живой породы", "affinity_effect": {"reward_bonus": 0.08, "enemy_bonus": -0.04}, "archetype": "wound", "archetype_name": "Резец глубин", "archetype_description": "Тайная реликвия Разлома: оружие для точных ударов и кровоточащих ран.", "set_id": "vanguard", "stats": {"attack": 4, "crit": 0.04, "bleed_chance": 0.12, "bleed_damage": 2}},
+	"brood_shell": {"name": "Панцирь тихого выводка", "slot": "armor", "archetype": "bastion", "archetype_name": "Бастион", "archetype_description": "Тайная реликвия Питомника: переживает первые атаки, приносит материалы и лечит после побед.", "set_id": "scavenger", "stats": {"defense": 2, "hp": 14, "kill_heal": 2, "tile_scrap": 1, "barrier_on_encounter": 5, "lifesteal": 0.03}},
+	"snare_hunter_core": {"name": "Ядро приманивающего импульса", "slot": "core", "archetype": "resonance", "archetype_name": "Резонанс", "archetype_description": "Тайная реликвия Сети: увеличивает награду и слегка повышает шанс новой встречи.", "set_id": "resonance", "stats": {"speed": 0.07, "crit": 0.03, "reward_bonus": 0.18, "tile_spawn_bonus": 0.06}},
+	"prism_heart": {"name": "Сердце призматического улья", "slot": "core", "landscape_affinity": "crystal_hive", "affinity_name": "Кристальный улей", "affinity_effect": {"crystals": 1, "enemy_bonus": -0.06, "reward_bonus": 0.08}, "archetype": "reflex", "archetype_name": "Рефлекс бездны", "archetype_description": "Тайная реликвия улья и обелиска: превращает часть урона в здоровье и позволяет уклоняться от импульсов.", "set_id": "phasebound", "stats": {"hp": 6, "speed": 0.03, "reward_bonus": 0.08, "dodge_chance": 0.06, "lifesteal": 0.04}},
+	"echo_veil": {"name": "Вуаль немого импульса", "slot": "armor", "landscape_affinity": "echo_obelisk", "affinity_name": "Обелиск немого сигнала", "affinity_effect": {"spawn_bonus": -0.09, "reward_bonus": 0.05}, "archetype": "phaseweave", "archetype_name": "Фазовая ткань", "archetype_description": "Тайная реликвия, глушащая часть сигнала встреч ценой более опасной добычи.", "set_id": "phasebound", "stats": {"defense": 1, "hp": 8, "dodge_chance": 0.045, "tile_spawn_bonus": -0.04, "reward_bonus": 0.12}},
+	"rootwatch_mantle": {"name": "Мантия корневого хранителя", "slot": "armor", "landscape_affinity": "spore_garden", "affinity_name": "Сад спороносных колокольчиков", "affinity_effect": {"heal": 3, "enemy_bonus": -0.05}, "archetype": "phaseweave", "archetype_name": "Фазовая ткань", "archetype_description": "Тайная реликвия сада: корни смягчают удар, а живой импульс поддерживает героя.", "set_id": "phasebound", "stats": {"defense": 1, "hp": 10, "kill_heal": 2, "dodge_chance": 0.045, "lifesteal": 0.025}},
+	"bone_impulse_edge": {"name": "Клинок костяного импульса", "slot": "weapon", "landscape_affinity": "bone_orchard", "affinity_name": "Костяной сад", "affinity_effect": {"reward_bonus": 0.06, "enemy_bonus": -0.05}, "archetype": "leech", "archetype_name": "Живой клинок", "archetype_description": "Тайная реликвия костяного сада: усиливает удар и возвращает часть здоровья при попадании.", "set_id": "vanguard", "stats": {"attack": 3, "crit": 0.025, "bleed_chance": 0.08, "bleed_damage": 2, "lifesteal": 0.05}}
 }
 
 # Prefix/suffix affixes make rare drops differ beyond a single rarity multiplier.
@@ -73,6 +104,16 @@ const ITEM_AFFIXES := {
 	"bleeding_grooves": {"name": "Кровавые насечки", "description": "+6% к шансу кровотечения и +1 к его урону.", "slot": "weapon", "position": "suffix", "stats": {"bleed_chance": 0.06, "bleed_damage": 1}},
 	"reaping_echo": {"name": "Эхо жатвы", "description": "+1 лечение после победы.", "slot": "weapon", "position": "suffix", "stats": {"kill_heal": 1}},
 	"reinforced_plate": {"name": "Усиленная пластина", "description": "+1 защита и +4 здоровья.", "slot": "armor", "position": "prefix", "stats": {"defense": 1, "hp": 4}},
+	"hard_shell_helm": {"name": "Костяная накладка", "description": "+4 здоровья и +1% уклонения.", "slot": "helmet", "position": "prefix", "stats": {"hp": 4, "dodge_chance": 0.01}},
+	"deep_focus": {"name": "Фокус глубины", "description": "+2,5% критического шанса и +2% к награде.", "slot": "helmet", "position": "suffix", "stats": {"crit": 0.025, "reward_bonus": 0.02}},
+	"crystal_brace": {"name": "Кристальный упор", "description": "+1 защита и +2 к барьеру в начале боя.", "slot": "shield", "position": "prefix", "stats": {"defense": 1, "barrier_on_encounter": 2}},
+	"root_latch": {"name": "Корневая защёлка", "description": "+1 лечение после победы.", "slot": "shield", "position": "suffix", "stats": {"kill_heal": 1}},
+	"whisper_thread": {"name": "Нить шёпота", "description": "−2 п.п. к шансу встречи и +2% к награде.", "slot": "amulet", "position": "prefix", "stats": {"tile_spawn_bonus": -0.02, "reward_bonus": 0.02}},
+	"echo_pendant": {"name": "Подвеска эха", "description": "+2% скорости и +2% вампиризма.", "slot": "amulet", "position": "suffix", "stats": {"speed": 0.02, "lifesteal": 0.02}},
+	"trophy_compass": {"name": "Око собирателя", "description": "+8 процентных пунктов к шансу трофея биома при экипировке.", "slot": "amulet", "position": "prefix", "stats": {"trophy_find_bonus": 0.08}},
+	"bossproof_ridge": {"name": "Гребень предвестника", "description": "Ослабляет особые атаки элиты и боссов на 3%.", "slot": "helmet", "position": "suffix", "stats": {"special_damage_reduction": 0.03}},
+	"phase_catching_brace": {"name": "Ловец импульса", "description": "Ослабляет телеграфированные особые атаки на 4%.", "slot": "shield", "position": "prefix", "stats": {"special_damage_reduction": 0.04}},
+	"boss_lens": {"name": "Линза охотника", "description": "+4% урона элите и боссам.", "slot": "amulet", "position": "suffix", "stats": {"elite_boss_damage_bonus": 0.04}},
 	"moss_lining": {"name": "Моховая подкладка", "description": "+8 здоровья и +2 лечения после события.", "slot": "armor", "position": "prefix", "stats": {"hp": 8, "event_heal": 2}},
 	"phase_guard": {"name": "Фазовый щит", "description": "+1 защита и +3 барьера в начале боя.", "slot": "armor", "position": "prefix", "stats": {"defense": 1, "barrier_on_encounter": 3}},
 	"quiet_march": {"name": "Тихий переход", "description": "−4 п.п. к шансу встречи и +3 здоровья.", "slot": "armor", "position": "suffix", "stats": {"tile_spawn_bonus": -0.04, "hp": 3}},
@@ -83,7 +124,23 @@ const ITEM_AFFIXES := {
 	"steady_heart": {"name": "Сердце ритма", "description": "+5 здоровья и +1% к скорости.", "slot": "core", "position": "prefix", "stats": {"hp": 5, "speed": 0.01}},
 	"route_echo": {"name": "Эхо маршрута", "description": "+5% к награде и +1% к критическому шансу.", "slot": "core", "position": "suffix", "stats": {"reward_bonus": 0.05, "crit": 0.01}},
 	"pathfinder_calibration": {"name": "Калибратор пути", "description": "−4 п.п. к шансу встречи и +3% к награде.", "slot": "core", "position": "suffix", "stats": {"tile_spawn_bonus": -0.04, "reward_bonus": 0.03}},
-	"impulse_overload": {"name": "Контур импульса", "description": "+1 атака и +1,5% к скорости.", "slot": "core", "position": "suffix", "stats": {"attack": 1, "speed": 0.015}}
+	"road_formation_etching": {"name": "Гравировка дорожных узлов", "description": "Увеличивает на 6% полезную боевую награду от трёхузловых формаций дороги.", "slot": "amulet", "position": "suffix", "stats": {"road_formation_bonus": 0.06}},
+	"deep_catalogue": {"name": "Глубокий каталог", "description": "Повышает шкалу редкости следующей найденной экипировки на 7 п.п. при экипировке амулета.", "slot": "amulet", "position": "suffix", "stats": {"rare_find_bonus": 0.07}},
+	"impulse_overload": {"name": "Контур импульса", "description": "+1 атака и +1,5% к скорости.", "slot": "core", "position": "suffix", "stats": {"attack": 1, "speed": 0.015}},
+	"echovore": {"name": "Эхоед", "description": "+6% вампиризма: часть урона возвращается здоровьем.", "slot": "weapon", "position": "prefix", "stats": {"lifesteal": 0.06}},
+	"phase_silk": {"name": "Фазовый шёлк", "description": "+5% шанса уклониться от атаки.", "slot": "armor", "position": "prefix", "stats": {"dodge_chance": 0.05}},
+	"hollow_lining": {"name": "Полая подкладка", "description": "+4% вампиризма и +2 здоровья.", "slot": "armor", "position": "suffix", "stats": {"lifesteal": 0.04, "hp": 2}},
+	"phantom_coil": {"name": "Катушка фантома", "description": "+4,5% уклонения и +1% скорости.", "slot": "core", "position": "prefix", "stats": {"dodge_chance": 0.045, "speed": 0.01}},
+	"life_resonance": {"name": "Жизненный резонанс", "description": "+5% вампиризма и +2% награды.", "slot": "core", "position": "suffix", "stats": {"lifesteal": 0.05, "reward_bonus": 0.02}},
+	"spore_bane": {"name": "Споровый жнец", "description": "+8% урона споровым существам и +6 п.п. к шансу их трофея.", "slot": "weapon", "position": "prefix", "stats": {"spore_damage_bonus": 0.08, "spore_trophy_bonus": 0.06}},
+	"bone_splitter": {"name": "Раскалыватель костей", "description": "+8% урона костяным существам и +6 п.п. к шансу их трофея.", "slot": "weapon", "position": "suffix", "stats": {"bone_damage_bonus": 0.08, "bone_trophy_bonus": 0.06}},
+	"prism_sunder": {"name": "Призматический раскол", "description": "+8% урона кристаллическим существам и +6 п.п. к шансу их трофея.", "slot": "weapon", "position": "suffix", "stats": {"crystal_damage_bonus": 0.08, "crystal_trophy_bonus": 0.06}},
+	"echo_cutter": {"name": "Резонансный резец", "description": "+8% урона эхо-сущностям и +6 п.п. к шансу их трофея.", "slot": "weapon", "position": "prefix", "stats": {"echo_damage_bonus": 0.08, "echo_trophy_bonus": 0.06}},
+	"spore_filter": {"name": "Фильтр спор", "description": "Снижает урон споровых существ на 6% и даёт 12% шанс подавить яд.", "slot": "helmet", "position": "prefix", "stats": {"spore_resistance": 0.06, "poison_resistance": 0.12}},
+	"echo_dampener": {"name": "Глушитель фантома", "description": "Снижает урон эхо-сущностей на 6% и даёт 12% шанс подавить искажение.", "slot": "helmet", "position": "suffix", "stats": {"echo_resistance": 0.06, "distortion_resistance": 0.12}},
+	"crystal_grounding": {"name": "Заземлитель улья", "description": "Снижает урон кристаллических существ на 8% и даёт 12% шанс подавить кровотечение.", "slot": "shield", "position": "prefix", "stats": {"crystal_resistance": 0.08, "bleed_resistance": 0.12}},
+	"bone_sieve": {"name": "Костяная прослойка", "description": "Снижает урон костяных существ на 6% и даёт 12% шанс подавить рану.", "slot": "armor", "position": "suffix", "stats": {"bone_resistance": 0.06, "wound_resistance": 0.12}},
+	"clear_tone": {"name": "Чистый тон", "description": "Даёт 12% шанс подавить ослабление от резонансных атак.", "slot": "amulet", "position": "suffix", "stats": {"weakness_resistance": 0.12}}
 }
 
 const SYNERGY_DEFS := {
@@ -110,6 +167,30 @@ const SYNERGY_DEFS := {
 		"description": "Сифон + Бастион: +6 здоровья, +1 лечение после победы.",
 		"requirements": {"weapon": ["siphon"], "armor": ["bastion"]},
 		"effects": {"hp": 6, "kill_heal": 1}
+	},
+	"living_phase": {
+		"name": "Живой фантом",
+		"description": "Живой клинок + Фазовая ткань: +4% вампиризма и +2% уклонения.",
+		"requirements": {"weapon": ["leech"], "armor": ["phaseweave"]},
+		"effects": {"lifesteal": 0.04, "dodge_chance": 0.02}
+	},
+	"echo_guard": {
+		"name": "Глухая защита",
+		"description": "Наблюдатель + Призматический отражатель: особые атаки элиты и боссов слабее на 5%.",
+		"requirements": {"helmet": ["observer"], "shield": ["reflector"]},
+		"effects": {"special_damage_reduction": 0.05}
+	},
+	"deep_hunter": {
+		"name": "Охотник на глубине",
+		"description": "Глубинное зрение + Слухач событий: +4% урона элите и боссам и +3% к награде.",
+		"requirements": {"helmet": ["deep_sight"], "amulet": ["event_reader"]},
+		"effects": {"elite_boss_damage_bonus": 0.04, "reward_bonus": 0.03}
+	},
+	"quiet_cartography": {
+		"name": "Тихая картография",
+		"description": "Глушитель эха + Нить проводника: ниже шанс встречи, больше материалов на тайлах.",
+		"requirements": {"helmet": ["echo_hood"], "amulet": ["wayfinder"]},
+		"effects": {"tile_spawn_bonus": -0.03, "tile_scrap": 1}
 	}
 }
 
@@ -125,21 +206,86 @@ const BUILD_STAT_CAPS := {
 	"barrier_on_encounter": {"min": 0, "max": 100},
 	"kill_heal": {"min": 0, "max": 10},
 	"tile_scrap": {"min": 0, "max": 5},
-	"event_heal": {"min": 0, "max": 10}
+	"event_heal": {"min": 0, "max": 10},
+	"lifesteal": {"min": 0.0, "max": 0.25},
+	"dodge_chance": {"min": 0.0, "max": 0.25},
+	"special_damage_reduction": {"min": 0.0, "max": 0.35},
+	"elite_boss_damage_bonus": {"min": 0.0, "max": 0.25},
+	"biome_damage_bonus": {"min": 0.0, "max": 0.20},
+	"biome_resistance": {"min": 0.0, "max": 0.20},
+	"spore_damage_bonus": {"min": 0.0, "max": 0.25},
+	"spore_trophy_bonus": {"min": 0.0, "max": 0.12},
+	"crystal_damage_bonus": {"min": 0.0, "max": 0.25},
+	"crystal_trophy_bonus": {"min": 0.0, "max": 0.12},
+	"bone_damage_bonus": {"min": 0.0, "max": 0.25},
+	"bone_trophy_bonus": {"min": 0.0, "max": 0.12},
+	"echo_damage_bonus": {"min": 0.0, "max": 0.25},
+	"echo_trophy_bonus": {"min": 0.0, "max": 0.12},
+	"spore_resistance": {"min": 0.0, "max": 0.20},
+	"crystal_resistance": {"min": 0.0, "max": 0.20},
+	"bone_resistance": {"min": 0.0, "max": 0.20},
+	"echo_resistance": {"min": 0.0, "max": 0.20},
+	"trophy_find_bonus": {"min": 0.0, "max": 0.25},
+	"road_formation_bonus": {"min": 0.0, "max": 0.25},
+	"rare_find_bonus": {"min": 0.0, "max": 0.12},
+	"poison_resistance": {"min": 0.0, "max": 0.25},
+	"bleed_resistance": {"min": 0.0, "max": 0.25},
+	"wound_resistance": {"min": 0.0, "max": 0.25},
+	"distortion_resistance": {"min": 0.0, "max": 0.25},
+	"weakness_resistance": {"min": 0.0, "max": 0.25}
 }
 
-func roll_item(rng: RandomNumberGenerator, loop_count: int, hero_level: int) -> Dictionary:
-	var slots: Array = ["weapon", "armor", "core"]
-	var slot: String = str(slots[rng.randi_range(0, slots.size() - 1)])
+const RARITY_ORDER: Array[String] = ["Обычный", "Редкий", "Эпический", "Реликтовый"]
+const RARITY_BASE_WEIGHTS := {"Обычный": 0.70, "Редкий": 0.24, "Эпический": 0.052, "Реликтовый": 0.008}
+
+func get_effective_rarity_bonus(equipped_bonus: float = 0.0, prepared_bonus: float = 0.0, source_bonus: float = 0.0) -> float:
+	# Gear, prepared road-card bonus, and source-specific quality nudges are
+	# additive inputs; the combined influence is capped at +25 pp.
+	return clampf(clampf(equipped_bonus, 0.0, 0.12) + clampf(prepared_bonus, 0.0, 0.18) + clampf(source_bonus, 0.0, 0.06), 0.0, 0.25)
+
+func get_rarity_distribution(rarity_bonus: float = 0.0) -> Dictionary:
+	# Preserve a strictly descending rarity order at every bonus value. Unlike
+	# adding a bonus directly to a uniform roll, this cannot inflate relic odds
+	# from 0.8% to 25.8% at the bonus cap.
+	var bias := clampf(rarity_bonus, 0.0, 0.25)
+	var weights := {
+		"Обычный": float(RARITY_BASE_WEIGHTS["Обычный"]) * (1.0 - 0.8 * bias),
+		"Редкий": float(RARITY_BASE_WEIGHTS["Редкий"]) * (1.0 + 1.4 * bias),
+		"Эпический": float(RARITY_BASE_WEIGHTS["Эпический"]) * (1.0 + 4.0 * bias),
+		"Реликтовый": float(RARITY_BASE_WEIGHTS["Реликтовый"]) * (1.0 + 12.0 * bias)
+	}
+	var total_weight := 0.0
+	for rarity_name in RARITY_ORDER:
+		total_weight += float(weights.get(rarity_name, 0.0))
+	var distribution: Dictionary = {}
+	if total_weight <= 0.0:
+		return {"Обычный": 0.70, "Редкий": 0.24, "Эпический": 0.052, "Реликтовый": 0.008}
+	for rarity_name in RARITY_ORDER:
+		distribution[rarity_name] = float(weights.get(rarity_name, 0.0)) / total_weight
+	return distribution
+
+func roll_rarity(rng: RandomNumberGenerator, rarity_bonus: float = 0.0) -> String:
+	var rarity_distribution := get_rarity_distribution(rarity_bonus)
 	var rarity_roll := rng.randf()
-	var rarity := "Обычный"
+	var cumulative_rarity_chance := 0.0
+	for rarity_name in RARITY_ORDER:
+		cumulative_rarity_chance += float(rarity_distribution.get(rarity_name, 0.0))
+		if rarity_roll < cumulative_rarity_chance:
+			return rarity_name
+	return "Реликтовый"
+
+func roll_item(rng: RandomNumberGenerator, loop_count: int, hero_level: int, rarity_bonus: float = 0.0) -> Dictionary:
+	var slots: Array = EQUIPMENT_SLOTS.duplicate()
+	var slot: String = str(slots[rng.randi_range(0, slots.size() - 1)])
+	# The caller applies gear and route preparation bonuses only on a successful drop.
+	# A single weighted distribution is shared by combat drops and caches.
+	var rarity := roll_rarity(rng, rarity_bonus)
 	var multiplier := 1.0
-	if rarity_roll > 0.94:
-		rarity = "Эпический"
-		multiplier = 1.8
-	elif rarity_roll > 0.70:
-		rarity = "Редкий"
-		multiplier = 1.35
+	match rarity:
+		"Редкий": multiplier = 1.35
+		"Эпический": multiplier = 1.8
+		"Реликтовый": multiplier = 2.15
+		_: multiplier = 1.0
 	var rank := 1 + int(floor(float(loop_count) / 2.0)) + int(floor(float(hero_level) / 3.0))
 	var archetype_values: Array = ARCHETYPES.get(slot, [])
 	var archetype: Dictionary = {"id": "standard", "name": "Стандарт", "description": "Базовые характеристики", "stats": {}}
@@ -172,14 +318,35 @@ func roll_item(rng: RandomNumberGenerator, loop_count: int, hero_level: int) -> 
 		"tile_spawn_bonus": 0.0,
 		"bleed_chance": 0.0,
 		"bleed_damage": 0,
-		"barrier_on_encounter": 0
+		"barrier_on_encounter": 0,
+		"lifesteal": 0.0,
+		"dodge_chance": 0.0,
+		"special_damage_reduction": 0.0,
+		"elite_boss_damage_bonus": 0.0,
+		"biome_damage_bonus": 0.0, "biome_resistance": 0.0,
+		"spore_damage_bonus": 0.0, "crystal_damage_bonus": 0.0, "bone_damage_bonus": 0.0, "echo_damage_bonus": 0.0,
+		"spore_trophy_bonus": 0.0, "crystal_trophy_bonus": 0.0, "bone_trophy_bonus": 0.0, "echo_trophy_bonus": 0.0,
+		"spore_resistance": 0.0, "crystal_resistance": 0.0, "bone_resistance": 0.0, "echo_resistance": 0.0,
+		"trophy_find_bonus": 0.0, "road_formation_bonus": 0.0, "rare_find_bonus": 0.0,
+		"poison_resistance": 0.0, "bleed_resistance": 0.0, "wound_resistance": 0.0, "distortion_resistance": 0.0, "weakness_resistance": 0.0
 	}
 	match slot:
 		"weapon":
 			item.attack = maxi(1, int(round((1.0 + float(rank) * 0.5 + rng.randi_range(0, 1)) * multiplier)))
+		"helmet":
+			item.hp = int(round((2.0 + float(rank) * 1.0) * multiplier))
+			item.crit = snappedf(0.015 + minf(0.08, float(rank) * 0.006), 0.005)
 		"armor":
 			item.defense = maxi(1, int(round((1.0 + float(rank) * 0.25) * multiplier)))
 			item.hp = int(round((4.0 + float(rank) * 2.0) * multiplier))
+		"shield":
+			item.defense = maxi(1, int(round((1.0 + float(rank) * 0.3) * multiplier)))
+			item.hp = int(round((2.0 + float(rank) * 1.25) * multiplier))
+			item.barrier_on_encounter = maxi(0, int(round(float(rank) * 0.7)))
+		"amulet":
+			item.hp = int(round((2.0 + float(rank) * 1.0) * multiplier))
+			item.speed = snappedf(0.015 + minf(0.08, float(rank) * 0.008), 0.005)
+			item.reward_bonus = snappedf(minf(0.10, 0.01 + float(rank) * 0.006), 0.005)
 		"core":
 			item.speed = snappedf(0.04 + minf(0.13, float(rank) * 0.015), 0.01)
 			item.crit = snappedf(0.025 + minf(0.07, float(rank) * 0.008), 0.005)
@@ -213,7 +380,7 @@ func apply_random_affixes(item: Dictionary, rng: RandomNumberGenerator) -> Dicti
 	result["affix_names"] = []
 	result["affix_description"] = ""
 	var rarity := str(result.get("rarity", "Обычный"))
-	if rarity not in ["Редкий", "Эпический"]:
+	if rarity not in ["Редкий", "Эпический", "Реликтовый"]:
 		result["power"] = item_power(result)
 		return result
 	var slot := str(result.get("slot", ""))
@@ -222,7 +389,7 @@ func apply_random_affixes(item: Dictionary, rng: RandomNumberGenerator) -> Dicti
 	var selected: Array[Dictionary] = []
 	if not prefix.is_empty():
 		selected.append(prefix)
-	if rarity == "Эпический":
+	if rarity in ["Эпический", "Реликтовый"]:
 		suffix = _roll_item_affix(slot, "suffix", rng)
 		if not suffix.is_empty():
 			selected.append(suffix)
@@ -298,7 +465,8 @@ func roll_boss_item(enemy: Dictionary, rng: RandomNumberGenerator, loop_count: i
 		"attack": 0, "defense": 0, "hp": 0, "speed": 0.0, "crit": 0.0,
 		"kill_heal": 0, "tile_scrap": 0, "event_heal": 0, "reward_bonus": 0.0,
 		"tile_spawn_bonus": 0.0, "bleed_chance": 0.0, "bleed_damage": 0,
-		"barrier_on_encounter": 0
+		"barrier_on_encounter": 0, "lifesteal": 0.0, "dodge_chance": 0.0, "special_damage_reduction": 0.0, "elite_boss_damage_bonus": 0.0,
+		"poison_resistance": 0.0, "bleed_resistance": 0.0, "wound_resistance": 0.0, "distortion_resistance": 0.0, "weakness_resistance": 0.0
 	}
 	var template_stats_value: Variant = template.get("stats", {})
 	if typeof(template_stats_value) == TYPE_DICTIONARY:
@@ -329,6 +497,10 @@ func roll_boss_item(enemy: Dictionary, rng: RandomNumberGenerator, loop_count: i
 		item["barrier_on_encounter"] = int(item.get("barrier_on_encounter", 0)) + rank_bonus * 2
 	if float(item.get("reward_bonus", 0.0)) > 0.0:
 		item["reward_bonus"] = minf(1.5, float(item.get("reward_bonus", 0.0)) + minf(0.08, float(rank_bonus) * 0.01))
+	if float(item.get("lifesteal", 0.0)) > 0.0:
+		item["lifesteal"] = minf(0.25, float(item.get("lifesteal", 0.0)) + minf(0.04, float(rank_bonus) * 0.005))
+	if float(item.get("dodge_chance", 0.0)) > 0.0:
+		item["dodge_chance"] = minf(0.25, float(item.get("dodge_chance", 0.0)) + minf(0.04, float(rank_bonus) * 0.005))
 	item["power"] = item_power(item)
 	return item
 
@@ -358,11 +530,15 @@ func make_secret_relic(relic_id: String, loop_count: int, hero_level: int, run_s
 		"set_name": str(set_definition.get("name", set_id)),
 		"is_secret_relic": true,
 		"source_event": "landscape_secret",
+		"landscape_affinity": str(template.get("landscape_affinity", "")),
+		"affinity_name": str(template.get("affinity_name", "")),
+		"affinity_effect": template.get("affinity_effect", {}).duplicate(true) if typeof(template.get("affinity_effect", {})) == TYPE_DICTIONARY else {},
         "affix_ids": [], "affix_names": [], "affix_description": "",
 		"attack": 0, "defense": 0, "hp": 0,
 		"speed": 0.0, "crit": 0.0, "kill_heal": 0, "tile_scrap": 0,
 		"event_heal": 0, "reward_bonus": 0.0, "tile_spawn_bonus": 0.0,
-		"bleed_chance": 0.0, "bleed_damage": 0, "barrier_on_encounter": 0
+		"bleed_chance": 0.0, "bleed_damage": 0, "barrier_on_encounter": 0, "lifesteal": 0.0, "dodge_chance": 0.0, "special_damage_reduction": 0.0, "elite_boss_damage_bonus": 0.0,
+		"poison_resistance": 0.0, "bleed_resistance": 0.0, "wound_resistance": 0.0, "distortion_resistance": 0.0, "weakness_resistance": 0.0
 	}
 	var stats_value: Variant = template.get("stats", {})
 	if typeof(stats_value) == TYPE_DICTIONARY:
@@ -388,6 +564,10 @@ func make_secret_relic(relic_id: String, loop_count: int, hero_level: int, run_s
 		item["bleed_chance"] = minf(0.5, float(item.get("bleed_chance", 0.0)) + float(rank_bonus) * 0.01)
 	if float(item.get("reward_bonus", 0.0)) > 0.0:
 		item["reward_bonus"] = minf(1.5, float(item.get("reward_bonus", 0.0)) + minf(0.05, float(rank_bonus) * 0.01))
+	if float(item.get("lifesteal", 0.0)) > 0.0:
+		item["lifesteal"] = minf(0.25, float(item.get("lifesteal", 0.0)) + minf(0.04, float(rank_bonus) * 0.005))
+	if float(item.get("dodge_chance", 0.0)) > 0.0:
+		item["dodge_chance"] = minf(0.25, float(item.get("dodge_chance", 0.0)) + minf(0.04, float(rank_bonus) * 0.005))
 	item["power"] = item_power(item)
 	return item
 
@@ -405,6 +585,22 @@ func item_power(item: Dictionary) -> float:
 	score += clampf(float(item.get("bleed_chance", 0.0)), 0.0, 0.5) * 12.0
 	score += float(item.get("bleed_damage", 0)) * 1.4
 	score += float(item.get("barrier_on_encounter", 0)) * 1.0
+	score += clampf(float(item.get("lifesteal", 0.0)), 0.0, 0.25) * 30.0
+	score += clampf(float(item.get("dodge_chance", 0.0)), 0.0, 0.25) * 26.0
+	score += clampf(float(item.get("special_damage_reduction", 0.0)), 0.0, 0.35) * 22.0
+	score += clampf(float(item.get("elite_boss_damage_bonus", 0.0)), 0.0, 0.25) * 20.0
+	score += clampf(float(item.get("biome_damage_bonus", 0.0)), 0.0, 0.20) * 22.0
+	score += clampf(float(item.get("biome_resistance", 0.0)), 0.0, 0.20) * 18.0
+	score += clampf(float(item.get("trophy_find_bonus", 0.0)), 0.0, 0.25) * 24.0
+	score += clampf(float(item.get("road_formation_bonus", 0.0)), 0.0, 0.25) * 20.0
+	score += clampf(float(item.get("rare_find_bonus", 0.0)), 0.0, 0.12) * 24.0
+	for biome_tag in ["spore", "crystal", "bone", "echo"]:
+		score += clampf(float(item.get(biome_tag + "_trophy_bonus", 0.0)), 0.0, 0.12) * 16.0
+	for status_id in ["poison", "bleed", "wound", "distortion", "weakness"]:
+		score += clampf(float(item.get(status_id + "_resistance", 0.0)), 0.0, 0.25) * 24.0
+	for tag in ["spore", "crystal", "bone", "echo"]:
+		score += clampf(float(item.get(tag + "_damage_bonus", 0.0)), 0.0, 0.25) * 24.0
+		score += clampf(float(item.get(tag + "_resistance", 0.0)), 0.0, 0.20) * 20.0
 	return score
 
 func get_upgrade_cost(item: Dictionary) -> Dictionary:
@@ -426,6 +622,9 @@ func get_upgrade_cost(item: Dictionary) -> Dictionary:
 		"Эпический":
 			rarity_multiplier = 1.6
 			rarity_crystals = 2
+		"Реликтовый":
+			rarity_multiplier = 2.25
+			rarity_crystals = 4
 		"Боссовая":
 			rarity_multiplier = 2.0
 			rarity_crystals = 3
@@ -446,22 +645,75 @@ func preview_upgrade_item(item: Dictionary) -> Dictionary:
 	var upgraded := item.duplicate(true)
 	var next_level := int(cost.get("next_level", 1))
 	var primary_step := 1 + floori(float(next_level - 1) / 3.0)
-	match str(item.get("slot", "")):
+	var slot := str(item.get("slot", ""))
+	match slot:
 		"weapon":
 			upgraded["attack"] = int(upgraded.get("attack", 0)) + primary_step
-		"armor":
+			if float(upgraded.get("lifesteal", 0.0)) > 0.0 and next_level % 3 == 0:
+				upgraded["lifesteal"] = minf(0.25, float(upgraded.get("lifesteal", 0.0)) + 0.01)
+		"armor", "shield":
 			upgraded["defense"] = int(upgraded.get("defense", 0)) + primary_step
+			if slot == "shield" and next_level % 2 == 0:
+				upgraded["special_damage_reduction"] = minf(0.35, float(upgraded.get("special_damage_reduction", 0.0)) + 0.005)
 			upgraded["hp"] = int(upgraded.get("hp", 0)) + 2 + next_level
+			if float(upgraded.get("dodge_chance", 0.0)) > 0.0 and next_level % 2 == 0:
+				upgraded["dodge_chance"] = minf(0.25, float(upgraded.get("dodge_chance", 0.0)) + 0.005)
+			if int(upgraded.get("barrier_on_encounter", 0)) > 0 and next_level % 3 == 0:
+				upgraded["barrier_on_encounter"] = int(upgraded.get("barrier_on_encounter", 0)) + 2
+		"helmet":
+			upgraded["hp"] = int(upgraded.get("hp", 0)) + 1 + next_level
+			upgraded["crit"] = snappedf(minf(0.75, float(upgraded.get("crit", 0.0)) + 0.003), 0.005)
+			if next_level % 2 == 0:
+				upgraded["special_damage_reduction"] = minf(0.35, float(upgraded.get("special_damage_reduction", 0.0)) + 0.005)
+			if next_level % 3 == 0:
+				upgraded["elite_boss_damage_bonus"] = minf(0.25, float(upgraded.get("elite_boss_damage_bonus", 0.0)) + 0.005)
+		"amulet":
+			upgraded["hp"] = int(upgraded.get("hp", 0)) + 1 + next_level
+			upgraded["speed"] = snappedf(minf(1.5, float(upgraded.get("speed", 0.0)) + 0.005), 0.005)
+			if next_level % 3 == 0:
+				upgraded["elite_boss_damage_bonus"] = minf(0.25, float(upgraded.get("elite_boss_damage_bonus", 0.0)) + 0.005)
+			if next_level % 2 == 0:
+				upgraded["reward_bonus"] = minf(1.5, float(upgraded.get("reward_bonus", 0.0)) + 0.01)
 		"core":
 			upgraded["speed"] = snappedf(minf(1.5, float(upgraded.get("speed", 0.0)) + 0.01), 0.005)
 			upgraded["crit"] = snappedf(minf(0.75, float(upgraded.get("crit", 0.0)) + 0.005), 0.005)
 			if next_level % 3 == 0:
 				upgraded["attack"] = int(upgraded.get("attack", 0)) + 1
+				if float(upgraded.get("lifesteal", 0.0)) > 0.0:
+					upgraded["lifesteal"] = minf(0.25, float(upgraded.get("lifesteal", 0.0)) + 0.005)
+				if float(upgraded.get("dodge_chance", 0.0)) > 0.0:
+					upgraded["dodge_chance"] = minf(0.25, float(upgraded.get("dodge_chance", 0.0)) + 0.005)
 		_:
 			return {}
 	upgraded["upgrade_level"] = next_level
 	upgraded["power"] = item_power(upgraded)
 	return upgraded
+
+func get_ejection_echo_dust(item: Dictionary) -> int:
+	# An overflowed item is not retained as gear. At settlement it is reduced to
+	# Echo Dust, a separate meta-resource; better items yield more, with hard caps.
+	if item.is_empty():
+		return 0
+	var rarity := str(item.get("rarity", "Обычный"))
+	var rarity_value := 1
+	match rarity:
+		"Редкий":
+			rarity_value = 2
+		"Эпический":
+			rarity_value = 4
+		"Реликтовый":
+			rarity_value = 6
+		"Боссовая", "Тайная":
+			rarity_value = 5
+		"Элитная":
+			rarity_value = 3
+	var rank := clampi(int(item.get("rank", 1)), 1, 100)
+	var upgrade_level := clampi(int(item.get("upgrade_level", 0)), 0, MAX_UPGRADE_LEVEL)
+	var power := maxf(0.0, float(item.get("power", item_power(item))))
+	var rank_bonus := clampi(floori(float(rank - 1) / 4.0), 0, 2)
+	var upgrade_bonus := mini(2, upgrade_level)
+	var power_bonus := clampi(floori(power / 35.0), 0, 2)
+	return clampi(rarity_value + rank_bonus + upgrade_bonus + power_bonus, 1, 10)
 
 func get_salvage_reward(item: Dictionary) -> Dictionary:
 	if item.is_empty():
@@ -479,6 +731,9 @@ func get_salvage_reward(item: Dictionary) -> Dictionary:
 		"Эпический":
 			rarity_scrap = 10
 			crystals = 2
+		"Реликтовый":
+			rarity_scrap = 18
+			crystals = 4
 		"Боссовая":
 			rarity_scrap = 14
 			crystals = 3
@@ -489,6 +744,16 @@ func get_salvage_reward(item: Dictionary) -> Dictionary:
 	var upgrade_level := clampi(int(item.get("upgrade_level", 0)), 0, MAX_UPGRADE_LEVEL)
 	return {"scrap": 8 + rank * 5 + upgrade_level * 7 + rarity_scrap, "crystals": crystals + floori(float(upgrade_level) / 3.0)}
 
+func can_equip_item(item: Dictionary, slot: String = "") -> bool:
+	if item.is_empty():
+		return false
+	var item_slot := str(item.get("slot", ""))
+	var requested_slot := item_slot if slot.is_empty() else slot
+	return EQUIPMENT_SLOTS.has(requested_slot) and item_slot == requested_slot and not str(item.get("id", "")).is_empty()
+
+func slot_name(slot: String) -> String:
+	return str(SLOT_NAMES.get(slot, "Неизвестный слот"))
+
 func should_equip(candidate: Dictionary, current: Dictionary) -> bool:
 	if current.is_empty():
 		return true
@@ -497,7 +762,7 @@ func should_equip(candidate: Dictionary, current: Dictionary) -> bool:
 func total_equipment_stats(equipment: Dictionary) -> Dictionary:
 	var stats := _empty_stat_block()
 	var set_counts: Dictionary = {}
-	for slot_value in ["weapon", "armor", "core"]:
+	for slot_value in EQUIPMENT_SLOTS:
 		var item_value: Variant = equipment.get(str(slot_value), {})
 		if typeof(item_value) != TYPE_DICTIONARY:
 			continue
@@ -538,11 +803,65 @@ func total_equipment_stats(equipment: Dictionary) -> Dictionary:
 		break
 	_apply_build_stat_caps(stats)
 	stats["power"] = 0.0
-	for slot_value in ["weapon", "armor", "core"]:
+	for slot_value in EQUIPMENT_SLOTS:
 		var item_value: Variant = equipment.get(str(slot_value), {})
 		if typeof(item_value) == TYPE_DICTIONARY:
 			stats["power"] = float(stats.get("power", 0.0)) + item_power(item_value)
 	return stats
+
+func get_landscape_affinity_effects(equipment: Dictionary, tile_id: String) -> Dictionary:
+	var total := {"heal": 0, "scrap": 0, "crystals": 0, "spawn_bonus": 0.0, "enemy_bonus": 0.0, "reward_bonus": 0.0, "messages": []}
+	if tile_id.is_empty():
+		return total
+	var names: Array[String] = []
+	for slot in EQUIPMENT_SLOTS:
+		var item_value: Variant = equipment.get(slot, {})
+		if typeof(item_value) != TYPE_DICTIONARY:
+			continue
+		var item: Dictionary = item_value
+		if str(item.get("landscape_affinity", "")) != tile_id:
+			continue
+		var effect_value: Variant = item.get("affinity_effect", {})
+		if typeof(effect_value) != TYPE_DICTIONARY:
+			continue
+		var effect: Dictionary = effect_value
+		for key in ["heal", "scrap", "crystals"]:
+			total[key] = int(total.get(key, 0)) + maxi(0, int(effect.get(key, 0)))
+		for key in ["spawn_bonus", "enemy_bonus", "reward_bonus"]:
+			total[key] = float(total.get(key, 0.0)) + float(effect.get(key, 0.0))
+		names.append(str(item.get("name", "Экипировка")))
+	if not names.is_empty():
+		total["messages"] = ["Сработала связь %s с ландшафтом «%s»." % [", ".join(names), tile_id]]
+	return total
+
+
+func get_landscape_combat_bonus(equipment: Dictionary, active_tile_ids: Array[String], enemy_data: Dictionary) -> Dictionary:
+	var tag := str(enemy_data.get("biome_tag", ""))
+	if tag.is_empty():
+		return {"bonus": 0.0, "items": []}
+	var affinity_tags := {
+		"spore_garden": "spore", "nursery": "spore",
+		"crystal_hive": "crystal", "bone_orchard": "bone",
+		"echo_obelisk": "echo", "fault_line": "echo"
+	}
+	var total := 0.0
+	var names: Array[String] = []
+	for slot_value in EQUIPMENT_SLOTS:
+		var item_value: Variant = equipment.get(str(slot_value), {})
+		if typeof(item_value) != TYPE_DICTIONARY:
+			continue
+		var item: Dictionary = item_value
+		var affinity := str(item.get("landscape_affinity", ""))
+		if affinity.is_empty() or not active_tile_ids.has(affinity):
+			continue
+		if str(affinity_tags.get(affinity, "")) != tag:
+			continue
+		var item_bonus := clampf(float(item.get("affinity_combat_bonus", 0.06)), 0.0, 0.12)
+		if item_bonus <= 0.0:
+			continue
+		total += item_bonus
+		names.append(str(item.get("name", "Реликвия")))
+	return {"bonus": clampf(total, 0.0, 0.18), "items": names}
 
 func total_perk_stats(perk_counts: Dictionary) -> Dictionary:
 	var stats := _empty_stat_block()
@@ -595,11 +914,18 @@ func _empty_stat_block() -> Dictionary:
 		"attack": 0, "defense": 0, "hp": 0, "speed": 0.0, "crit": 0.0,
 		"kill_heal": 0, "tile_scrap": 0, "event_heal": 0,
 		"reward_bonus": 0.0, "tile_spawn_bonus": 0.0, "bleed_chance": 0.0,
-		"bleed_damage": 0, "barrier_on_encounter": 0, "active_sets": [], "active_synergies": [], "power": 0.0
+		"bleed_damage": 0, "barrier_on_encounter": 0, "lifesteal": 0.0, "dodge_chance": 0.0, "special_damage_reduction": 0.0, "elite_boss_damage_bonus": 0.0,
+		"biome_damage_bonus": 0.0, "biome_resistance": 0.0,
+		"spore_damage_bonus": 0.0, "crystal_damage_bonus": 0.0, "bone_damage_bonus": 0.0, "echo_damage_bonus": 0.0,
+		"spore_trophy_bonus": 0.0, "crystal_trophy_bonus": 0.0, "bone_trophy_bonus": 0.0, "echo_trophy_bonus": 0.0,
+		"spore_resistance": 0.0, "crystal_resistance": 0.0, "bone_resistance": 0.0, "echo_resistance": 0.0,
+		"trophy_find_bonus": 0.0, "road_formation_bonus": 0.0, "rare_find_bonus": 0.0,
+		"poison_resistance": 0.0, "bleed_resistance": 0.0, "wound_resistance": 0.0, "distortion_resistance": 0.0, "weakness_resistance": 0.0,
+		"active_sets": [], "active_synergies": [], "power": 0.0
 	}
 
 func _numeric_stat_keys() -> Array[String]:
-	return ["attack", "defense", "hp", "speed", "crit", "kill_heal", "tile_scrap", "event_heal", "reward_bonus", "tile_spawn_bonus", "bleed_chance", "bleed_damage", "barrier_on_encounter"]
+	return ["attack", "defense", "hp", "speed", "crit", "kill_heal", "tile_scrap", "event_heal", "reward_bonus", "tile_spawn_bonus", "bleed_chance", "bleed_damage", "barrier_on_encounter", "lifesteal", "dodge_chance", "special_damage_reduction", "elite_boss_damage_bonus", "biome_damage_bonus", "biome_resistance", "spore_damage_bonus", "crystal_damage_bonus", "bone_damage_bonus", "echo_damage_bonus", "spore_trophy_bonus", "crystal_trophy_bonus", "bone_trophy_bonus", "echo_trophy_bonus", "spore_resistance", "crystal_resistance", "bone_resistance", "echo_resistance", "trophy_find_bonus", "road_formation_bonus", "rare_find_bonus", "poison_resistance", "bleed_resistance", "wound_resistance", "distortion_resistance", "weakness_resistance"]
 
 func _apply_build_stat_caps(stats: Dictionary) -> void:
 	for key_value in BUILD_STAT_CAPS.keys():

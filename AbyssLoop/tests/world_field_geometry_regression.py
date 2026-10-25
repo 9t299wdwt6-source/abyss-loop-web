@@ -1,71 +1,72 @@
-"""Numerical geometry regression for the separate landscape field. No Godot runtime implied."""
+"""Numerical guard for the projected legacy landscape cells on the new square map."""
 from __future__ import annotations
 import math
 from pathlib import Path
-import sys
-
+import re
 ROOT = Path(__file__).resolve().parents[1]
 VIEW = (ROOT / "scripts/ui/route_view.gd").read_text(encoding="utf-8")
 TILE = (ROOT / "scripts/systems/tile_system.gd").read_text(encoding="utf-8")
-CELLS = [
-    "0:0", "1:0", "2:0", "7:0", "8:0", "9:0", "0:1", "9:1",
-    "0:2", "4:2", "5:2", "3:3", "4:3", "5:3", "6:3", "2:4",
-    "3:4", "4:4", "5:4", "6:4", "7:4", "3:5", "4:5", "5:5",
-    "6:5", "0:6", "9:6", "0:7", "1:7", "2:7", "7:7", "8:7", "9:7",
-]
-SIZES = [(620, 420), (900, 600), (1280, 720), (1440, 900), (1920, 1080)]
-SHAPES = ("classic_ring", "deep_descent", "narrow_ring", "fractured_loop")
+CELLS = re.findall(r'"(\d+:\d+)"', TILE.split("const MAX_WORLD_TILES_PER_ROUTE_SECTOR")[0])
+SIZES = [(300,350),(620,420),(900,600),(1280,720),(1440,900),(1920,1080)]
+SHAPES = {
+    "classic_ring": (4,3,11,8),
+    "narrow_ring": (5,2,9,10),
+    "deep_descent": (4,2,10,9),
+    "fractured_loop": (3,4,13,6),
+}
+MAP_COLS, MAP_ROWS = 19, 14
+FIELD_COLS, FIELD_ROWS = 10, 8
 
-def route_points(width: float, height: float, shape: str, count: int = 18):
-    center = (width * 0.5, height * 0.51)
-    rx, ry = min(width * 0.385, height * 0.78), height * 0.34
-    if shape == "narrow_ring":
-        rx, ry = rx * 0.78, ry * 0.77
-    elif shape == "deep_descent":
-        rx, ry = rx * 0.92, ry * 0.88
-    elif shape == "fractured_loop":
-        rx, ry = rx * 1.04, ry * 0.94
-    result = []
-    for i in range(count):
-        angle = -math.pi / 2 + math.tau * i / count
-        x = center[0] + math.cos(angle) * rx
-        y = center[1] + math.sin(angle) * ry
-        if shape == "deep_descent":
-            x += math.cos(angle * 2) * rx * 0.055
-            y += math.sin(angle * 2 + 0.4) * ry * 0.07
-        elif shape == "fractured_loop":
-            x += math.cos(angle * 3) * rx * 0.095
-            y += math.sin(angle * 2) * ry * 0.09
-        result.append((x, y))
+def road_cells(shape):
+    x,y,w,h=SHAPES[shape]; r=x+w-1; b=y+h-1; out=[]
+    for col in range(x,r+1): out.append((col,y))
+    for row in range(y+1,b+1): out.append((r,row))
+    for col in range(r-1,x-1,-1): out.append((col,b))
+    for row in range(b-1,y,-1): out.append((x,row))
+    return out
+
+def world_map(road):
+    blocked=set(road); used=set(); result={}
+    for key in CELLS:
+        col,row=map(int,key.split(':'))
+        pref=((col+0.5)*MAP_COLS/FIELD_COLS-0.5,(row+0.5)*MAP_ROWS/FIELD_ROWS-0.5)
+        best=None; bestcost=math.inf
+        for y in range(MAP_ROWS):
+            for x in range(MAP_COLS):
+                if (x,y) in blocked or (x,y) in used: continue
+                cost=(x-pref[0])**2+(y-pref[1])**2+((y*MAP_COLS+x)%7)*0.0001
+                if cost<bestcost: bestcost=cost; best=(x,y)
+        if best is not None:
+            result[key]=best; used.add(best)
     return result
 
-def distance_to_segment(point, start, end):
-    vx, vy = end[0] - start[0], end[1] - start[1]
-    denom = vx * vx + vy * vy
-    t = 0.0 if denom <= 1e-9 else max(0.0, min(1.0, ((point[0] - start[0]) * vx + (point[1] - start[1]) * vy) / denom))
-    return math.hypot(point[0] - (start[0] + vx * t), point[1] - (start[1] + vy * t))
-
-checks = 0
-min_path_clearance = float("inf")
-for width, height in SIZES:
-    field_x, field_y = 18.0, 34.0
-    field_width, field_height = width - 36.0, height - 68.0
+assert "const MAP_COLUMNS := 19" in VIEW and "const MAP_ROWS := 14" in VIEW
+assert "const ROAD_CELL_COUNT := 34" in VIEW
+checks=0; min_cell_size=math.inf
+for width,height in SIZES:
+    cell=min((width-28)/MAP_COLS,(height-64)/MAP_ROWS)
+    min_cell_size=min(min_cell_size,cell)
+    mapw,maph=MAP_COLS*cell,MAP_ROWS*cell
+    left,top=(width-mapw)/2,(height-maph)/2
     for shape in SHAPES:
-        points = route_points(width, height, shape)
-        for cell in CELLS:
-            col, row = map(int, cell.split(":"))
-            center = (field_x + (col + 0.5) * field_width / 10.0, field_y + (row + 0.5) * field_height / 8.0)
-            clearance = min(distance_to_segment(center, points[i], points[(i + 1) % len(points)]) for i in range(len(points)))
-            min_path_clearance = min(min_path_clearance, clearance)
-            # _find_closest_cell uses 27 px; the visible trail extends at most 7.5 px.
-            assert clearance > 27.0, f"field cell center conflicts with route selection: {width}x{height} {shape} {cell}: {clearance:.2f}px"
-            assert clearance > math.hypot(14.0, 11.0) + 7.5, f"compact landscape badge overlaps route trail: {width}x{height} {shape} {cell}: {clearance:.2f}px"
-            checks += 1
-
-assert "_find_closest_cell(position) >= 0 or _is_near_route_line(position)" in VIEW
-assert "Geometry2D.get_closest_point_to_segment" in VIEW
-assert "footprint_size := Vector2(minf(28.0" in VIEW
-assert "WORLD_FIELD_COLUMNS := 10" in TILE and "WORLD_FIELD_ROWS := 8" in TILE
-print(f"WORLD FIELD GEOMETRY REGRESSION PASSED: {checks} center/route clearance cases across {len(SIZES)} viewport sizes and {len(SHAPES)} route profiles.")
-print(f"Minimum tested center-to-route clearance: {min_path_clearance:.2f}px.")
-print("This numerical model is an offline guard; final pixels and input must still be inspected in Godot.")
+        road=road_cells(shape)
+        assert len(road)==34, f"{shape}: expected 34 road squares, got {len(road)}"
+        assert len(set(road))==34, f"{shape}: duplicate road squares"
+        for i,(x,y) in enumerate(road):
+            nx,ny=road[(i+1)%len(road)]
+            assert abs(nx-x)+abs(ny-y)==1, f"{shape}: road is not orthogonally connected at {i}"
+        mapped=world_map(road)
+        assert len(mapped)==len(CELLS), f"{shape} {width}x{height}: not all legacy cells mapped"
+        assert len(set(mapped.values()))==len(mapped), f"{shape} {width}x{height}: two persistent cells map to same screen cell"
+        assert not (set(mapped.values()) & set(road)), f"{shape} {width}x{height}: landscape target overlaps road"
+        for key,(x,y) in mapped.items():
+            cx=left+(x+0.5)*cell; cy=top+(y+0.5)*cell
+            assert left+cell/2-0.01 <= cx <= left+mapw-cell/2+0.01
+            assert top+cell/2-0.01 <= cy <= top+maph-cell/2+0.01
+            checks+=1
+assert "func _get_map_rect() -> Rect2" in VIEW
+assert "func _draw_map_grid(route_geometry: Dictionary)" in VIEW
+assert "func _get_world_display_cell_map(road_cells: Array) -> Dictionary" in VIEW
+assert "var slot := road_cells.find(coord)" in VIEW
+print(f"WORLD FIELD GEOMETRY REGRESSION PASSED: {checks} landscape targets mapped uniquely off the 34-cell road across {len(SIZES)} view sizes and {len(SHAPES)} shapes.")
+print(f"Smallest supported square tile: {min_cell_size:.2f}px; physical/runtime rendering still requires Godot verification.")

@@ -32,6 +32,10 @@ def inspect_resource_paths(root: Path) -> list[str]:
             ref = raw.rstrip(".,:;]")
             if not ref or " " in ref or "${" in ref:
                 continue
+            # Import metadata points to generated files under .godot/imported/. Those are
+            # produced by Godot's editor import and are deliberately absent from clean ZIPs.
+            if ref.startswith("res://.godot/imported/"):
+                continue
             target = root / ref.removeprefix("res://")
             if not target.exists():
                 issues.append(f"{path.relative_to(root)}: unresolved resource path {ref}")

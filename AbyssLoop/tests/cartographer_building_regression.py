@@ -10,7 +10,7 @@ checks={
     "cartographer is a regular upgradeable shelter building with clear costs and max level": '"cartographer": {' in registry and '"max_level": 5' in registry and 'Обсерватория картографов' in registry,
     "old saves migrate the new building to a safe zero level": '"cartographer": 0' in state and 'for building_id in DEFAULT_BUILDINGS.keys()' in state,
     "building level provides a bounded rare tile weight multiplier": "func get_rare_tile_weight_multiplier()" in state and 'minf(0.50, float(level) * per_level)' in state,
-    "the shared weighted-draft function applies the multiplier to route and field card draws": 'tile_id in ["rift", "signal", "archive", "nursery"]' in tile and 'GameState.get_rare_tile_weight_multiplier()' in tile,
+    "the shared weighted-draft function applies the multiplier to route and field card draws": 'tile_id in ["rift", "signal", "archive", "nursery", "fault_line", "spore_garden", "crystal_hive", "bone_orchard", "echo_obelisk", "lost_convoy", "hunter_marker"]' in tile and 'GameState.get_rare_tile_weight_multiplier()' in tile,
     "Godot smoke compares level-zero and level-five draw counts with fixed seeds": 'base_rare_rng.seed = 7741' in smoke and 'observatory_rng.seed = 7741' in smoke and 'observatory_rare_count > base_rare_count' in smoke,
 }
 failed=[name for name,ok in checks.items() if not ok]

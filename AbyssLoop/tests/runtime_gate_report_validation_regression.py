@@ -1,4 +1,4 @@
-"""Validate all seven runtime-report gates and reject stale/malformed evidence.
+"""Validate all eight runtime-report gates and reject stale/malformed evidence.
 
 This is a contract test only. Fixtures are synthetic and never written to the
 real project; this test does not execute Godot and is not runtime evidence.
@@ -21,6 +21,7 @@ REQUIRED_GATES = [
     "Gameplay smoke",
     "Save-system regression",
     "Expedition integration audit",
+    "Inventory-to-settlement runtime acceptance",
 ]
 
 

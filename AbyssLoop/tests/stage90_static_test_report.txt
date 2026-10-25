@@ -1,0 +1,15 @@
+PASS: short header is selected for compact widths
+PASS: discovery counter is drawn from RouteView redraw
+PASS: discovery count validates modern IDs and excludes current road cells
+PASS: discovery counter has RU localized format
+PASS: compact route title has RU localization
+PASS: unknown terrain gets a dedicated fog pass
+PASS: unknown state is marked at small but usable map-cell sizes
+PASS: placement validity badge scales with cell size
+PASS: high contrast uses a distinct fog and status outline
+PASS: tile IDs and cell geometry remain driven by TileSystem
+PASS: discovery HUD fits reserved map/footer boundary in 5 target viewports
+STAGE 90 DISCOVERY READABILITY REGRESSION PASSED: 10/10 source contracts + 5 viewport scenarios
+Static/source and layout-reference checks only; Godot runtime/browser rendering are not implied.
+
+Static-only caveat: runtime/browser not confirmed for Stage 90.

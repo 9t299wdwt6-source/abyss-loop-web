@@ -1,0 +1,1534 @@
+ABYSS LOOP — STATIC TEST REPORT
+UTC: 2026-10-24T16:23:23.977300+00:00
+Root: AbyssLoop/ (portable project root)
+Checks discovered: 108; checks completed: 108; passed: 108; failed/timed out: 0
+Duration so far: 31.80s
+Execution: 4 worker(s); each subprocess has a 75s timeout and timeout cleanup kills its process tree.
+NOTE: This report does not establish successful Godot/GDScript compilation or in-engine behavior.
+
+[PASS] acceptance_matrix_regression.py (1.08s)
+ACCEPTANCE MATRIX CHECK PASSED: 84 acceptance scenarios and explicit runtime status are documented.
+
+[PASS] accessibility_feedback_regression.py (1.11s)
+ACCESSIBILITY FEEDBACK REGRESSION PASSED
+- accessibility settings default and migrate safely
+- settings toggle options have live handlers
+- visual feedback supports reduced motion and low-flash colors
+- generated one-shot tones use a dedicated SFX bus
+- important manager events emit feedback categories
+- UI connects feedback bus and route visualization
+- runtime smoke asserts feedback settings
+Audio rendering and visual timing must be checked in Godot on target hardware.
+
+[PASS] accessibility_settings_regression.py (0.99s)
+PASS: project is versioned 0.61.0 without changing its stable name
+PASS: settings defaults include display, contrast, motion and symbol preferences
+PASS: legacy profiles receive defaults and all settings are normalized
+PASS: save validator bounds scale and animation speed
+PASS: volume controls only update recognized audio buses
+PASS: UI scale applies immediately through Window content scaling
+PASS: windowed and fullscreen modes apply and persist
+PASS: reduced motion snaps the route marker and limits feedback
+PASS: animation speed affects only UI feedback timing
+PASS: high contrast updates text, panels and button outlines
+PASS: state effects have redundant non-colour text prefixes
+PASS: route feedback receives accessibility settings without affecting combat state
+PASS: Prototype 52 accessibility manual runtime checklist is still included in release
+ACCESSIBILITY SETTINGS REGRESSION: 13/13
+Note: source-level checks only; Godot compilation, real window changes and visual contrast require runtime acceptance.
+
+[PASS] balance_campaign_regression.py (2.22s)
+BALANCE CAMPAIGN REGRESSION PASSED: parser, seeded scenario matrix, and report generation
+Reminder: this is a simplified combat screening model, not a Godot gameplay test.
+
+[PASS] biome_equipment_interaction_regression.py (1.04s)
+PASS: six-slot item stats include general and four biome-specific combat counters
+PASS: Abyss Tracker set grants bounded offense, defense and modest reward
+PASS: rare item affixes create each theme counter in valid equipment slots
+PASS: themed enemies carry persistent canonical biome tags
+PASS: affinity bonus requires both matching equipped relic and live landscape sector
+PASS: hero attack applies biome and matching-landscape bonus before hit resolution
+PASS: biome resistance mitigates matching enemies but does not replace special-attack guard
+PASS: saved item counters are bounded during validation
+PASS: item text explains all themed counters and biome-conditioned relic bonuses
+PASS: runtime smoke covers contextual bonus positive and negative cases
+PASS: new landscape pairings offer distinct strategic risk/reward tradeoffs
+BIOME EQUIPMENT INTERACTION REGRESSION PASSED: 11/11 checks
+Source-level only; Godot runtime and balance remain separate validation gates.
+
+[PASS] biome_trophy_equipment_regression.py (0.98s)
+PASS: amulet trophy finder is a real rare affix with a clear bonus
+PASS: trophy bonus enters the shared item stat calculator and has a strict cap
+PASS: item power accounts for trophy utility instead of treating it as cosmetic
+PASS: equipped amulet bonus reaches the actual loot roll
+PASS: trophy bonus is additive, clamped and cannot bypass the world cap
+PASS: elite and boss trophy odds remain special-cased after equipment bonus
+PASS: item comparison text exposes the actual trophy bonus
+PASS: save validation bounds trophy bonus and old items may omit the field
+PASS: landscape synergies retain distinct strategic trade-offs
+PASS: source keeps the bonus contextual to equipped loadout rather than backpack contents
+BIOME TROPHY EQUIPMENT REGRESSION PASSED: 10/10 checks
+Source-level guards only; Godot runtime and balance remain separate acceptance gates.
+
+[PASS] boss_phase_regression.py (0.98s)
+BOSS PHASE REGRESSION CHECK PASSED
+- all four bosses have multi-phase definitions
+- boss registry defines four different special effects
+- content audit validates per-boss special status and duration
+- phase definitions tune attack, defense, cadence and warning
+- boss instance stores scaled baseline stats and phase data
+- health thresholds trigger one-way phase advancement
+- new special attacks warn and wait for a later turn
+- UI shows boss phase and pending strike
+- runtime smoke checks phase definition and telegraph
+- phase entry effects are defined by boss data and applied once
+- boss status metadata is carried from registry to live enemies
+- snapshot migration normalizes and validates boss phase state
+- runtime smoke crosses two thresholds without repeating a phase
+The actual phase fight still requires Godot runtime testing.
+
+[PASS] boss_relic_regression.py (1.05s)
+PASS: Warden drops a named weapon/armor pair from Vanguard
+PASS: Harvester drops a named weapon/core pair from Resonance
+PASS: boss relics retain unique identity, rank and source metadata
+PASS: boss relics scale with expedition rank inside bounded stat limits
+PASS: boss victories prefer named relics with a generic fallback
+PASS: elite/boss gear has distinct upgrade and salvage tiers
+PASS: item details show bleed and opening barrier stats
+PASS: armory shows the boss source and matching set
+PASS: Godot smoke covers boss drops and all salvage tiers
+BOSS RELIC REGRESSION PASSED: 9/9 checks
+Source guards only; Godot smoke test remains the runtime validation.
+
+[PASS] campaign_history_regression.py (0.94s)
+[PASS] history is explicitly bounded to 50 summaries
+[PASS] legacy saves default to empty history without schema break
+[PASS] records are normalized and do not store full snapshots
+[PASS] duplicate run IDs replace rather than duplicate
+[PASS] oldest rows are trimmed after reaching capacity
+[PASS] history transaction rolls back in memory when save fails
+[PASS] history is included in permanent save and new-game reset
+[PASS] save validation rejects oversized and duplicate records
+[PASS] summary carries replay identity, seed, version, timestamp and run metrics
+[PASS] Stage68B history keeps local measurement schema, elapsed time, baseline and end state
+[PASS] run settlement commits history and the rich summary in one atomic GameState transaction
+[PASS] settlement transaction includes difficulty record, history and loadout rollback
+[PASS] journal UI exposes all, returns, and defeats filters
+[PASS] journal UI displays score, seed, difficulty, outcomes and resources
+[PASS] journal entries show expedition mode and endgame completion
+[PASS] project version advanced to 0.61.0
+CAMPAIGN HISTORY REGRESSION PASSED: 16/16 checks
+Static source guards only; verify serialization, duplicate completion, and UI in Godot 4.7.2.
+
+[PASS] cartographer_building_regression.py (1.09s)
+PASS: cartographer is a regular upgradeable shelter building with clear costs and max level
+PASS: old saves migrate the new building to a safe zero level
+PASS: building level provides a bounded rare tile weight multiplier
+PASS: the shared weighted-draft function applies the multiplier to route and field card draws
+PASS: Godot smoke compares level-zero and level-five draw counts with fixed seeds
+CARTOGRAPHER BUILDING REGRESSION PASSED: 5/5 checks
+Source checks do not replace Godot runtime; smoke checks the actual weighted draw effect.
+
+[PASS] closed_loop_brand_regression.py (1.04s)
+PASS: official title is Abyss Loop in project metadata
+PASS: visible UI brand is ABYSS LOOP
+PASS: route advances and previous node lookup use modular wraparound
+PASS: generated routes are normalized into explicit closed-loop topology
+PASS: each node stores previous and next modulo-linked node ids
+PASS: previous snapshots are normalized when an expedition resumes
+PASS: map draws final node back to first node
+PASS: map visually marks the loop as continuous
+PASS: hero moves between route nodes; no tower combat implementation
+PASS: runtime smoke test covers wraparound and loop counters
+PASS: procedural generator remains seed-driven and not an open-end route
+CLOSED-LOOP / BRAND REGRESSION PASSED: 11 checks. This is source-level evidence, not a Godot runtime test.
+
+[PASS] combat_encounter_regression.py (0.91s)
+COMBAT ENCOUNTER REGRESSION CHECK PASSED:
+- config defines a boss cadence
+- two configurable boss profiles exist
+- encounter generator supports groups
+- encounter generator supports boss-only fights
+- route manager forces boss-node fights
+- all encounter members receive independent attack updates
+- boss reward guarantees a drop through the shared loot contract
+- boss statistics persist
+- smoke test covers boss and pack generation
+- boss encounters retain a distinct map marker
+- elite encounters have a distinct map marker
+Note: source-level guard only; run tests/smoke_test.gd in Godot for runtime validation.
+
+[PASS] content_registry_validation_regression.py (1.08s)
+CONTENT REGISTRY VALIDATION REGRESSION PASSED
+- registry validator checks required data
+- synergy ids resolve to known tile ids
+- event choices require unique stable ids
+- research dependencies are validated
+- difficulty, modifier and objective data are validated
+- enemy defense scaling is data configured
+- boss selection supports arbitrary registered boss ids
+- item drop bonus parameters are centralized
+- long expedition event history is bounded
+- Godot smoke test executes registry validation
+- tile synergy IDs are unique and effects are whitelisted
+- shelter building and expedition mode data are validated
+- route modifiers resolve to supported route shapes
+- research prerequisite cycles are rejected
+GDScript registry validation is covered in smoke_test.gd but still requires the Godot runtime to execute.
+
+[PASS] content_v1_matrix_regression.py (1.12s)
+CONTENT V1.0 MATRIX REGRESSION PASSED
+- Categories: 22
+- Stable-ID content records: 225
+- Authored data checks: 225; issues: 0
+- Stable IDs match the reviewed manifest
+- Readiness matrix: tests/reports/CONTENT_V1_READINESS_MATRIX_RU.md
+- Dedicated per-entity sprites and multi-language localization remain release-readiness tasks, not claimed as complete.
+
+[PASS] contract_system_regression.py (1.07s)
+PASS: optional contracts include none and four timed resource-backed jobs
+PASS: each contract defines target, deadline, cost and payout
+PASS: contract conditions use real world/combat/event counters
+PASS: deadline failure and one-time payout are explicitly guarded
+PASS: contract affordability is checked before run generation
+PASS: fee, run counter and first snapshot commit atomically
+PASS: contract state persists in snapshot v4
+PASS: snapshot migration supplies empty contract for old runs
+PASS: snapshot validator checks registered contract and state flags
+PASS: preparation UI previews price deadline and payout
+PASS: active HUD and run result show contract status
+PASS: runtime smoke verifies contract definitions and registration
+PASS: project version is 0.61.0 for this build
+CONTRACT SYSTEM REGRESSION PASSED: 13 checks
+Static source evidence only; contract flow must also be run in Godot 4.7.2.
+
+[PASS] cross_system_interaction_regression.py (0.84s)
+PASS: equipment and perk bonuses share one capped loadout calculator
+PASS: hero combat stats are recalculated from equipment and perks instead of incrementally stacking
+PASS: route exploration receives equipment spawn and tile-resource modifiers
+PASS: landscape cells use their own placement and per-sector synergy path
+PASS: route-tile and landscape-tile synergies are both part of the sector visit pipeline
+PASS: manager retains separate validation for route and landscape placement targets
+PASS: stacked route, local tile, equipment and neighbour modifiers are capped once after accumulation
+PASS: derived spawn chance and reward affect encounter setup
+PASS: equipment reward bonuses affect loot and equipment drop chance
+PASS: combat uses derived attack, defense and crit stats and status-effect damage pipeline
+PASS: weapon-specific bleed and encounter barrier flow from equipped stats into battle
+PASS: UI supports route-node and landscape placement through distinct model APIs
+PASS: route and landscape previews use their matching placement calculators
+PASS: road placement rejects event/perk decision states like landscape placement
+CROSS-SYSTEM INTERACTION REGRESSION: 14/14
+Source-level guard only; compile, encounter outcomes, UI placement and balance still require in-engine validation.
+
+[PASS] developer_tools_regression.py (2.02s)
+DEVELOPER TOOLS REGRESSION PASSED
+- developer button is only created in a debug build
+- F9 shortcut refuses release builds
+- diagnostics overlay uses bounded scrolling
+- diagnostic report has a dedicated helper preloaded and delegated to
+- diagnostic report includes seed and closed-loop status
+- diagnostic report includes combat and status effects
+- diagnostic report invokes content registry validation
+- diagnostic report includes objectives, contracts and snapshot
+- clipboard action is a direct user action
+- diagnostic component documents read-only behavior
+- diagnostic report helper has no gameplay mutation calls
+- offline diagnostics tool reuses content validator
+- offline diagnostics does not modify game saves
+- offline diagnostics CLI exits successfully
+- offline diagnostics report is written
+Note: source-level UI assertions do not replace the Godot 4.7.2 compile/runtime check.
+
+[PASS] difficulty_challenge_regression.py (0.92s)
+DIFFICULTY / CHALLENGE REGRESSION PASSED: 14 checks
+- four named difficulties provide explicit rule descriptions
+- all difficulty modes define combat, rewards, healing, retention and score multiplier
+- difficulty registry validates bounds and required fields
+- selected difficulty is described in pre-expedition preview and refreshed on change
+- difficulty cannot be swapped during an active or resumable run
+- difficulty id persists in expedition snapshot and restore validates it
+- difficulty healing modifier applies to cycle, event, shrine, kill and tile healing
+- defeat retention forecast and atomic settlement use chosen difficulty
+- difficulty rewards affect both actual loop income and forecast
+- score uses real run counters and successful optional objectives
+- best score and difficulty records persist with safe old-save defaults
+- result screen reports selected difficulty score and personal record
+- supply objective and contract targets reflect observed run yields
+- prototype version advances without changing stable app name
+Source-level checks only; Godot runtime difficulty balance still requires matched campaigns in Godot 4.7.2.
+
+[PASS] dual_placement_regression.py (0.99s)
+PASS: road-node click invokes the route-tile placement API
+PASS: route view handles touch press and ignores touch release/cancel
+PASS: screen-touch viewport coordinates are converted to RouteView-local coordinates
+PASS: mouse and touch use the same road/landscape click dispatcher
+PASS: landscape click invokes the separate world-placement API
+PASS: road hover calls the road-synergy preview
+PASS: landscape hover calls the landscape-sector preview
+PASS: road placement remains blocked during active combat
+PASS: road placement is blocked while event/perk choices are pending
+PASS: road placement spends exactly the selected hand card and saves the run snapshot
+PASS: road placement duplicates card data before it enters the route map
+PASS: placement lock message is shared by both UI targets
+PASS: map visual uses the same validator as road placement and includes non-colour state icons
+PASS: blocked landscape cells include full-sector and global placement locks in visual state
+PASS: both click handlers guard against a missing manager
+PASS: landscape click shows the same action lock before calling the manager
+PASS: localization identifies both road and landscape targets after hint relocation
+PASS: route view label no longer claims that cards cannot be placed on roads
+PASS: Godot smoke includes road preview and relocated both-target guidance assertions
+PASS: existing road/landscape geometry contract remains covered
+DUAL PLACEMENT REGRESSION: 20/20
+Source-level checks only; verify actual clicks and rendering in Godot 4.7.2.
+
+[PASS] early_run_balance_regression.py (0.93s)
+EARLY-RUN BALANCE REGRESSION PASSED: 7 checks
+- safe opening length is balance-configured
+- intro limit is bounded to preserve route opportunities
+- opening nodes after the shrine are plain
+- later routes still guarantee event, cache and danger
+- route creation passes the configured guarantee
+- first standard run has an adequate hand
+- starting hand has a hard upper bound
+Source guards only; encounter pacing and combat fairness need in-engine campaigns.
+
+[PASS] economy_balance_regression.py (1.03s)
+ECONOMY BALANCE REGRESSION PASSED
+- core economy coefficients are centralized
+- enemy and loot scaling use configured values
+- difficulty alters reward and danger trajectory
+- return preview compares safe payout, defeat loss and next-loop risk
+- return confirmation surfaces the estimate
+- defeat retention stays configured in one place
+Forecast accuracy still requires in-engine gameplay comparisons.
+
+[PASS] economy_campaign_regression.py (3.27s)
+ECONOMY CAMPAIGN REGRESSION PASSED
+- parsed resource sources/sinks are anchored to current GDScript registries
+- strategy purchase priorities respect their intended target levels
+- 384-run report is deterministic for a fixed seed and covers success/failure regimes
+- all sampled balances stay non-negative; model limitations distinguish investment stalls from hardlocks
+- end-balance interpretation is bounded by finite purchase plans and partial-defeat rules
+- Godot runtime is not inferred
+
+[PASS] elite_enemy_regression.py (1.08s)
+PASS: elite cadence and tuning live in balance config
+PASS: each enemy role has a registered elite status ability
+PASS: content validation checks elite ability effect and schedule
+PASS: promotion boosts one normal enemy and preserves boss distinction
+PASS: elite spawn cadence excludes boss cycles
+PASS: special attacks are telegraphed before impact for elites
+PASS: elite role ability applies through shared status system
+PASS: elite gives increased item-drop chance and a small bounded quality bias without forcing a fixed rarity
+PASS: elite victory count flows through the run ledger into the atomic result summary
+PASS: lifetime elite count survives saves and old saves default safely
+PASS: elite defeat total appears in shelter stats and expedition report
+PASS: map and combat HUD visibly identify elites
+PASS: runtime smoke tests promotion, data ability, barrier behavior and reward stats
+PASS: project version advances with current build
+ELITE ENEMY REGRESSION PASSED: 14 checks
+Source guards only; Godot runtime smoke needs execution in Godot 4.7.2.
+
+[PASS] enemy_roles_regression.py (1.01s)
+ENEMY ROLE REGRESSION CHECK PASSED
+- enemy roster contains fast, tank, caster, support and hunter roles
+- enemy config explains its behavior before the action
+- support is ordered behind front-line enemies in groups
+- support heals the most injured ally with a capped amount
+- hunter telegraphs an empowered attack at low hero health
+- caster applies a registered timed distortion effect
+- smoke test verifies tactical enemy roles
+Enemy combat behaviors still require Godot runtime verification.
+
+[PASS] equipment_backpack_regression.py (1.11s)
+PASS: six typed equipment slots and a bounded twelve-cell run backpack are defined centrally
+PASS: new helmet, shield and amulet types have authored archetypes, upgrades and affix pools
+PASS: loot and secret relics enter the hand-managed backpack instead of auto-equipping
+PASS: bag capacity is enforced with FIFO ejection and keeps an ejection ledger for later salvage
+PASS: equipment swap removes the selected item and does not return displaced run gear to the bag
+PASS: equip and unequip persist snapshots and roll back bag, gear, ledger and eviction feedback on save failure
+PASS: equipment changes cannot be exploited to heal by repeatedly swapping max-health gear
+PASS: run UI exposes six equipment slots, twelve explicit backpack positions, comparison and manual equip
+PASS: equipment and backpack render as separate three-column grids with a bounded scroll area
+PASS: backpack supports drag-and-drop, right-click quick equip, and rarity borders
+PASS: items are not manually discarded; queue overflow owns the run-loss rule
+PASS: backpack actions stay in a visible footer and details avoid an empty grid scroll area
+PASS: backpack panel scrolls its bounded slot list and supports explicit resume
+PASS: legacy and current saves normalize all six slots and cap/validate backpack items
+PASS: permanent equip and unequip use all six slots with rollback if saving fails
+PASS: only gear surviving settlement enters the permanent armory transactionally
+PASS: landscape-affinity relics resolve on their matching field tile and affect visit/enemy/reward modifiers
+PASS: affinity metadata is validated and the content registry accepts six slot categories
+PASS: item text shows risky as well as protective encounter modifiers and landscape links
+PASS: helmet/shield/amulet stats actively interact with elite and boss attacks
+PASS: enemy-specific stats have bounded saved values and appear in item tooltips
+EQUIPMENT/BACKPACK REGRESSION PASSED: 21/21 source guards
+Source guards only; GDScript compilation, click flows, save/reload and real balance still require Godot 4.7.2 runtime acceptance.
+
+[PASS] equipment_build_balance_regression.py (1.02s)
+PASS: source defines all four archetype synergies
+PASS: build stats flow through the combined hero calculation
+PASS: repeatable matrix includes ordinary waves, boss and attrition campaigns
+PASS: 12-seed matrix is deterministic across repeated runs
+PASS: overclock build wins the wave-clear time screen
+PASS: bastion build produces the strongest attrition outcome
+PASS: route build lowers expected encounters and yields the most tile materials
+PASS: precision build retains a distinct crit/reward profile
+
+OFFLINE EQUIPMENT BUILD SCREENING (simplified model; not Godot combat evidence)
+overclock: waves_time=10.18s; boss_time=11.44s; attrition_survival=0.00; attrition_hp=0.0; encounters=8.00; materials=0.0
+precision: waves_time=12.16s; boss_time=14.18s; attrition_survival=0.00; attrition_hp=0.0; encounters=8.00; materials=0.0
+route: waves_time=13.30s; boss_time=15.51s; attrition_survival=0.67; attrition_hp=6.9; encounters=7.52; materials=20.0
+bastion: waves_time=13.97s; boss_time=16.29s; attrition_survival=1.00; attrition_hp=101.1; encounters=8.00; materials=0.0
+EQUIPMENT BUILD BALANCE SCREENING PASSED: 8 checks across 12 deterministic seeds.
+This screening is intentionally simplified; actual results require matched Godot runtime campaigns.
+
+[PASS] equipment_build_regression.py (1.10s)
+EQUIPMENT BUILD REGRESSION CHECK PASSED
+- slot-specific item archetypes are defined
+- two-piece set bonuses are data-driven
+- comparison score includes utility effects
+- rare and epic drops have a slot-specific data-driven affix pool
+- rarity affixes alter actual equipment stats and show in the armory
+- set effects are applied centrally
+- combat and event traits affect gameplay
+- armory compares candidates with current gear
+- save validation bounds new numerical properties
+- runtime smoke covers item rolls and set bonuses
+Runtime assertions in smoke_test.gd still require Godot execution.
+
+[PASS] equipment_enemy_interaction_regression.py (1.02s)
+PASS: special-attack mitigation and elite/boss damage have explicit caps
+PASS: new helmet, shield and amulet archetypes provide those stats
+PASS: gear stats are included in central aggregation and item power
+PASS: the derived hero stats are recalculated from current equipment
+PASS: hero attacks against elite and boss targets receive a bounded damage bonus
+PASS: special equipment defense is applied only to elite/boss special attacks after their multipliers
+PASS: cross-slot synergies reward purposeful helmet/shield/amulet combinations
+PASS: upgrade steps can improve the newly introduced combat-specific stats
+PASS: save validation rejects out-of-range values from old or edited item data
+PASS: new affix stable IDs are recorded in the reviewed content manifest
+PASS: item detail formatting explains both elite offense and special-attack protection
+EQUIPMENT/ENEMY INTERACTION REGRESSION PASSED: 11/11 source guards
+Source-only checks; fight timing, hit values, and save/reload remain to be accepted in Godot 4.7.2.
+
+[PASS] equipment_landscape_mechanics_regression.py (0.86s)
+PASS: lifesteal and phase-dodge are real loadout stats with caps and item-power weight
+PASS: weapon, armor and core upgrades can improve their relevant combat stats
+PASS: secret rewards include distinct named relics using the new combat mechanics
+PASS: persistent equipment validation bounds the new stats instead of trusting saved numbers
+PASS: combat resolves dodge before damage and communicates the outcome to the caller
+PASS: expedition applies healing from dealt damage and skips hit effects after a successful dodge
+PASS: new road and landscape tiles are registered with explicit placement zones and themed enemy pools
+PASS: tile visits return biome pools and apply non-cosmetic risk, healing and reward effects
+PASS: biome enemies are excluded from ordinary random encounters and can be forced by a tile
+PASS: road and landscape tile pools propagate through sectors, random events and encounter creation
+PASS: landscape secrets unlock guaranteed follow-up events and named equipment rewards
+PASS: placement previews and the map renderer can show the new set of tiles
+PASS: equipment archetype combinations now reward deliberate use of added slots
+PASS: content validation checks tile pools and secret recipe tile references
+EQUIPMENT/LANDSCAPE MECHANICS REGRESSION PASSED: 14/14 source guards
+Source-level only. This does not compile GDScript or certify Godot runtime, browser export, balance, or visuals.
+
+[PASS] equipment_synergy_regression.py (0.96s)
+EQUIPMENT SYNERGY REGRESSION CHECK PASSED
+- four small archetype synergies are data-driven
+- synergy activation checks slot-specific archetype requirements
+- only one archetype synergy can be active at once
+- equipment sets and synergies share one aggregation pass
+- modifier caps exist for shared additive stats
+- perk stats are rebuilt from saved ranks rather than trusted as derived values
+- hero synchronization uses the combined loadout calculator
+- combat reward, tile materials, healing and encounter modifiers are capped
+- armory delegates before-and-after synergy and set presentation
+- runtime smoke covers build swaps, perks and caps
+GDScript runtime assertions still require Godot 4.7.2.
+
+[PASS] event_chain_regression.py (1.00s)
+EVENT CHAIN REGRESSION CHECK PASSED
+- chain events require earlier choices
+- resolved chain events cannot repeat once completed
+- event selector filters missing prerequisites and resolved events
+- event decisions preserve and mutate chain flags
+- a delayed route pulse modifies real future combat reward
+- runtime smoke covers conditional chain data
+Actual event-chain execution requires Godot runtime testing.
+
+[PASS] expedition_event_regression.py (0.97s)
+EXPEDITION EVENT REGRESSION CHECK PASSED:
+- event content is data-driven
+- every configured event offers multiple effects
+- event system chooses weighted definitions
+- every event cell interrupts route movement
+- event resolution checks affordability before spending
+- choices update health and expedition danger
+- risk effects can affect the next encounter
+- event choices are presented through a blocking modal
+- unaffordable choice can be disabled
+- event decisions are included in persistent statistics
+- event choice history is shown in the expedition report
+- smoke test covers event generation
+Note: source-level guard only; run tests/smoke_test.gd in Godot for runtime validation.
+
+[PASS] expedition_integration_audit_regression.py (0.99s)
+EXPEDITION INTEGRATION AUDIT REGRESSION PASSED: 17/17 source-level integration invariants
+- checkpoint updates roll back in-memory snapshot after failed disk write
+- discard is a result-bearing transaction and restores checkpoint on failure
+- settlement snapshots every durable field including history, records and loadout
+- failed settlement restores rewards, counters, history, difficulty record, loadout, summary and checkpoint
+- rich summary, history row and difficulty result are added before the single settlement save
+- manager no longer performs follow-up history/record saves after settling rewards
+- manager halts and pauses after failed terminal save instead of emitting completion
+- retry keeps original terminal outcome and prevents double settlement
+- failed settlement locks event, perk, tile, speed and unpause actions
+- periodic or manual snapshot failure is visible only once until next successful save
+- UI confirms deleting an expedition only after durable deletion succeeds
+- runtime gate executes the cross-system audit after save regression
+- runtime gate requires all seven gates before creating a runtime-tested archive
+- package release requires the integration checklist and runnable audit
+- runtime script tests exactly-once summary, history and difficulty record persistence
+- runtime script injects a rejected save and checks terminal outcome idempotency
+- current project version is stable-name 0.61.0
+The Godot integration script is wired into the Windows runtime gate; it must still pass in Godot 4.7.2 to claim runtime acceptance.
+
+[PASS] expedition_modifier_regression.py (0.98s)
+EXPEDITION MODIFIER REGRESSION PASSED: 12 checks
+- four data-driven run modifiers include neutral baseline
+- modifier definitions expose route profile and risk/reward coefficients
+- modifier registry validates challenge target and reward values
+- starting tile delta affects the actual tile hand limit
+- modifier selection is wired into run creation
+- difficulty and modifier multipliers both reach combat stats
+- modifier affects route danger, event damage and encounter chance
+- challenge reward is flagged before being added to temporary loot
+- modifier and challenge are restored from expedition snapshots
+- map view has distinct closed-loop shape profiles
+- UI displays active challenge and final result
+- project does not implement enemy-attacking tower gameplay
+Runtime interaction and visual route continuity still require Godot testing.
+
+[PASS] expedition_objective_regression.py (0.98s)
+OBJECTIVE REGRESSION PASSED
+- objective catalogue covers loops, bosses, combat, events and resources
+- goal is picked deterministically from the same seed shown in preparation
+- goal progress is derived from real run counters
+- objective reward has an idempotent rewarded flag
+- goal survives snapshots and appears in run/report UI
+- runtime smoke verifies objective catalogue
+- objective UI previews condition and reward before launch
+- objective filtering checks run feasibility and supported counters
+Objective progress/payout need Godot runtime testing.
+
+[PASS] expedition_persistence_regression.py (0.92s)
+EXPEDITION PERSISTENCE REGRESSION CHECK PASSED:
+- checkpoint includes route, RNG, combat, inventory, tiles, and pending decisions
+- periodic snapshot is enabled while paused or awaiting a decision
+- restoring returns to a safe paused state
+- Stage68B local run timer/baseline are stored and restored
+- v1/v2/v3 snapshots migrate to current status schema v4
+- settlement clears checkpoint to avoid duplicate payouts
+Note: source-level guard only; run the project and smoke tests in Godot for runtime validation.
+
+[PASS] first_hour_guidance_regression.py (0.94s)
+PASS: first-run panel is created and hidden until an active first expedition
+PASS: guide refresh is called from the live expedition HUD sync
+PASS: event and perk guidance takes priority before combat and tile hints
+PASS: normal, elite, boss and telegraphed boss encounter states have distinct hints
+PASS: first tile and later tile placement have separate guidance
+PASS: synergy is inferred from the same tile-system calculation rather than a guessed heuristic
+PASS: low-health hint does not replace or unlock the return action
+PASS: all first-hour guide strings exist, are used and are non-empty
+PASS: guide is presentation-only and does not mutate gameplay or save state
+PASS: event flow still blocks the route until a choice is resolved
+PASS: guide signature avoids recomputing synergy on every rendered frame
+FIRST-HOUR GUIDANCE REGRESSION: 11/11
+Source-level check only; visual fitting and the actual first-hour playthrough require Godot runtime testing.
+
+[PASS] first_session_flow_regression.py (0.95s)
+FIRST-SESSION FLOW REGRESSION PASSED: 7 checks
+- first session guide appears until first completed expedition
+- guide distinguishes fresh run from resumable save
+- guide explains automatic closed route
+- guide explains safe return and risk
+- guide points to persistent shelter progression
+- help remains available from first-session panel
+- first session state uses persisted run counters
+Source-level check only; first-session usability still needs an in-engine playthrough.
+
+[PASS] four_boss_rotation_regression.py (0.95s)
+PASS: the first four boss milestones rotate through four separate enemies
+PASS: new bosses have different multi-phase attack patterns
+PASS: boss special effects travel from data registry into combat status application
+PASS: the new boss relics offer distinct build directions and matched sets
+PASS: the content readiness audit rejects missing or invalid special status definitions
+PASS: Godot smoke checks four milestones and four distinct special effects
+FOUR BOSS ROTATION REGRESSION PASSED: 6/6 checks
+Source guards only; Godot runtime smoke is required for the in-engine combat result.
+
+[PASS] gameplay_cycle_regression.py (0.99s)
+PASS: full result metadata is constructed before terminal persistence
+PASS: replay identity includes run counter seed and difficulty
+PASS: score includes loops battles bosses elites events and objective rewards
+PASS: settlement atomically accepts rich metadata score difficulty and final loadout
+PASS: checkpoint clear and reward addition precede exactly one durable save
+PASS: rich summary, difficulty record and bounded history are in the same payload
+PASS: failed persistence rolls back history records loadout rewards and the checkpoint
+PASS: terminal failure pauses run and retains original return/defeat outcome
+PASS: successful commit only then emits completion summary
+PASS: runtime integration audit verifies persisted summary and exactly one history row
+PASS: build identity is 0.61.0 and stable application name is unchanged
+GAMEPLAY CYCLE REGRESSION PASSED: 11/11 assertions
+Source-level guard only; execute expedition_integration_audit.gd with Godot 4.7.2 for runtime verification.
+
+[PASS] godot_parse_hotfix_regression.py (0.96s)
+PASS: continued prose line in GameState remains a comment
+PASS: snapshot encounter list keeps its Variant source
+PASS: snapshot loop does not redeclare encounter_value
+PASS: tile_system.gd uses consistent spaces for indentation
+PASS: Object.get is not called with a Dictionary-style default
+PASS: checkpoint state has an explicit bool type
+PASS: equipment state has an explicit bool type
+PASS: armory affordability has an explicit bool type
+PASS: research unlock state has an explicit bool type
+PASS: research affordability has an explicit bool type
+PASS: rollback balances use explicit integer types
+PASS: boss fixture uses unique variable name
+PASS: duplicate boss_group declaration is removed
+GODOT PARSE HOTFIX REGRESSION: 13/13
+
+[PASS] item_text_presenter_regression.py (0.94s)
+ITEM TEXT PRESENTER REGRESSION PASSED
+[PASS] UI preloads the dedicated item presenter
+[PASS] item bonus formatting delegates to presenter
+[PASS] value list formatting delegates to presenter
+[PASS] all equipment bonus fields remain represented
+[PASS] empty bonus output remains explicit
+[PASS] item comparison wording and thresholds are centralized
+[PASS] loadout synergy/set text and effect descriptions are centralized
+[PASS] presenter only formats values and does not mutate game state
+
+[PASS] item_upgrade_salvage_regression.py (1.02s)
+PASS: items have a separate bounded upgrade level
+PASS: upgrade prices scale with rank, prior upgrades and rarity
+PASS: preview improves the appropriate stats per slot
+PASS: upgrade keeps original ID and other item fields by deep-copying without reroll
+PASS: salvage rewards are deterministic and account for rarity and upgrade level
+PASS: authoritative upgrade rejects active expeditions and insufficient resources
+PASS: upgrading syncs the armory item and an equipped copy with the same ID
+PASS: upgrade transaction rolls back costs and both inventories if saving fails
+PASS: equipped gear cannot be salvaged in the authoritative state layer
+PASS: salvage transaction returns rewards once and rolls back if save fails
+PASS: legacy save items without upgrade_level remain valid while new level is bounded
+PASS: UI exposes item details and explicit before/after upgrade preview and costs
+PASS: salvage is a two-step confirmation and blocks equipped items in UI
+PASS: runtime smoke covers weapon, armor, core, rarity, cap and preserved affixes
+PASS: new build identifies itself as version 0.61.0 without changing profile name
+ITEM UPGRADE/SALVAGE REGRESSION PASSED: 15 checks
+Source guards only; GDScript save/UI operations still require Godot 4.7.2 runtime tests.
+
+[PASS] keyboard_focus_navigation_regression.py (0.89s)
+PASS: buttons advertise a visible high-contrast focus state
+PASS: button commands use a short anti-double-activation guard
+PASS: form controls use explicit high-contrast focus outlines
+PASS: expedition selectors participate in keyboard focus
+PASS: seed input participates in keyboard focus
+PASS: settings sliders and toggles participate in keyboard focus
+PASS: modals remember where focus came from
+PASS: closing a modal restores valid prior focus
+PASS: modal tab traversal is explicitly looped
+PASS: modal focus collection excludes disabled actions
+PASS: confirmation starts on a safe option
+PASS: keyboard focus cannot escape to background while an overlay is open
+PASS: destructive salvage confirmation is protected from Escape
+PASS: Escape releases text-input focus before global shortcuts
+PASS: screen transitions focus a primary action
+PASS: help lists keyboard and confirmation behavior
+KEYBOARD FOCUS NAVIGATION REGRESSION: 16/16
+Note: source-level guards only; traversal order and visual focus must still be exercised in Godot 4.7.2.
+
+[PASS] keyboard_ux_regression.py (0.94s)
+KEYBOARD/UX REGRESSION CHECK PASSED:
+- buttons are reachable by keyboard
+- F1 opens contextual help
+- Escape handles modal state
+- event and level-up choices are not accidentally dismissed
+- Space toggles expedition pause
+- 1/2/3 switch simulation speed
+- right column is bounded by a scroll container
+- log is inside a bounded scroll container
+- mouse wheel can scroll the log/controls without moving the whole window
+- help can resume tutorial progress
+Note: source-level guard only; key handling, scrolling, and layout must be checked inside Godot.
+
+[PASS] landscape_secret_regression.py (0.99s)
+PASS: secret events require explicit per-run discovery flags and resolve once
+PASS: secret events bypass regular random rolls only after discovery
+PASS: landscape secrets are registry-authored and require adjacent tiles in the same sector
+PASS: secret flags are saved, logged and not rediscovered after first reveal
+PASS: secret event outcomes have distinct risk/reward decisions and named loot
+PASS: secret item rewards enter the backpack and are banked only if they survive settlement
+PASS: relic IDs remain unique when a player reuses an expedition seed
+PASS: secret relics participate in stable content audits
+PASS: Godot smoke tests cover both secrets and duplicate prevention
+LANDSCAPE SECRET REGRESSION PASSED: 9/9 checks
+Source guards only; Godot smoke verifies the event and discovery path at runtime.
+
+[PASS] localization_catalog_regression.py (0.81s)
+PASS: reference catalog has at least 100 reviewed Russian UI strings
+PASS: localization service is an autoload
+PASS: all literal UI localization keys exist
+PASS: tutorial pages use catalog-backed keys
+PASS: settings volume keys are assembled from three catalog entries
+PASS: all catalog entries are non-empty strings
+PASS: format strings keep expected numeric/string placeholders
+PASS: localization audit tool is included
+PASS: runtime smoke verifies catalog loading and help content
+PASS: fixed tutorial prose is no longer embedded in TUTORIAL_STEPS
+PASS: placement tutorial describes both road and landscape targets
+PASS: tile-system preview templates are catalog-backed
+LOCALIZATION CATALOG REGRESSION: 12/12
+Source-level checks only; GDScript import and visual text fitting require Godot 4.7.2.
+
+[PASS] long_expedition_regression.py (0.96s)
+[PASS] standalone expedition mode is separate from difficulty and route modifiers
+[PASS] endgame target is 12 loops and four scheduled bosses
+[PASS] mode selection is exposed in the preparation screen
+[PASS] mode is passed through start-run and stored in the run snapshot
+[PASS] old snapshots without mode fall back to standard
+[PASS] long mode applies soft cap to danger while standard mode remains unchanged
+[PASS] long mode caps loop reward multiplier without changing standard formula
+[PASS] enemy/boss scaling input is bounded only in the long mode
+[PASS] checkpoint writes occur at intervals, are idempotent, and remain bounded
+[PASS] checkpoint data includes survival, danger, boss count and resources
+[PASS] restored checkpoints reject malformed/duplicate loops and clamp payload values
+[PASS] endgame completion requires loop goal, boss goal, and no pending battle/perk/event
+[PASS] completed endgame settles as a full-retention return and adds a score bonus
+[PASS] atomic settlement metadata exposes endgame progress and completion state
+[PASS] history persists mode and endgame completion
+[PASS] Godot smoke test covers long-mode caps and idempotent checkpoint creation
+[PASS] prototype version advanced to 0.61.0
+LONG EXPEDITION REGRESSION PASSED: 17/17 checks
+Static guards only. Final-boss flow, save/resume, and balance must be played in Godot 4.7.2.
+
+[PASS] long_expedition_runtime_gate_regression.py (1.00s)
+PASS: runtime gate starts the actual long-expedition mode
+PASS: runtime gate asserts 12 loops and four required bosses
+PASS: runtime gate verifies the four configured boss loops
+PASS: runtime gate verifies the four durable checkpoints and endgame result
+PASS: runtime gate exercises production route and encounter methods
+PASS: runtime scene points at the actual acceptance script
+PASS: CI runs the long expedition runtime scene with a bounded timeout
+LONG EXPEDITION RUNTIME GATE REGRESSION PASSED: 7/7 checks
+
+[PASS] loot_rarity_balance_regression.py (1.02s)
+PASS: base rarity weights match 70/24/5.2/0.8 percent
+PASS: one weighted distribution powers item rolls rather than additive uniform bias
+PASS: rarity odds normalize and retain ordered tier list
+PASS: rarity bonus is clamped and cannot flatten hierarchy at its cap
+PASS: source-specific drop chance is centralized for enemy, elite, boss and cache
+PASS: elite and cache gain bounded quality bias without being guaranteed top quality
+PASS: both combat and cache use the same drop probability helper
+PASS: both paths use common rarity-distribution weighting with gear and prepared bonuses
+PASS: elite keeps rolled rarity tier and applies only a separate stat premium
+PASS: boss guaranteed named loot is kept separate from ordinary rarity distribution
+PASS: failed rolls disclose source drop probability without pretending rarity rolled
+PASS: successful item feedback displays its conditional rarity probability
+PASS: UI displays actual source odds and conditional quality forecast
+PASS: runtime smoke covers normalized and monotonically improved quality odds
+PASS: old prepared bonuses remain capped and are consumed only on successful drops
+PASS: all existing boss relic and inventory APIs remain available
+LOOT RARITY BALANCE REGRESSION PASSED: 16/16 source checks
+Source-level only: actual seeded draws, GDScript parsing, UI, and balance distribution still require Godot 4.7.2 runtime acceptance.
+
+[PASS] objective_availability_regression.py (1.11s)
+PASS: each objective has a supported real progress kind
+PASS: objective target and text are validated
+PASS: all run modifiers are checked for objective reachability
+PASS: run creation and preview share deterministic selection
+PASS: random seed preview is the seed actually passed to start
+PASS: condition and reward are visible before the expedition starts
+PASS: seed edits immediately refresh objective preview
+PASS: objective preview is exercised by the Godot smoke test
+OBJECTIVE AVAILABILITY REGRESSION PASSED: 8 static checks. Runtime remains separate.
+
+[PASS] off_road_structure_regression.py (1.08s)
+PASS: archive and nursery are registered as visible structures
+PASS: structures appear only in the rare unlock pool at lower weights
+PASS: archive produces materials, crystals and reward bonus on sector visits
+PASS: nursery raises encounter chance and enemy strength in exchange for payout
+PASS: synergy recipes cover both structure planning and dangerous combinations
+OFF-ROAD STRUCTURE REGRESSION PASSED: 5/5 checks
+Source guards only; the existing Godot smoke suite exercises visit effects and weighted discovery.
+
+[PASS] performance_long_run_regression.py (1.02s)
+PERFORMANCE LONG-RUN REGRESSION PASSED
+- autosave and UI refresh cadence are configured
+- event log stays bounded
+- event history stays bounded on long runs and after restore
+- route view skips unchanged redraw requests
+- settings and metric labels skip unchanged assignments
+- notification audio has cooldown and concurrent player cap
+- benchmark scenarios cover seeded generation
+Long-duration load, frame pacing and audio overlap require Godot runtime profiling on target hardware.
+
+[PASS] placement_zone_regression.py (0.96s)
+PASS: all tile types declare their intended zone
+PASS: the game and offline content audit validate placement zone values
+PASS: road validator rejects field-only tiles and field validator rejects road-only tiles
+PASS: placement previews call the exact same zone-aware validators
+PASS: hand card tells the player that special structures belong on the field
+PASS: Godot smoke covers road rejects, field accepts and both previews
+PLACEMENT ZONE REGRESSION PASSED: 6/6 checks
+Source guards only; Godot smoke covers the live placement methods.
+
+[PASS] progression_build_regression.py (0.96s)
+PROGRESSION BUILD REGRESSION CHECK PASSED
+- perk pool has offensive, defensive, economy and utility roles
+- every perk has a stack limit
+- draft filters capped perks and removes duplicates
+- perk application records rank and applies effect fields
+- all-capped fallback avoids a stuck level-up modal
+- UI shows category and rank cap
+- gameplay stats combine items and perks
+- runtime smoke covers caps and duplicate-free drafts
+Runtime assertions still need Godot execution.
+
+[PASS] rare_route_loot_regression.py (1.04s)
+PASS: lost convoy and hunter marker are explicitly road-only authored cards
+PASS: new cards enter the same weighted rare-draft path only after unlock
+PASS: convoy pays materials and arms a bounded rarity bias
+PASS: hunter marker arms a bounded drop chance bonus and exposes risk tradeoff
+PASS: equipped loadout has a capped rare-find stat and the generated roll consumes it
+PASS: rarity bias is optional and capped, leaving unmodified rolls unchanged
+PASS: prepared loot is consumed only after a successful non-boss drop
+PASS: new stat is valid in saved equipment and surfaced in the tooltip
+PASS: Godot smoke includes bounds, monotonic rarity and equipped loadout cases
+PASS: two route formations and three local synergies are registered with meaningful tradeoffs
+RARE ROUTE LOOT REGRESSION PASSED: 10/10 checks
+Static source checks only; GDScript smoke must run in Godot 4.7.2.
+
+[PASS] real_run_balance_capture_regression.py (1.19s)
+[PASS] Godot save envelope exposes bounded expedition history
+[PASS] standalone runs JSON export is accepted
+[PASS] export-level capture kind is propagated to rows without an override
+[PASS] missing/malformed input fails closed
+[PASS] duplicate run IDs are excluded without double counting
+[PASS] unsupported outcome is rejected
+[PASS] negative metric and non-object rows are rejected
+[PASS] float danger remains valid while integer metrics are strict
+[PASS] comparison groups separate build, modifier, mode, contract, challenge, and capture source
+[PASS] contract and modifier challenge variants remain distinct comparison groups
+[PASS] report explicitly distinguishes scripted engine QA from player history
+[PASS] small samples are explicitly marked insufficient
+[PASS] report does not invent automatic balance verdict
+[PASS] legacy entries are counted and never assigned fabricated duration
+[PASS] duration requires telemetry schema 1
+[PASS] run report contains no local input file path
+[PASS] new capture schema includes duration and baseline metrics
+[PASS] run history normalization preserves telemetry but remains bounded
+[PASS] save validation caps supported telemetry schema and validates metrics
+[PASS] tool explicitly documents local-only/no-network behavior
+[PASS] capture source labels are normalized to a bounded allowlist
+REAL-RUN BALANCE CAPTURE REGRESSION PASSED: 21/21 checks
+Tests use synthetic fixtures only; no real-run data or balance verdict is claimed.
+
+[PASS] release_artifact_hygiene_regression.py (1.08s)
+RELEASE ARTIFACT HYGIENE REGRESSION PASSED: local secrets/logs/temp files excluded, fingerprints stable, symlink source rejected, project inputs retained
+
+[PASS] release_candidate_regression.py (5.17s)
+PASS: project uses stable identity and current 0.61.0 version
+PASS: manifest labels build RC7 and runtime remains unverified until gate report
+PASS: release checklist distinguishes automated runtime gates from manual acceptance
+PASS: Windows release gate names the Prototype 61 runtime-tested output
+PASS: Windows test launcher uses the matching output
+PASS: Windows scripts have no stale Prototype 34/36/55/56/57 runtime output
+PASS: Windows test launchers set conservative deterministic worker default
+PASS: runtime report validation requires the current version and fingerprint
+PASS: all seven gate labels are explicitly required
+PASS: symlinks are rejected before package inclusion
+PASS: local credential and secret artifacts are filtered from release members
+PASS: stage-60 atomic gameplay-cycle regression is included
+PASS: stage-61 UI acceptance and modal regression ship in RC7
+PASS: stage-62 QA runner cleanup and both process-tree regressions ship in RC7 hotfix
+PASS: RC7 packager includes artifact-hygiene, UI and runtime-report tests
+PASS: packager requires RC7 project version and manifest status
+PASS: Stage 78 item comparison and field-cache documents/tests/report are mandatory package inputs
+PASS: independent preflight enforces Stage 78 package evidence
+PASS: Stage68A resource graph audit and acceptance documents are mandatory package inputs
+PASS: independent preflight enforces Stage68A evidence
+PASS: Stage68B local balance capture tool, tests and guide are mandatory package inputs
+PASS: independent preflight enforces Stage68B evidence
+PASS: RC7 package includes Stage64B automated engine capture with source labels
+PASS: independent preflight enforces Stage64B automated capture evidence
+PASS: RC7 package includes browser reload/resume acceptance
+PASS: RC7 package includes road/landscape touch placement regression
+PASS: RC7 package includes the autoload-aware save-system regression scene
+PASS: Web CI runs the save-system regression with autoloads initialized
+PASS: Packaged standalone workflow runs save regression with autoloads initialized
+PASS: Desktop runtime gate runs save regression through the autoload-aware scene
+PASS: independent preflight enforces road/landscape touch placement regression
+PASS: independent preflight enforces browser reload/resume acceptance
+PASS: deterministic RC7 ZIP (7da1a33bc5a0b7f33f9a9147308adea6f1fd2d36eaaba65d32a1d89d73d13185)
+PASS: runtime-tested packaging rejects a missing report
+RELEASE CANDIDATE RC7 REGRESSION PASSED: 32 source assertions, deterministic ZIP and fail-closed gate
+Source-level only; the actual Godot runtime gate still has to run on Windows.
+
+[PASS] release_gate_runner_regression.py (1.12s)
+RELEASE GATE RUNNER REGRESSION PASSED: static, exact engine, isolated import/launch/smoke/save, source fingerprint and fail-fast packaging
+This is source-level evidence; the release gate itself must be executed with Godot 4.7.2 on Windows.
+PASS: runtime gate timeout process-tree regression is included in the package
+
+[PASS] release_package_regression.py (2.38s)
+RELEASE PACKAGE REGRESSION PASSED: AbyssLoop/ root folder, required files, archive integrity, stable save identity, runtime QA isolation, keyboard-focus and accessibility safeguards, version and no tower combat
+Package content is validated at file/archive level; this does not confirm Godot runtime compilation.
+
+[PASS] release_preflight_regression.py (1.00s)
+RELEASE PREFLIGHT REGRESSION PASSED: version drift, manifest drift, incomplete static report, extra ZIP member and byte mismatch are rejected
+
+[PASS] research_respec_regression.py (0.92s)
+RESEARCH RESPEC REGRESSION PASSED: 11 checks
+- build version is 0.61.0 without changing stable app identity
+- respec preview is blocked while an expedition checkpoint is active
+- reset refunds only 80 percent and explicitly calculates retained cost
+- known nodes are reset while unknown stable IDs remain preserved
+- purchase ledger records actual research cost and purchase rolls back on save failure
+- respec transaction rolls back unlocks, ledger and both resources on save failure
+- purchase history is included in persisted data
+- legacy saves remain valid without purchase ledger and investment fields are validated
+- unknown IDs are preserved and aliases support stable-ID migrations
+- research UI exposes reset, shows costs and requires explicit confirmation
+- refund rounding is deterministic and does not over-refund
+UI interaction, GDScript compilation and save-failure injection still require Godot 4.7.2 runtime testing.
+
+[PASS] research_tree_regression.py (1.10s)
+RESEARCH TREE REGRESSION PASSED
+- research branches contain tactical, combat, economy and event paths
+- dependencies are declared and checked centrally
+- rare tiles, starting attack, events and cycle income use unlock effects
+- research interface is scrollable and displays effect/dependency
+- runtime smoke covers research effects
+- four shelter specializations have explicit root nodes and summaries
+- branch-aware UI displays progress, next-node preview and blocked reasons
+Actual purchases and their effects require Godot runtime testing.
+
+[PASS] resource_graph_regression.py (0.92s)
+RESOURCE GRAPH REGRESSION: PASS — 84 res:// references checked across 7 scenes.
+All referenced paths exist and every ExtResource reference used by a scene is declared.
+Static source check only; Godot import, GDScript compilation and runtime remain separate gates.
+
+[PASS] road_formation_and_loadout_regression.py (0.92s)
+PASS: road formations are defined as stable data-driven three-tile patterns
+PASS: registry validates formation ids, road-legal tiles, whitelisted effects, and numeric bounds
+PASS: formation matching wraps previous and next nodes around the closed route
+PASS: formation effects share the existing live synergy aggregation
+PASS: placement preview detects formations centered on affected neighbouring nodes
+PASS: equipped cartographer bonus scales only positive formation reward
+PASS: live road-node visit passes actual equipped items into synergy calculation
+PASS: new stat has a safe aggregation cap and affects item power
+PASS: item details explain the cartographer effect
+PASS: runtime smoke covers every formation, equipped effect, loop wraparound, and preview
+ROAD FORMATION + LOADOUT REGRESSION: 10/10
+
+[PASS] route_geometry_regression.py (0.85s)
+ROUTE GEOMETRY REGRESSION PASSED: shared drawing/input geometry, adaptive markers, dense-route stress tests
+NOTE: source guard passed; the corresponding GDScript smoke test still requires Godot runtime execution.
+
+[PASS] route_topology_stress_regression.py (1.00s)
+ROUTE TOPOLOGY STRESS REGRESSION PASSED: 120 geometry scenarios across viewport sizes, profiles and node counts.
+Minimum gap between neighboring hit areas: 2.40px. This remains a numerical model; Godot runtime is separate.
+
+[PASS] run_debrief_regression.py (0.92s)
+PASS: summary screen renders a dedicated debrief panel and delegates to presenter
+PASS: UI preloads extracted pure presenter
+PASS: debrief presenter handles endgame, return and defeat paths
+PASS: debrief uses actual loss, victory, boss and loop metrics
+PASS: debrief handles unfinished or failed optional contracts
+PASS: presenter is read-only and cannot change gameplay or rewards
+PASS: summary metadata still comes from finalized expedition ledger and atomic settlement
+PASS: Godot smoke calls extracted presenter for return, defeat and endgame cases
+RUN DEBRIEF REGRESSION: 8/8
+Source-level only; rendered fit and game feel require Godot runtime review.
+
+[PASS] runtime_gate_process_cleanup_regression.py (5.79s)
+PASS: runtime-gate step captures normal output and exit status
+PASS: runtime-gate step preserves nonzero exit status and diagnostic output
+PASS: runtime-gate timeout terminates the process tree without hanging (2.51s)
+RUNTIME GATE PROCESS CLEANUP REGRESSION PASSED: 3 functional checks and shared cleanup guard
+
+[PASS] runtime_gate_report_validation_regression.py (0.96s)
+PASS: reject missing report
+PASS: reject failed result (runtime gate report does not declare Result: PASS exactly once)
+PASS: reject non-exact result status (runtime gate report does not declare Result: PASS exactly once)
+PASS: reject duplicate result header (runtime gate report does not declare Result: PASS exactly once)
+PASS: reject wrong engine version (runtime gate report was not generated by Godot 4.7.2)
+PASS: reject non-stable engine build (runtime gate report was not generated by Godot 4.7.2)
+PASS: reject development engine build (runtime gate report was not generated by Godot 4.7.2)
+PASS: reject wrong build version (runtime report is for a different build version)
+PASS: reject stale source fingerprint (runtime gate report is stale: project sources changed after runtime tests)
+PASS: reject missing Godot version gate (runtime gate report is incomplete: Godot version)
+PASS: reject one failed gate hidden behind Result PASS (runtime gate report contains non-PASS gates: Gameplay smoke)
+PASS: reject duplicate gate row (runtime gate report contains duplicate gate rows: Gameplay smoke)
+PASS: reject unexpected gate row (runtime gate report contains unexpected gate rows: unrecognized extra gate)
+PASS: accept complete report contract in isolated fixture
+RUNTIME GATE REPORT VALIDATION REGRESSION PASSED: 13 rejection cases and 1 isolated contract-acceptance case
+Synthetic report checks verify the validation contract only; no fixture is runtime evidence and no Godot process was run.
+
+[PASS] runtime_gate_sandbox_regression.py (1.10s)
+RUNTIME GATE SANDBOX REGRESSION PASSED: 13 checks
+- runtime gate uses an isolated temporary project
+- isolated project uses a distinct user-data identity
+- QA cannot import actual legacy user profiles
+- main project is editor/import-preflighted before main launch
+- main scene launches before gameplay smoke
+- save regression runs after smoke
+- cross-system expedition audit runs after save regression
+- all seven runtime gates are required
+- failed runtime gates do not package
+- runtime report is fingerprinted against source
+- runtime fingerprint is refreshed after static reports are regenerated
+- packager requires a current gate report on release path
+- fingerprint excludes volatile reports and caches
+The runtime gate must still be executed with Godot 4.7.2 on Windows.
+
+[PASS] save_integrity_regression.py (1.10s)
+PASS: payload schema stays v3 while integrity envelope is v2
+PASS: new save envelope declares SHA-256
+PASS: removing checksum cannot downgrade envelope v2 to legacy
+PASS: canonical payload sorts dictionary keys recursively
+PASS: Web JSON integer-to-float conversion is normalized before version/schema checks
+PASS: checksum is verified before migration and data validation
+PASS: unknown checksum algorithm is rejected
+PASS: invalid checksum length and mismatch are rejected
+PASS: save decode reports stable rejection reasons with expected/actual digest prefixes
+PASS: payload checksum uses the JSON roundtrip representation actually persisted
+PASS: legacy envelopes without checksum remain readable
+PASS: primary and backup recovery use common checksum encoder
+PASS: corrupt primary is quarantined and repaired from validated backup
+PASS: save, export and profile migration use common envelope encoder
+PASS: runtime regression checks tamper detection and backup fallback
+PASS: runtime regression checks checksum key-order invariance
+PASS: independent canonical JSON fixtures are stable and payload-sensitive
+SAVE INTEGRITY SOURCE REGRESSION PASSED: 18 assertions
+Source-level only; the GDScript runtime test must pass in Godot 4.7.2.
+
+[PASS] save_profile_migration_regression.py (1.12s)
+SAVE PROFILE MIGRATION REGRESSION PASSED: 9 checks
+- application config name is stable across prototype builds
+- build version is separate from application profile name
+- legacy profile selection prefers newest valid save
+- legacy primary is preferred before its own backup
+- legacy source profile uses a narrow prefix allowlist
+- source profile is never modified by migration
+- QA can disable profile import
+- missing-primary recovery is surfaced in UI
+- migration and missing-primary behavior have runtime regression coverage
+GDScript execution is still required for the end-to-end profile restore test.
+
+[PASS] save_system_atomic_regression.py (0.97s)
+SAVE SYSTEM ATOMIC REGRESSION CHECK PASSED:
+- current save format is versioned
+- stable project data profile name is used
+- profile migration only runs when the current profile is empty
+- legacy import can be disabled for isolated QA
+- only known previous project profiles are considered
+- missing primary restores backup
+- temporary save file is used
+- backup replacement is atomic
+- primary replacement is atomic
+- file content is verified before replacement
+- rollback restores old file when rename fails
+- interrupted replacements are recovered
+- damaged primary is quarantined
+- backup fallback is explicit
+- missing primary recovery is explicit
+- legacy profile import is atomic
+- invalid resource counts are rejected
+- snapshot shape is validated
+- tutorial state is part of save data
+- migration v1 to v2 exists
+- migration v2 to v3 exists
+- stable version title does not fragment user profile
+Note: source-level check only; also run tests/save_system_regression.gd in Godot.
+
+[PASS] seed_determinism_regression.py (1.06s)
+SEED/DIFFICULTY REGRESSION CHECK PASSED
+- difficulty presets alter threat, risk/reward and group composition
+- difficulty and optional run modifier are selected and stored for resume
+- custom seed can reproduce the initial generation
+- encounter composition supports difficulty modifier
+- difficulty, run modifier, and seed are available to the player before starting
+- runtime smoke checks hundreds of deterministic route seeds
+Seed stability and difficulty tuning still need Godot runtime testing.
+
+[PASS] shelter_branch_regression.py (1.03s)
+SHELTER BRANCH REGRESSION PASSED: 13 checks
+- version advances to 0.61.0 while application profile stays stable
+- four branches exist with human-readable summaries
+- every research node belongs to exactly one known branch
+- each specialization has an independently unlockable entry node
+- all prerequisites stay inside the same specialization
+- branch dependencies and all targets resolve to registered research
+- starter branches are individually affordable but cannot all be bought with starter scrap
+- branch status centralizes next-node and blocked-node preview
+- UI visibly groups branches and explains lock reasons
+- runtime smoke validates branch entries and unique membership
+- save schema stays unchanged because no persisted field shape changed
+- building and research income share one cap for forecast and payout
+- runtime smoke exercises the configured maximum income cap
+Godot compilation and interactive UI still require runtime acceptance in Godot 4.7.2.
+
+[PASS] shelter_economy_cap_regression.py (0.96s)
+SHELTER ECONOMY CAP REGRESSION PASSED: 6 checks
+- income cap is centralized and validates a safe range
+- all building and research income is aggregated before the cap
+- forecast and actual payout use the same helper
+- economic investment cannot exceed six extra scraps per loop
+- cap preserves base route income rather than replacing its formula
+- runtime smoke verifies maximum and lower bound
+Numerical screening and source guards are not a substitute for in-engine economy campaigns.
+
+[PASS] snapshot_schema_regression.py (1.07s)
+SNAPSHOT SCHEMA REGRESSION PASSED: 14 checks
+- snapshot v1/v2/v3 migrate to current status-aware v4 snapshot
+- v4 adds status state while preserving contract and world field schema
+- v1, v2, v3, and v4 snapshots can be restored
+- snapshot validator checks status durations, stacks, known IDs and duplicates
+- snapshot validator bounds world tile count
+- Stage68B snapshot telemetry fields are optional for legacy snapshots and bounded when present
+- legacy snapshots without run baseline are captured as schema zero instead of guessed
+- field schema v2 validates cell coordinates, tile id, and route index
+- prototype 32 empty field schema is safely migrated
+- legacy current profile snapshots migrate old combat debuffs to status effects
+- save export validates and writes an independent file
+- save import rejects invalid payloads before atomic commit
+- UI offers export only from the base settings
+- import warns that profile replacement is destructive and requires restart
+Source-level guards only; file-dialog and GDScript runtime paths need Godot testing.
+
+[PASS] stage64b_engine_run_capture_regression.py (1.04s)
+PASS: capture uses the real ExpeditionManager across data-driven difficulty/mode cases
+PASS: five fixed seeds repeat across four difficulties and both expedition modes
+PASS: capture uses production route/combat methods with fixed scaled-time increments
+PASS: capture probes explicit contracts and non-standard modifiers separately
+PASS: capture assigns configuration-unique IDs and marks coverage-only rows
+PASS: capture preserves challenge metadata before freeing the manager
+PASS: capture requires a real road and landscape placement in each run
+PASS: capture never forces player/enemy health, loot, or damage
+PASS: capture stores the actual completed summary with telemetry schema 1
+PASS: capture labels the data as scripted and not a human-playtest or balance verdict
+PASS: capture has a bounded simulation-step ceiling and explicit failure exit
+PASS: scene launches the scripted Node with project autoloads
+PASS: analysis separates automated engine QA from profile-history rows
+STAGE64B ENGINE CAPTURE REGRESSION PASSED: 13/13 checks
+These source checks do not claim that the Godot capture has run or that balance was measured.
+
+[PASS] stage66b_readability_localization_regression.py (0.94s)
+PASS: route target uses the exact TileSystem road placement validator
+PASS: landscape target uses the exact TileSystem landscape placement validator
+PASS: visual target state includes non-colour plus and cross symbols
+PASS: high contrast mode adds light and dark edge separation to route markers
+PASS: high contrast mode makes field markers and label plates more distinct
+PASS: road-target and landscape-target preview status text comes from catalog
+PASS: dynamic road preview strings come from localization templates
+PASS: dynamic landscape preview strings cover sector, effects, caps, and combinations
+PASS: tutorial no longer contradicts dual-target road placement
+PASS: help copy describes both legal placement targets
+PASS: placement hover now checks sector cap before showing a legal target
+PASS: Godot smoke remains listed for runtime check rather than falsely marked as passed
+STAGE66B READABILITY/LOCALIZATION REGRESSION: 12/12
+Static/source checks only; Godot rendering and translated GDScript formatting still require runtime acceptance.
+
+[PASS] stage66c_enemy_status_readability_regression.py (0.86s)
+PASS: all enemy role labels are localized and non-empty
+PASS: combat HUD resolves each registered role through localization
+PASS: enemy behavior hint remains available as HUD tooltip
+PASS: elite role is shown alongside the elite label
+PASS: boss and elite telegraphs remain visible after role labeling
+PASS: route map uses explicit boss and elite markers rather than colour alone
+PASS: route and landscape tile icons remain shape-drawn from tile IDs
+PASS: known statuses have distinct non-colour prefixes
+PASS: status names, stacks, and durations remain visible
+PASS: status presentation does not change combat rules
+STAGE66C READABILITY REGRESSION: 10/10
+Static/source checks only; GDScript compilation, font coverage and HUD fit require Godot runtime acceptance.
+
+[PASS] stage71_balance_matrix_regression.py (0.84s)
+PASS: matrix covers all four registered difficulty presets
+PASS: matrix includes three same-seed-count repeats per difficulty in the ordinary mode
+PASS: matrix includes the long mode at three loops across all difficulties
+PASS: matrix has repeat groups for the three non-standard modifiers
+PASS: matrix has repeat groups for three separately identified contracts
+PASS: landscape survey really attempts three legal landscape placements
+PASS: each case uses the actual ExpeditionManager with a deterministic seed
+PASS: test leaves game combat and reward formulas unmodified
+PASS: matrix captures contract and modifier challenge IDs separately
+PASS: scene runs the Stage71 capture node
+PASS: CI executes the matrix with a bounded timeout and preserves output
+PASS: analysis separates contracts and challenges into comparison groups
+STAGE71 BALANCE MATRIX REGRESSION PASSED: 12/12 checks
+These are source guards; Stage71 result data still requires the actual Godot runtime capture.
+
+[PASS] stage76_contextual_loot_and_tile_hand_regression.py (0.95s)
+PASS: four existing stable affixes grant matching biome damage and trophy bonuses
+PASS: biome trophy bonuses have bounded aggregation caps and are part of recognized stats
+PASS: affix descriptions communicate the six percentage-point reward correctly
+PASS: equipped contextual stats are derived from equipped loadout, not backpack contents
+PASS: victory uses defeated enemy biome to choose only its matching affix
+PASS: trophy chance formula caps global and biome-specific bonuses and leaves bosses guaranteed
+PASS: landscape focus raises only the matching biome trophy chance
+PASS: item text displays biome-specific trophy chance
+PASS: save validation rejects out-of-range contextual trophy stats
+PASS: tile draft can exclude a specific card while preserving old caller compatibility
+PASS: hand exchange requires active run, valid card, crystal and one exchange per loop
+PASS: hand exchange is blocked during combat, event, perk and pending settlement
+PASS: exchange excludes the old card and updates its loop marker only once
+PASS: failed persistence rolls back hand, ledger, RNG and event history
+PASS: loop exchange marker is validated and old saves remain optional
+PASS: UI exposes redraw reason, live drop/rarity forecast, and wires the button callback
+PASS: content audit accepts the new stat keys while preserving stable IDs
+PASS: Godot smoke describes contextual trophies and card exchange constraints
+STAGE 76 REGRESSION PASSED: 18/18 source guards
+Source-level only; Godot compile, runtime, browser export and visual acceptance are separate gates.
+
+[PASS] stage77_tactical_tile_forecast_regression.py (0.99s)
+PASS: route forecast discovers pair synergies created when the selected tile is only the neighbour
+PASS: route pair match identity keeps trigger and neighbour positions separate
+PASS: forecast evaluates changed node and adjacent trigger nodes on the closed route
+PASS: immutable start node is excluded from route synergy trigger and placement targets
+PASS: route forecast shows the target node that will activate neighbour-triggered synergy
+PASS: route forecast distinguishes aggregate new synergy effects from node-level caps
+PASS: route preview returns new pair-synergy instances for downstream UI and tests
+PASS: world forecast reports enemy pool for landscape-only threats
+PASS: world forecast uses actually equipped landscape affinity effects
+PASS: world forecast shows affinity resource and visit-modifier effects
+PASS: world forecast previews a newly prepared secret recipe before placement
+PASS: secret recipe matching respects physical adjacency and same route sector
+PASS: landscape forecast includes affinity data without mutating equipment or tiles
+PASS: road preview still relies on the shared route placement validator
+PASS: landscape preview still relies on the shared landscape placement validator
+PASS: UI routes hovered road and landscape cells through the shared preview functions
+PASS: Godot smoke covers reverse-order road synergy and land-affinity forecasts
+PASS: Godot smoke validates that route forecast leaves the live map unchanged
+STAGE 77 TILE FORECAST REGRESSION PASSED: 18/18 source guards
+Source-level only; Godot parsing/runtime and visual acceptance remain separate gates.
+
+[PASS] stage78_equipment_comparison_and_overflow_cache_regression.py (0.97s)
+PASS: the active run backpack remains a fixed 12-slot FIFO queue
+PASS: new snapshots record order version and keep legacy cache empty
+PASS: legacy snapshots combine old bag/cache chronology and migrate to newest-first
+PASS: equipping removes the new item from bag and never returns displaced run gear to it
+PASS: unequipping returns gear at the front and uses FIFO eviction when full
+PASS: players can reorder inventory and persist the discard order
+PASS: right-click quick equips and drag/drop targets compatible equipment slots
+PASS: UI loads drag controls for inventory grids
+PASS: UI explains FIFO behavior and uses only the 12 active backpack cells
+PASS: empty bag cells are valid drag reorder targets
+PASS: drop tiers include a rare relic tier with a lower baseline roll band
+PASS: cache tiles can roll equipment and successful roll consumes prepared bonuses
+PASS: save validator accepts older snapshots but validates explicit ordering versions
+PASS: ejected item ledger is optional for legacy saves, capped at 100, and validates item payloads and unique IDs
+PASS: settlement banks only surviving gear, with the backpack kept on safe return and lost on defeat
+PASS: equipped item comparison still reports deltas beyond raw power
+PASS: smoke source explicitly covers FIFO queue behavior
+PASS: run drops are not copied into permanent armory until settlement
+STAGE 79 INVENTORY REGRESSION PASSED: 18/18 source guards
+Source-level only; Godot parse/runtime and visual mouse interaction require a Godot 4.7.2 runtime check.
+
+[PASS] stage80_ejected_loot_resource_regression.py (1.11s)
+PASS: overflow item conversion depends on rarity, rank, upgrade and power with cap
+PASS: each ejection increments cumulative conversion value and count even if history is trimmed
+PASS: older snapshots without cumulative values derive from legacy ejection records
+PASS: settlement adds echo dust atomically with summary and checkpoint removal
+PASS: settlement idempotency returns the committed result when the same run id is retried
+PASS: failed settlement save rolls back dust and settlement identifiers
+PASS: save validation accepts legacy profiles and validates bounded dust/idempotency ledger
+PASS: run save validation bounds cumulative overflow resource values
+PASS: salvage building requires echo dust and generic upgrades roll back on failed save
+PASS: base screen shows resource and recycler price includes the new cost
+STAGE 80 EJECTION RESOURCE REGRESSION PASSED: 10/10 source guards
+Static source-level evidence only. Godot 4.7.2 runtime and settlement/save reload must still be tested in-engine.
+
+[PASS] stage82_inventory_identity_regression.py (1.02s)
+PASS: duplicate backpack IDs are rejected instead of being reported as successful loot
+PASS: new item insertion checks all equipped slots before evicting an old item
+PASS: unequipping permits moving its own item but blocks duplicate IDs in other slots
+PASS: manual equip refuses an item ID that is already equipped
+PASS: snapshot restore validates every equipment slot, ID, and equipment-slot compatibility
+PASS: restored equipment wins over bag copies and duplicate equipped copies are removed
+PASS: rejected duplicates cannot evict the backpack tail or create ejection dust
+PASS: runtime smoke checks identity uniqueness against currently equipped gear
+PASS: loot paths keep using the shared run-inventory insertion gate
+PASS: new Stage 82 audit evidence is mandatory in package preflight
+STAGE 82 INVENTORY IDENTITY REGRESSION PASSED: 10/10 checks
+Source-level evidence only; Godot restore/drag-drop/save behavior still requires runtime acceptance.
+
+[PASS] static_project_check.py (1.23s)
+STATIC PROJECT CHECK PASSED: resource paths exist and delimiters are balanced.
+Note: this is not a Godot/GDScript runtime compilation check.
+
+[PASS] static_suite_runner_regression.py (4.40s)
+PASS: static suite keeps the four-worker default and bounds optional concurrency
+PASS: both Windows QA launchers set a deterministic default
+PASS: normal process returns captured output and exit status
+PASS: timed-out process tree is terminated without a hanging output pipe (2.51s)
+STATIC SUITE RUNNER REGRESSION PASSED: 3 functional checks plus launcher/config guards
+
+[PASS] status_effect_presenter_regression.py (1.02s)
+PASS: presenter is a small standalone RefCounted component
+PASS: presenter reads active statuses from shared status-effect system
+PASS: presenter formats stack counts and remaining duration
+PASS: presenter limits visible effects and reports hidden count
+PASS: empty status list has explicit text
+PASS: symbols are optional and status text stays descriptive
+PASS: each known status effect has its own stable non-colour marker
+PASS: HUD uses component for hero and current target
+PASS: HUD respects saved status-symbol setting
+PASS: component does not tick, apply, or remove status effects
+PASS: UI preloads dedicated presenter
+STATUS EFFECT PRESENTER REGRESSION PASSED: 11 checks
+Static source checks only; GDScript compilation and visual behavior must be checked in Godot.
+
+[PASS] status_effect_regression.py (1.01s)
+PASS: status data defines refresh, stack and periodic damage behavior
+PASS: barrier refreshes rather than stacking indefinitely between encounters
+PASS: registry validates status type duration and stack constraints
+PASS: apply refreshes or stacks without duplicate IDs and honors cap
+PASS: periodic damage uses active duration and bounded ticks
+PASS: modifier calculation is centralized and bounded
+PASS: all combat hits honor defence modifiers, wounds and barriers
+PASS: legacy caster slow migrates into status data
+PASS: hero and enemy combat both tick statuses only inside active combat
+PASS: caster uses the shared status system and crit can expose the target
+PASS: status data for both hero and current target is visible in expedition HUD
+PASS: snapshot schema v4 persists and validates effects
+PASS: old snapshots migrate to v4 and preserve legacy slow duration
+PASS: runtime smoke checks stack caps ticks expiry migration barriers refresh and wounds
+PASS: project version is 0.61.0 for this build
+STATUS EFFECT REGRESSION PASSED: 15 checks
+Static source evidence only; runtime assertions must be executed in Godot 4.7.2.
+
+[PASS] telegraph_counterplay_regression.py (0.94s)
+PASS: five status counter stats are aggregated and individually capped
+PASS: status counter stats use deterministic expedition RNG and suppress before applying
+PASS: elite, boss, hunter and caster status applications share the counter helper
+PASS: pre-attack warning includes equipped counter chance
+PASS: new counter affixes have stable definitions and typed slots
+PASS: counter stats appear in item detail text
+PASS: route and landscape forecasts accept the active equipment loadout
+PASS: tile forecast calculates tactical counter advice through the same equipment aggregator
+PASS: new resistance values are validated when loading persisted item data
+PASS: stable affix ID is tracked in the reviewed V1 content manifest
+TELEGRAPH COUNTERPLAY REGRESSION PASSED: 10/10 source guards
+Source-level only; no Godot compilation, real encounter or UI runtime is implied.
+
+[PASS] theme_art_regression.py (1.16s)
+PASS: UI preloads the approved environment asset
+PASS: UI uses nearest-neighbour scaling for pixel art
+PASS: route map uses themed background
+PASS: route markers use blocky rectangular silhouettes
+PASS: route tiles have low-resolution type glyphs
+PASS: hero token is independently drawn in original pixel blocks
+PASS: brand label no longer claims neutral theme
+PASS: themed route cell type names exist
+PASS: themed creature names exist without changing ids
+PASS: project keeps stable game identity and separately versions the prototype
+THEME ART REGRESSION PASSED. Visual judgment and GDScript compilation still require Godot runtime testing.
+
+[PASS] tile_draft_recipe_regression.py (1.03s)
+PASS: all road and off-road tile types have explicit draw weights
+PASS: weighted choice respects rare-tile unlock gate
+PASS: archive and nursery have explicit field-only placement zones
+PASS: new recipes cover resource, safer ambush and dangerous resonance
+PASS: real Godot smoke tests bound rare tile frequency with a fixed seed
+PASS: real Godot smoke tests exercise recipe rewards
+TILE DRAFT/RECIPE REGRESSION PASSED: 6/6 checks
+These source guards do not replace Godot runtime smoke.
+
+[PASS] tile_effect_pipeline_regression.py (0.97s)
+PASS: same-sector triggers use a shared aggregate before caps
+PASS: forecast uses same route-sector aggregation for before/after states
+PASS: forecast totals compare capped marginal deltas by route sector
+PASS: final modifier limits are centralized
+PASS: live run applies landscape synergy once per visited sector
+PASS: pipeline order is base node, local tiles, neighbour synergies, then caps
+PASS: smoke tests cover all three final modifier caps
+PASS: smoke tests cover removal and replacement without ghost bonuses
+PASS: tile card discovery uses weighted probabilities and keeps rare cards gated
+PASS: forecast smoke verifies no source-map mutation
+TILE EFFECT PIPELINE REGRESSION PASSED: 9 source guards and overlapping/add/remove cap arithmetic.
+Godot smoke assertions were added but need execution on Godot 4.7.2; this Python test is source-level only.
+
+[PASS] tile_synergy_regression.py (0.74s)
+TILE SYNERGY REGRESSION CHECK PASSED
+- control and rare tile definitions exist
+- new recipes add resource, safety and risk/reward choices
+- synergies have stable ids and effect maps
+- adjacency supports circular route wrapping
+- neighbor effect types are aggregated
+- placement preview provides forecasts and rejection reasons
+- manager applies synergies to actual run state
+- route view reports mouse hover
+- UI previews selected tile on hovered landscape cell
+- landscape synergies use orthogonal neighbor cells
+- landscape synergies cannot cross route-sector boundaries
+- field preview detects combinations whose trigger is the existing neighbor
+- runtime and preview use a shared capped synergy aggregator
+- synergy caps exist for all five supported effects
+- preview reports actual marginal sector effects and cap state
+- GDScript smoke includes a multi-recipe cap fixture
+- new combination preview names the triggered route sector
+- runtime smoke covers known combinations and reverse placement order
+Runtime smoke assertions were added but are not executed by this Python check; run them in Godot.
+
+[PASS] trophy_interaction_regression.py (0.87s)
+PASS: four biome families drop distinct named trophy materials
+PASS: matching landscape increases trophy chance with an explicit cap
+PASS: elite drops are more reliable and quantity is bounded
+PASS: trophies are stored in run ledger and survive checkpoint export/restore
+PASS: family trophies provide distinct short-term rewards
+PASS: echo residue increases item chance through the shared formula and a charge is consumed only after a non-boss item drop
+PASS: bestiary totals are added during the same settlement transaction as run rewards
+PASS: older profiles and run checkpoints safely default missing trophy fields
+PASS: invalid trophy keys/counts and echo charges are rejected by save validation
+PASS: debrief and shelter display run trophies and permanent bestiary totals
+PASS: four new tile recipes use supported bounded risk, reward and healing effects
+TROPHY INTERACTION REGRESSION PASSED: 11/11 checks
+Source-level only. GDScript runtime, visual layout, balance and real save/reload remain separate acceptance gates.
+
+[PASS] tutorial_regression.py (0.69s)
+TUTORIAL REGRESSION CHECK PASSED:
+- five tutorial pages reference centralized catalog keys
+- first run launches tutorial
+- tutorial state persists
+- progress can go back and forward
+- placement tutorial accurately describes both legal target types
+- skip/complete state persists
+- reopen and reset help is available
+- help can be opened through the header
+- old save migration provides tutorial defaults
+Note: source-level check only; visual and keyboard interactions need Godot runtime testing.
+
+[PASS] type_inference_regression.py (0.68s)
+TYPE INFERENCE REGRESSION CHECK PASSED: boss, route count, and loop status have explicit types.
+Note: this source guard does not replace Godot runtime compilation.
+
+[PASS] ui_layout_regression.py (0.83s)
+UI LAYOUT REGRESSION CHECK PASSED:
+- fullscreen shell expands in both dimensions
+- main column expands in both dimensions
+- brand has a minimum readable width on desktop and releases width for compact layouts
+- phase badge has a minimum width
+- settings button has a minimum width
+- short labels do not autowrap
+- content root expands horizontally and vertically
+- right expedition column uses a scroll container
+- right scroll container disables horizontal overflow
+- event log uses a bounded scroll area
+- event log has a fixed minimum viewing height
+- buttons support keyboard focus
+- disabled actions use muted styling
+- disabled action text remains readable
+- help button is accessible in the header
+- placement preview label exists in tactical panel for road and landscape targets
+- route view emits hover state
+- preview uses gameplay tile system
+- equipment summary wraps at the panel edge
+- equipment summary expands to the panel width
+- expedition report uses a vertical details scroll area
+- expedition report details scroll vertically
+- expedition report footer action remains outside the scroll area
+Note: this checks intended layout safeguards in source; it does not replace a Godot runtime test.
+
+[PASS] ui_modal_responsiveness_regression.py (0.85s)
+PASS: long dialog body has a dedicated scroll container
+PASS: body scrolling is vertical and horizontal overflow is disabled
+PASS: modal body height is capped against viewport height
+PASS: long modal text wraps inside the available width
+PASS: dialog title and choice buttons are outside the body scroller
+PASS: choice buttons expand to the panel width and retain minimum height
+PASS: settings retain their own bounded vertical scroll area
+PASS: new overlays reapply saved high contrast before focus is configured
+PASS: base screen reapplies high contrast when rebuilding controls
+PASS: expedition screen reapplies high contrast when rebuilding controls
+UI MODAL RESPONSIVENESS REGRESSION: 10/10
+Static source guard only; verify actual clipping and focus in Godot 4.7.2.
+
+[PASS] ui_screenshot_findings_regression.py (0.86s)
+PASS: shelter content has a vertical scroll area instead of clipping below the viewport
+PASS: shelter cards size to content so the scroll can reach the statistics/footer
+PASS: shelter reassurance content is stacked in a single VBox child
+PASS: first-session onboarding content is stacked in a single VBox child
+PASS: long route instruction is placed in the tile panel, not under the route canvas
+PASS: route footer retains a concise prompt without a duplicate instruction line
+PASS: expedition equipment wraps and uses a more readable 12px baseline
+PASS: tile cards have larger target height and text
+PASS: repeated tile cards identify separate copies without changing gameplay state
+PASS: status, control and tile panel headings are enlarged
+PASS: route marker labels use a fitted backing plate and adaptive font for dense routes
+PASS: event and tutorial modal body font is increased
+PASS: right-hand expedition panel remains scrollable without horizontal overflow
+PASS: mobile viewport resize switches the shelter and expedition into compact layouts
+PASS: Web stretch aspect expands to avoid portrait letterboxing
+PASS: compact view uses the actual browser window as its virtual content size
+PASS: viewport resize updates virtual content scale before breakpoint layout
+PASS: compact shell hides overflow-prone desktop header and resource controls
+PASS: narrow shelter stacks preparation and buildings and grids statistics
+PASS: narrow expedition uses a single vertical scroll container and stacked map/controls
+PASS: map hit targets use a smaller minimum canvas in compact mode
+SCREENSHOT UI REGRESSION: 21/21
+Static checks only; verify shelter scrolling and font sizing in Godot at 1440x900 and 1920x1080.
+
+[PASS] web_export_readiness_regression.py (0.98s)
+WEB EXPORT READINESS REGRESSION PASSED: project compatibility, preset/CI hooks, and fail-closed build artifact checks
+This test uses synthetic export files; it does not compile or execute Godot.
+
+[PASS] web_gameplay_browser_acceptance_regression.py (0.87s)
+PASS: browser acceptance performs a real page reload after road placement
+PASS: reload test tolerates cached JavaScript but requires fresh WASM/PCK requests
+PASS: reload test checks transition to shelter
+PASS: browser script explicitly checks saved-expedition resume
+PASS: resume click targets the compact saved-expedition button after reload
+PASS: browser acceptance includes real touch interaction checks
+PASS: browser QA boots and captures a 390x844 phone-portrait viewport
+PASS: browser QA validates tutorial touch on phone portrait
+PASS: phone portrait tap targets the visible tutorial action after adaptive scaling
+PASS: resume test checks the same persisted road-node image crop
+PASS: browser QA scope separates the phone-portrait probe from full mobile and campaign acceptance
+PASS: reload, resume, JS errors, and console errors fail the browser acceptance
+WEB GAMEPLAY RELOAD REGRESSION PASSED: 12/12 checks
+These source tests do not claim that browser persistence has passed; the Chromium runtime job records that evidence.
+
+[PASS] web_viewport_regression.py (0.96s)
+PASS: Web smoke test uses a real browser viewport resize
+PASS: all four target viewport sizes are represented
+PASS: each resized viewport is measured from the actual canvas
+PASS: viewport result is included in the fail-closed smoke checks
+PASS: viewport evidence is preserved in JSON output
+PASS: mobile QA explicitly does not pretend to replace physical Safari/touch testing
+WEB VIEWPORT REGRESSION PASSED: 6/6 checks
+
+[PASS] world_field_geometry_regression.py (0.86s)
+WORLD FIELD GEOMETRY REGRESSION PASSED: 660 center/route clearance cases across 5 viewport sizes and 4 route profiles.
+Minimum tested center-to-route clearance: 31.58px.
+This numerical model is an offline guard; final pixels and input must still be inspected in Godot.
+
+[PASS] world_field_regression.py (1.11s)
+PASS: separate 10x8 field and allowed cells exist
+PASS: placement validates cell and limits tiles per route sector
+PASS: field view has separate click/hover channels
+PASS: draw and hit test resolve same field rect
+PASS: road segment takes hit-test priority over landscape cells
+PASS: route hit testing takes priority over landscape clicks
+PASS: landscape markers remain compact around the road
+PASS: runtime smoke covers route/field separation at multiple sizes
+PASS: route node clicks can place a selected card through the road-tile model
+PASS: road and field preview targets use separate placement calculators
+PASS: field placement spends hand card and saves snapshot
+PASS: field tiles apply on route sector visits
+PASS: adjacent field tiles have real gameplay synergy
+PASS: preview shows route sector before placement
+PASS: preview detects newly completed synergies from either placement order
+PASS: snapshot field schema v2 validates ID, cell and route index
+PASS: official project version is 0.61.0
+PASS: no landscape marker overlaps route nodes/trail in 80 geometry scenarios
+WORLD FIELD REGRESSION PASSED: 18 static checks. Godot runtime remains separate.

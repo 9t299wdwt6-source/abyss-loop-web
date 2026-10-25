@@ -1,0 +1,21 @@
+STAGE 88 DISCOVERY MASK REGRESSION PASSED
+PASS: expedition manager owns the persisted modern discovery mask
+PASS: new expeditions reveal a starting region and visits expand the mask
+PASS: legacy snapshots without the new field default to a fully visible map
+PASS: discovery normalization accepts only canonical m:col:row IDs
+PASS: reveal helper uses persisted route seed and excludes road cells
+PASS: discovery mask keeps placement IDs unchanged and is saved with snapshots
+PASS: view accepts the mask and invalidates cached rendering when it changes
+PASS: unknown cells are dimmed and visibly marked without a selected card
+PASS: preview targets have corner brackets distinct from committed filled tiles
+PASS: UI passes discovery state into RouteView
+PASS: unknown cell hover explains exploration without blocking placement preview
+PASS: save validator rejects malformed, oversized and road-overlapping masks
+PASS: discovery field remains optional for prior snapshot compatibility
+PASS: independent discovery-mask model covers 8 seed/route samples without marking road cells
+STAGE 88 DISCOVERY MASK REGRESSION PASSED: 13 source guards + 8 reference scenarios
+Source and numerical tests only; Godot runtime and browser rendering remain unconfirmed.
+
+FULL STATIC SUITE EVIDENCE
+Checks discovered: 114; checks completed: 114; passed: 114; failed/timed out: 0
+runtime not confirmed: report is source/numerical only; no Godot engine executed.

@@ -33,8 +33,26 @@ func _run_tests() -> void:
 	assert(abyss_art != null, "the approved pixel-art backdrop must load in the runtime")
 	assert(abyss_art.get_width() == 480 and abyss_art.get_height() == 300, "pixel-art backdrop dimensions must stay low-resolution for nearest filtering")
 	var route := Generation.generate_route(123456, 18)
-	assert(route.size() == 18, "route cell count must be 18")
+	assert(route.size() == 18, "legacy 18-node route geometry remains loadable for older saved expeditions")
 	assert(str(route[0].kind) == "shrine", "route must have a stable start cell")
+	# Stage 86 procedural contours are seed-reproducible, bounded and preserve legacy geometry at seed 0.
+	for procedural_shape_id in ["classic_ring", "deep_descent", "narrow_ring", "fractured_loop"]:
+		var legacy_contour: Array[Vector2i] = TileSystemType.get_road_grid_coordinates_for_seed(str(procedural_shape_id), 0)
+		assert(legacy_contour == TileSystemType.get_road_grid_coordinates(str(procedural_shape_id)), "seed 0 must preserve legacy rectangular geometry")
+		var shape_signatures: Dictionary = {}
+		for contour_seed_value in range(1, 81):
+			var contour: Array[Vector2i] = TileSystemType.get_road_grid_coordinates_for_seed(str(procedural_shape_id), contour_seed_value)
+			assert(TileSystemType.is_valid_procedural_road_grid_coordinates(contour), "Stage 86 contour must be a simple 34-cell orthogonal loop: shape=%s seed=%d" % [procedural_shape_id, contour_seed_value])
+			assert(contour == TileSystemType.get_road_grid_coordinates_for_seed(str(procedural_shape_id), contour_seed_value), "same geometry seed must reproduce exactly the same contour")
+			var signature_parts: Array[String] = []
+			for contour_point in contour:
+				signature_parts.append("%d:%d" % [contour_point.x, contour_point.y])
+			shape_signatures[",".join(signature_parts)] = true
+		assert(shape_signatures.size() >= 8, "each route family must expose multiple distinct procedural contours across seeds")
+		var seeded_cells: Array[Vector2i] = TileSystemType.get_road_grid_coordinates_for_seed(str(procedural_shape_id), 42)
+		var seeded_road_cell := "m:%d:%d" % [seeded_cells[0].x, seeded_cells[0].y]
+		assert(not bool(TileSystemType.can_place_world(route, {}, seeded_road_cell, {"id": "archive"}, str(procedural_shape_id), 42).get("ok", true)), "landscape placement must reject road cells for the same geometry seed")
+
 	# Regression: visual node positions and mouse hit-testing must share geometry
 	# for every expedition contour and supported content-panel size.
 	var route_view = RouteViewScript.new()
@@ -309,15 +327,55 @@ func _run_tests() -> void:
 	assert(bool(preview_result.get("ok", false)), "empty legal node should have a placement preview")
 	assert(not preview_result.get("synergies", []).is_empty(), "placement preview must show a known neighbor synergy")
 	assert(str(preview_result.get("text", "")).contains("Узел снабжения"), "road preview must identify the selected tile before placement")
+	var route_tiles_before_preview := {"2": {"id": "cache"}}
+	var route_tiles_snapshot := route_tiles_before_preview.duplicate(true)
+	var reverse_route_preview: Dictionary = tile_system.get_placement_preview(route, route_tiles_before_preview, 3, {"id": "ward"})
+	assert(bool(reverse_route_preview.get("ok", false)) and reverse_route_preview.get("new_route_synergy_matches", []).size() == 1, "road preview must detect a synergy triggered by the pre-existing tile when the neighbour is placed last")
+	assert(str(reverse_route_preview.get("text", "")).contains("узла 3") and str(reverse_route_preview.get("text", "")).contains("Контур снабжения"), "road preview must identify the neighbour trigger node and the new synergy")
+	assert(route_tiles_before_preview == route_tiles_snapshot, "placement forecasts must not mutate route tiles")
 	var occupied_route_preview: Dictionary = tile_system.get_placement_preview(route, {"2": {"id": "ward"}}, 2, {"id": "cache"})
 	assert(not bool(occupied_route_preview.get("ok", true)), "road preview must reject occupied route nodes")
 	var forbidden_preview: Dictionary = tile_system.get_placement_preview(route, {}, 0, {"id": "cache"})
 	assert(not bool(forbidden_preview.get("ok", true)), "preview must explain why the route start is forbidden")
-	assert(TileSystemType.WORLD_FIELD_KEYS.size() >= 30, "landscape field must expose enough distinct non-road cells")
-	assert(TileSystemType.is_world_cell_valid("0:0") and not TileSystemType.is_world_cell_valid("4:0"), "field mask must allow only registered landscape cells")
+	assert(TileSystemType.WORLD_FIELD_KEYS.size() == 80, "legacy landscape IDs must remain stable for pre-Stage-85 saves")
+	var road_profiles := {"classic_ring": true, "narrow_ring": true, "deep_descent": true, "fractured_loop": true}
+	for profile_id in road_profiles.keys():
+		var physical_road := TileSystemType.get_road_grid_coordinates(str(profile_id))
+		var physical_road_set: Dictionary = {}
+		for physical_coord in physical_road:
+			physical_road_set["%d:%d" % [physical_coord.x, physical_coord.y]] = true
+		assert(physical_road.size() == 34 and physical_road_set.size() == 34, "every Stage 85 contour must contain 34 unique road cells")
+		var free_cell_count := 0
+		for board_row in range(TileSystemType.MAP_ROWS):
+			for board_col in range(TileSystemType.MAP_COLUMNS):
+				var board_coord_id := "%d:%d" % [board_col, board_row]
+				if not physical_road_set.has(board_coord_id):
+					free_cell_count += 1
+		assert(free_cell_count == 232, "every route shape must expose 232 off-road grid cells")
+	assert(TileSystemType.is_world_cell_valid("m:0:0") and TileSystemType.is_world_cell_valid("m:18:13") and not TileSystemType.is_world_cell_valid("m:-1:0") and not TileSystemType.is_world_cell_valid("m:19:0"), "full-board IDs must validate within the 19x14 grid only")
+	assert(TileSystemType.world_route_index("m:4:2", route.size(), "classic_ring") == 0, "landscape sector must map to the nearest actual road contour slot")
+	assert(not bool(tile_system.can_place_world(route, {}, "m:4:3", {"id": "archive"}, "classic_ring").ok), "landscape placement must never target a road cell")
+	assert(not bool(tile_system.can_place_world(route, {}, "m:4:2", {"id": "archive"}, "classic_ring").ok), "landscape-only structures must avoid roadside cells")
+	assert(bool(tile_system.can_place_world(route, {}, "m:0:0", {"id": "archive"}, "classic_ring").ok), "wilderness structures should accept cells beyond the roadside band")
+	assert(bool(tile_system.can_place_world(route, {}, "m:4:2", {"id": "roadside_test", "placement_zone": "roadside"}, "classic_ring").ok), "roadside placement should accept a cell orthogonally adjacent to the route")
+	assert(not bool(tile_system.can_place_world(route, {}, "m:0:0", {"id": "roadside_test", "placement_zone": "roadside"}, "classic_ring").ok), "roadside placement should reject a cell away from the route")
+	assert(TileSystemType.is_world_cell_valid("0:0") and TileSystemType.is_world_cell_valid("4:0") and TileSystemType.is_world_cell_valid("9:7"), "expanded landscape field must permit every 10x8 logical cell")
+	var unique_world_cell_ids: Dictionary = {}
+	for world_cell_value in TileSystemType.WORLD_FIELD_KEYS:
+		var world_cell_key := str(world_cell_value)
+		assert(not unique_world_cell_ids.has(world_cell_key), "landscape logical IDs must remain unique: %s" % world_cell_key)
+		unique_world_cell_ids[world_cell_key] = true
 	var landscape_cache := {"id": "cache", "name": "Узел снабжения", "short": "СНАБ"}
 	var field_preview: Dictionary = tile_system.get_world_placement_preview(route, {}, "2:0", landscape_cache)
 	assert(bool(field_preview.get("ok", false)) and int(field_preview.get("route_index", -1)) >= 0, "landscape placement preview must resolve a real route sector")
+	var affinity_item := {"id": "preview_affinity", "name": "Линза сада", "landscape_affinity": "spore_garden", "affinity_effect": {"heal": 2, "scrap": 1, "reward_bonus": 0.10}}
+	var equipped_affinity_preview: Dictionary = tile_system.get_world_placement_preview(route, {}, "2:0", {"id": "spore_garden"}, {"amulet": affinity_item})
+	assert(bool(equipped_affinity_preview.get("ok", false)) and int(equipped_affinity_preview.get("equipment_affinity", {}).get("heal", 0)) == 2, "landscape forecast must use the equipped item's matching affinity")
+	assert(str(equipped_affinity_preview.get("text", "")).contains("Эффект надетой экипировки") and str(equipped_affinity_preview.get("text", "")).contains("Угроза участка"), "landscape forecast must explain affinity effects and the enemy family")
+	var secret_before_tiles := {}
+	var secret_after_tiles := {"4:4": {"id": "crystal_hive", "route_index": 2}, "5:4": {"id": "echo_obelisk", "route_index": 2}}
+	var new_secret_recipes: Array = tile_system.get_new_landscape_secret_recipes(secret_before_tiles, secret_after_tiles, "4:4")
+	assert(new_secret_recipes.size() == 1 and str(new_secret_recipes[0].get("flag", "")) == "secret_prism_echo_found", "landscape forecast must detect a newly prepared secret recipe")
 	var field_ward := {"id": "ward", "field_x": 1, "field_y": 0, "route_index": TileSystemType.world_route_index("1:0", route.size())}
 	var field_cache := {"id": "cache", "field_x": 2, "field_y": 0, "route_index": TileSystemType.world_route_index("2:0", route.size())}
 	var landscape_synergy: Dictionary = tile_system.get_world_synergy_bonus({"1:0": field_ward, "2:0": field_cache}, "2:0")
@@ -418,7 +476,7 @@ func _run_tests() -> void:
 	var item_rng := RandomNumberGenerator.new()
 	item_rng.seed = 77531
 	var rolled_item: Dictionary = inventory_system.roll_item(item_rng, 4, 5)
-	assert(["weapon", "armor", "core"].has(str(rolled_item.get("slot", ""))), "equipment roll must choose a valid slot")
+	assert(InventorySystemType.EQUIPMENT_SLOTS.has(str(rolled_item.get("slot", ""))), "equipment roll must choose a valid slot")
 	assert(not str(rolled_item.get("archetype", "")).is_empty(), "rolled equipment must have a gameplay archetype")
 	assert(not str(rolled_item.get("set_id", "")).is_empty(), "rolled equipment must define a set")
 	assert(float(rolled_item.get("power", 0.0)) >= 0.0, "equipment comparison score must be non-negative")

@@ -13,7 +13,7 @@ checks = {
     "support is ordered behind front-line enemies in groups": "var front_line: Array = []" in enemies and "return front_line + support_line" in enemies,
     "support heals the most injured ally with a capped amount": "_get_lowest_health_ally" in manager and "before_hp + heal_amount" in manager and "max_hp" in manager,
     "hunter telegraphs an empowered attack at low hero health": "Охотник замечает слабость героя" in manager and "<= 0.35" in manager,
-    "caster applies a registered timed distortion effect": 'apply_effect(hero, "distortion"' in manager and "status_effect_system.tick_effects(hero, delta)" in manager and "attack_speed_penalty" in manager,
+    "caster applies a registered timed distortion effect": '_apply_enemy_status_effect("distortion"' in manager and 'return status_effect_system.apply_effect(hero, effect_id, duration, magnitude, source_id)' in manager and "status_effect_system.tick_effects(hero, delta)" in manager and "attack_speed_penalty" in manager,
     "smoke test verifies tactical enemy roles": "enemy roster must include support, execute and weaken roles" in smoke,
 }
 missing = [name for name, ok in checks.items() if not ok]

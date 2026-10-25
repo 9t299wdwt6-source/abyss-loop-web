@@ -1,0 +1,9 @@
+ABYSS LOOP — STAGE 86 STATIC / NUMERICAL REPORT
+
+Stage 86 procedural contour regression: 17/17 PASS.
+Python reference stress model: 2,048 seed/profile scenarios across four contour families.
+Full Python static/regression suite: 112/112 PASS.
+
+Checks cover the 19x14 board, 34 unique orthogonal road cells, 1-cell outer margin, closed loop, absence of extra side contacts, repeatability and diversity across seeded contour variants, legacy fixed geometry when route_geometry_seed=0, and seed consistency for rendering/placement/sector/save validation source paths.
+
+Scope: source and numerical checks only. This report does not claim that GDScript compiled or that Godot runtime, actual rendering/input, old-save restore, Web export, or browser playtest passed. See PROCEDURAL_ROUTE_CONTOURS_RUNTIME_CHECKLIST_STAGE86_RU.md.

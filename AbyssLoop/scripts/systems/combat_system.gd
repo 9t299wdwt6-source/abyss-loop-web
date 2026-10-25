@@ -6,7 +6,10 @@ var status_effect_system = StatusEffectSystemScript.new()
 
 func perform_attack(attacker: Dictionary, defender: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
 	if attacker.is_empty() or defender.is_empty() or int(defender.get("hp", 0)) <= 0:
-		return {"damage": 0, "raw_damage": 0, "absorbed": 0, "critical": false, "defeated": int(defender.get("hp", 0)) <= 0}
+		return {"damage": 0, "raw_damage": 0, "absorbed": 0, "total_damage": 0, "critical": false, "dodged": false, "defeated": int(defender.get("hp", 0)) <= 0}
+	var dodge_chance := clampf(float(defender.get("dodge_chance", 0.0)), 0.0, 0.25)
+	if dodge_chance > 0.0 and rng.randf() < dodge_chance:
+		return {"damage": 0, "raw_damage": 0, "absorbed": 0, "total_damage": 0, "critical": false, "dodged": true, "defeated": false}
 	var attack_penalty := status_effect_system.get_modifier(attacker, "attack_penalty")
 	var attack_value := float(attacker.get("attack", 1.0)) * (1.0 - attack_penalty)
 	var defense_penalty := status_effect_system.get_modifier(defender, "defense_penalty")
@@ -20,7 +23,7 @@ func perform_attack(attacker: Dictionary, defender: Dictionary, rng: RandomNumbe
 	damage *= rng.randf_range(0.9, 1.1)
 	var final_damage := maxi(1, int(round(damage)))
 	var damage_result: Dictionary = status_effect_system.apply_incoming_damage(defender, final_damage)
-	return {"damage": int(damage_result.get("damage", 0)), "raw_damage": final_damage, "absorbed": int(damage_result.get("absorbed", 0)), "total_damage": int(damage_result.get("total_damage", final_damage)), "critical": critical, "defeated": bool(damage_result.get("defeated", int(defender.get("hp", 0)) <= 0))}
+	return {"damage": int(damage_result.get("damage", 0)), "raw_damage": final_damage, "absorbed": int(damage_result.get("absorbed", 0)), "total_damage": int(damage_result.get("total_damage", final_damage)), "critical": critical, "dodged": false, "defeated": bool(damage_result.get("defeated", int(defender.get("hp", 0)) <= 0))}
 
 func enemy_can_be_defeated(enemy: Dictionary) -> bool:
 	return int(enemy.get("hp", 0)) <= 0

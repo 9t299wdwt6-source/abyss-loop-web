@@ -1,0 +1,21 @@
+ABYSS LOOP — STAGE 80 STATIC TEST REPORT
+Project: Abyss Loop 0.61.0
+Stage: ejected-loot conversion to Echo Dust and base improvement spend
+
+Full Python static/regression suite: 106/106 PASS (27.09 seconds)
+Focused Stage 80 source guards: 10/10 PASS
+Stage 79 inventory regression: 18/18 PASS
+Equipment/backpack regression: 21/21 PASS
+Save integrity source regression: 18 assertions PASS
+
+Coverage added:
+- rarity/rank/upgrade/power based ejection conversion with per-item cap
+- cumulative ejection resource aggregate surviving the 100-item ledger cap
+- legacy checkpoint migration when cumulative fields are missing
+- atomic settlement + rollback of Echo Dust and run idempotency ledger
+- duplicate settlement protection by run_id
+- save validation and 1,000,000 resource cap
+- transactional Mineral Recycler upgrade cost using Echo Dust
+- base UI and debrief feedback for gained resource
+
+Evidence boundary: source-level regression only. This report does not prove GDScript parsing, Godot 4.7.2 runtime, save/reload behavior or UI input acceptance. No browser export or deployment was run.

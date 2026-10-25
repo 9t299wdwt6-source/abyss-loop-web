@@ -10,7 +10,7 @@ checks = {
     "encounter generator supports boss-only fights": "if boss_encounter:" in (ROOT / "scripts/systems/enemy_system.gd").read_text(encoding="utf-8"),
     "route manager forces boss-node fights": "var is_boss_node := index == 0 and loop_count > 0 and loop_count % boss_interval == 0" in (ROOT / "scripts/systems/expedition_manager.gd").read_text(encoding="utf-8"),
     "all encounter members receive independent attack updates": "for fighter_value in attackers:" in (ROOT / "scripts/systems/expedition_manager.gd").read_text(encoding="utf-8"),
-    "boss reward guarantees a drop": 'var item_chance := 1.0 if is_boss else' in (ROOT / "scripts/systems/expedition_manager.gd").read_text(encoding="utf-8"),
+    "boss reward guarantees a drop through the shared loot contract": 'if source == "boss":\n\t\treturn 1.0' in (ROOT / "scripts/systems/loot_system.gd").read_text(encoding="utf-8") and 'get_equipment_drop_chance(drop_source, combat_reward_bonus, echo_charges, pending_drop_bonus)' in (ROOT / "scripts/systems/expedition_manager.gd").read_text(encoding="utf-8"),
     "boss statistics persist": '"total_bosses_defeated": total_bosses_defeated' in (ROOT / "scripts/core/game_state.gd").read_text(encoding="utf-8"),
     "smoke test covers boss and pack generation": "high_threat_pack" in (ROOT / "tests/smoke_test.gd").read_text(encoding="utf-8") and "boss_group" in (ROOT / "tests/smoke_test.gd").read_text(encoding="utf-8"),
     "boss encounters retain a distinct map marker": '"Б" if boss_encounter else' in (ROOT / "scripts/ui/route_view.gd").read_text(encoding="utf-8"),

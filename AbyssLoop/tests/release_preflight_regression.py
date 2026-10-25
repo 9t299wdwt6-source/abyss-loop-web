@@ -11,6 +11,98 @@ from release_preflight import REQUIRED_FILES, audit_archive, audit_project  # no
 from release_integrity import iter_project_files  # noqa: E402
 
 VERSION = "0.61.0"
+STAGE90_REQUIRED = {
+    "ROADMAP_STATUS_STAGE90_RU.md",
+    "STAGE90_DISCOVERY_READABILITY_BUILD_REPORT_RU.md",
+    "DISCOVERY_READABILITY_RUNTIME_CHECKLIST_STAGE90_RU.md",
+    "tests/stage90_discovery_readability_regression.py",
+    "tests/stage90_static_test_report.txt",
+}
+assert STAGE90_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage90 discovery-readability evidence must be mandatory in independent preflight"
+
+STAGE89_REQUIRED = {
+    "ROADMAP_STATUS_STAGE89_RU.md",
+    "STAGE89_MAP_RUNTIME_INTEGRATION_BUILD_REPORT_RU.md",
+    "MAP_RUNTIME_INTEGRATION_CHECKLIST_STAGE89_RU.md",
+    "tests/stage89_map_runtime_gate_regression.py",
+    "tests/stage89_static_test_report.txt",
+    "tests/expedition_runtime_acceptance.gd",
+}
+assert STAGE89_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage89 map runtime gate evidence must be mandatory in independent preflight"
+
+STAGE88_REQUIRED = {
+    "ROADMAP_STATUS_STAGE88_RU.md",
+    "STAGE88_DISCOVERY_AND_PLACEMENT_FEEDBACK_BUILD_REPORT_RU.md",
+    "DISCOVERY_MASK_RUNTIME_CHECKLIST_STAGE88_RU.md",
+    "tests/stage88_discovery_mask_regression.py",
+    "tests/stage88_static_test_report.txt",
+}
+assert STAGE88_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage88 discovery-mask evidence must be mandatory in independent preflight"
+STAGE87_REQUIRED = {
+    "ROADMAP_STATUS_STAGE87_RU.md",
+    "STAGE87_BIOME_TERRAIN_VISUAL_BUILD_REPORT_RU.md",
+    "BIOME_TERRAIN_VISUAL_RUNTIME_CHECKLIST_STAGE87_RU.md",
+    "tests/stage87_biome_terrain_visual_regression.py",
+    "tests/stage87_static_test_report.txt",
+}
+assert STAGE87_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage87 terrain visual evidence must be required by release preflight"
+STAGE86_REQUIRED = {
+    "ROADMAP_STATUS_STAGE86_RU.md",
+    "STAGE86_PROCEDURAL_ROUTE_CONTOURS_BUILD_REPORT_RU.md",
+    "PROCEDURAL_ROUTE_CONTOURS_RUNTIME_CHECKLIST_STAGE86_RU.md",
+    "tests/stage86_procedural_contour_regression.py",
+    "tests/stage86_static_test_report.txt",
+}
+assert STAGE86_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage86 procedural road evidence must be required by release preflight"
+STAGE85_REQUIRED = {
+    "ROADMAP_STATUS_STAGE85_RU.md",
+    "STAGE85_FULL_LANDSCAPE_MAP_BUILD_REPORT_RU.md",
+    "FULL_LANDSCAPE_MAP_RUNTIME_CHECKLIST_STAGE85_RU.md",
+    "tests/stage85_full_landscape_regression.py",
+    "tests/stage85_static_test_report.txt",
+}
+assert STAGE85_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage85 full landscape evidence must be required by release preflight"
+STAGE84_REQUIRED = {
+    "ROADMAP_STATUS_STAGE84_RU.md",
+    "STAGE84_SQUARE_GRID_LANDSCAPE_MAP_BUILD_REPORT_RU.md",
+    "SQUARE_GRID_MAP_RUNTIME_CHECKLIST_STAGE84_RU.md",
+    "tests/stage84_square_grid_map_regression.py",
+    "tests/stage84_static_test_report.txt",
+}
+assert STAGE84_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage84 square-grid map evidence must be required by release preflight"
+STAGE83_REQUIRED = {
+    "ROADMAP_STATUS_STAGE83_RU.md",
+    "STAGE83_INVENTORY_TO_SETTLEMENT_RUNTIME_BUILD_REPORT_RU.md",
+    "INVENTORY_SETTLEMENT_RUNTIME_CHECKLIST_STAGE83_RU.md",
+    "tests/inventory_settlement_runtime_acceptance.gd",
+    "tests/inventory_settlement_runtime_acceptance_runner.tscn",
+    "tests/stage83_inventory_settlement_regression.py",
+    "tests/stage83_static_test_report.txt",
+}
+assert STAGE83_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage83 inventory settlement runtime evidence must be required by release preflight"
+STAGE82_REQUIRED = {
+    "ROADMAP_STATUS_STAGE82_RU.md",
+    "STAGE82_INVENTORY_IDENTITY_AND_SETTLEMENT_AUDIT_BUILD_REPORT_RU.md",
+    "INVENTORY_IDENTITY_RUNTIME_CHECKLIST_STAGE82_RU.md",
+    "tests/stage82_inventory_identity_regression.py",
+    "tests/stage82_static_test_report.txt",
+}
+assert STAGE82_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage82 identity and inventory integrity evidence must be required by release preflight"
+STAGE81_REQUIRED = {
+    "ROADMAP_STATUS_STAGE81_RU.md",
+    "STAGE81_LOOT_DROP_PROBABILITY_AND_RARITY_BALANCE_BUILD_REPORT_RU.md",
+    "LOOT_RARITY_BALANCE_RUNTIME_CHECKLIST_STAGE81_RU.md",
+    "tests/loot_rarity_balance_regression.py",
+    "tests/stage81_static_test_report.txt",
+}
+assert STAGE81_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage81 loot probability and rarity balance evidence must be required by release preflight"
+STAGE76_REQUIRED = {
+    "ROADMAP_STATUS_STAGE76_RU.md",
+    "STAGE76_CONTEXTUAL_LOOT_AND_TILE_HAND_BUILD_REPORT_RU.md",
+    "TILE_HAND_AND_BIOME_TROPHY_RUNTIME_CHECKLIST_STAGE76_RU.md",
+    "tests/stage76_contextual_loot_and_tile_hand_regression.py",
+}
+assert STAGE76_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage76 mechanic evidence must be required by the independent release preflight"
 STAGE68A_REQUIRED = {
     "ROADMAP_STATUS_STAGE68A_RU.md",
     "STAGE68A_BUILD_REPORT_RU.md",
@@ -42,6 +134,7 @@ STAGE64B_REQUIRED = {
     "tests/reports/STAGE64B_AUTOMATED_ENGINE_RUN_CAPTURE_GUIDE_RU.md",
 }
 assert STAGE64B_REQUIRED.issubset(set(REQUIRED_FILES)), "Stage64B automated engine capture and evidence must be mandatory in independent preflight"
+assert "tests/equipment_landscape_mechanics_regression.py" in REQUIRED_FILES, "new gear/landscape mechanics regression must be mandatory in independent preflight"
 assert "tests/dual_placement_regression.py" in REQUIRED_FILES, "dual-placement mouse/touch regression must be included in independent preflight"
 assert "tests/save_system_regression_runner.tscn" in REQUIRED_FILES, "autoload-aware save-system regression runner must be mandatory in independent preflight"
 
@@ -70,6 +163,90 @@ def write_fixture(root: Path) -> None:
             content = f"Этап 61 {VERSION}\n"
         elif name == "ROADMAP_CONTINUATION_STAGES29-62_RU.md":
             content = f"Этап 62 {VERSION}; runtime не подтверждён\n"
+        elif name == "ROADMAP_STATUS_STAGE90_RU.md":
+            content = "Stage 90; runtime не подтверждён\n"
+        elif name == "STAGE90_DISCOVERY_READABILITY_BUILD_REPORT_RU.md":
+            content = "РАЗВЕДАНО n/232; runtime acceptance\n"
+        elif name == "DISCOVERY_READABILITY_RUNTIME_CHECKLIST_STAGE90_RU.md":
+            content = "Godot 4.7.2 stable; 390×844\n"
+        elif name == "tests/stage90_discovery_readability_regression.py":
+            content = "route.discovery.count; viewport\n"
+        elif name == "tests/stage90_static_test_report.txt":
+            content = "STAGE 90 DISCOVERY READABILITY REGRESSION PASSED; runtime/browser not confirmed\n"
+        elif name == "ROADMAP_STATUS_STAGE89_RU.md":
+            content = "Stage 89; runtime не подтверждён\n"
+        elif name == "STAGE89_MAP_RUNTIME_INTEGRATION_BUILD_REPORT_RU.md":
+            content = "discovery mask; runtime не подтверждён\n"
+        elif name == "MAP_RUNTIME_INTEGRATION_CHECKLIST_STAGE89_RU.md":
+            content = "Godot 4.7.2 stable; 390×844\n"
+        elif name == "tests/stage89_map_runtime_gate_regression.py":
+            content = "discovered_world_cells; legacy snapshot migration\n"
+        elif name == "tests/stage89_static_test_report.txt":
+            content = "STAGE 89 MAP RUNTIME GATE REGRESSION PASSED; runtime not confirmed\n"
+        elif name == "ROADMAP_STATUS_STAGE88_RU.md":
+            content = "Stage 88; runtime не подтверждён\n"
+        elif name == "STAGE88_DISCOVERY_AND_PLACEMENT_FEEDBACK_BUILD_REPORT_RU.md":
+            content = "discovery mask; runtime не подтверждён\n"
+        elif name == "DISCOVERY_MASK_RUNTIME_CHECKLIST_STAGE88_RU.md":
+            content = "Godot 4.7.2 stable; viewport 390×844\n"
+        elif name == "tests/stage88_discovery_mask_regression.py":
+            content = "discovered_world_cells; save-safe\n"
+        elif name == "tests/stage88_static_test_report.txt":
+            content = "STAGE 88 DISCOVERY MASK REGRESSION PASSED; runtime not confirmed\n"
+        elif name == "ROADMAP_STATUS_STAGE87_RU.md":
+            content = "Stage 87; runtime не подтверждён\n"
+        elif name == "STAGE87_BIOME_TERRAIN_VISUAL_BUILD_REPORT_RU.md":
+            content = "четыре косметические области; не исполняет GDScript\n"
+        elif name == "BIOME_TERRAIN_VISUAL_RUNTIME_CHECKLIST_STAGE87_RU.md":
+            content = "Godot 4.7.2 stable; viewport 390×844\n"
+        elif name == "tests/stage87_biome_terrain_visual_regression.py":
+            content = "visual_biome; 266 cells\n"
+        elif name == "tests/stage87_static_test_report.txt":
+            content = "STAGE 87 BIOME TERRAIN VISUAL REGRESSION PASSED; runtime not confirmed\n"
+        elif name == "ROADMAP_STATUS_STAGE86_RU.md":
+            content = "Stage 86; 112/112 PASS; runtime не подтверждён\n"
+        elif name == "STAGE86_PROCEDURAL_ROUTE_CONTOURS_BUILD_REPORT_RU.md":
+            content = "34 дорожные клетки; runtime не подтверждён\n"
+        elif name == "PROCEDURAL_ROUTE_CONTOURS_RUNTIME_CHECKLIST_STAGE86_RU.md":
+            content = "Godot 4.7.2 stable; viewport 390×844\n"
+        elif name == "tests/stage86_procedural_contour_regression.py":
+            content = "range(1, 513) seeded scenarios; seed 0 preserves legacy geometry\n"
+        elif name == "tests/stage86_static_test_report.txt":
+            content = "112/112 PASS; source and numerical checks only\n"
+        elif name == "ROADMAP_STATUS_STAGE85_RU.md":
+            content = "Stage 85; 17/17 PASS\n"
+        elif name == "STAGE85_FULL_LANDSCAPE_MAP_BUILD_REPORT_RU.md":
+            content = "19×14; 232 off-road cells; runtime не подтверждён\n"
+        elif name == "FULL_LANDSCAPE_MAP_RUNTIME_CHECKLIST_STAGE85_RU.md":
+            content = "Godot 4.7.2 stable; viewport 390×844\n"
+        elif name == "tests/stage85_full_landscape_regression.py":
+            content = "Stage 85 regression\n"
+        elif name == "tests/stage85_static_test_report.txt":
+            content = "STAGE 85 STATIC REPORT; source/numerical checks only\n"
+        elif name == "ROADMAP_STATUS_STAGE84_RU.md":
+            content = "Stage 84; 110/110 PASS\n"
+        elif name == "STAGE84_SQUARE_GRID_LANDSCAPE_MAP_BUILD_REPORT_RU.md":
+            content = "19×14; 34-cell road; runtime не подтверждён\n"
+        elif name == "SQUARE_GRID_MAP_RUNTIME_CHECKLIST_STAGE84_RU.md":
+            content = "Godot 4.7.2 stable; 300×350 viewport\n"
+        elif name == "ROADMAP_STATUS_STAGE83_RU.md":
+            content = "Stage 83; 109/109 PASS; 15/15 PASS\n"
+        elif name == "STAGE83_INVENTORY_TO_SETTLEMENT_RUNTIME_BUILD_REPORT_RU.md":
+            content = "12-item backpack; runtime не подтверждён\n"
+        elif name == "INVENTORY_SETTLEMENT_RUNTIME_CHECKLIST_STAGE83_RU.md":
+            content = "Godot 4.7.2 stable; defeat runtime check\n"
+        elif name == "ROADMAP_STATUS_STAGE82_RU.md":
+            content = "Stage 82; 108/108 PASS\n"
+        elif name == "STAGE82_INVENTORY_IDENTITY_AND_SETTLEMENT_AUDIT_BUILD_REPORT_RU.md":
+            content = "duplicate item IDs; runtime не подтверждён\n"
+        elif name == "INVENTORY_IDENTITY_RUNTIME_CHECKLIST_STAGE82_RU.md":
+            content = "Godot 4.7.2 stable; duplicate\n"
+        elif name == "ROADMAP_STATUS_STAGE81_RU.md":
+            content = "Stage 81; 107/107 PASS\n"
+        elif name == "STAGE81_LOOT_DROP_PROBABILITY_AND_RARITY_BALANCE_BUILD_REPORT_RU.md":
+            content = "70,0%; runtime не подтверждён\n"
+        elif name == "LOOT_RARITY_BALANCE_RUNTIME_CHECKLIST_STAGE81_RU.md":
+            content = "Godot 4.7.2 stable; Stage68C old build\n"
         elif name == "ROADMAP_STATUS_STAGE68A_RU.md":
             content = "Stage68A; 79/79\n"
         elif name == "STAGE68A_BUILD_REPORT_RU.md":

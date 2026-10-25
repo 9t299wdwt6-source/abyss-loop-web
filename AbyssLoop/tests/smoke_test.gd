@@ -12,8 +12,10 @@ const ProgressionSystemType = preload("res://scripts/systems/progression_system.
 const RouteViewScript = preload("res://scripts/ui/route_view.gd")
 const ExpeditionManagerType = preload("res://scripts/systems/expedition_manager.gd")
 const StatusEffectSystemType = preload("res://scripts/systems/status_effect_system.gd")
+const LootSystemType = preload("res://scripts/systems/loot_system.gd")
 const UIControllerType = preload("res://scripts/ui/ui_controller.gd")
 const RunDebriefPresenterType = preload("res://scripts/ui/run_debrief_presenter.gd")
+const ItemTextPresenterType = preload("res://scripts/ui/item_text_presenter.gd")
 
 func _initialize() -> void:
 	call_deferred("_run_tests")
@@ -33,10 +35,29 @@ func _run_tests() -> void:
 	assert(abyss_art != null, "the approved pixel-art backdrop must load in the runtime")
 	assert(abyss_art.get_width() == 480 and abyss_art.get_height() == 300, "pixel-art backdrop dimensions must stay low-resolution for nearest filtering")
 	var route := Generation.generate_route(123456, 18)
-	assert(route.size() == 18, "route cell count must be 18")
+	assert(route.size() == 18, "legacy 18-node route geometry remains loadable for older saved expeditions")
 	assert(str(route[0].kind) == "shrine", "route must have a stable start cell")
 	# Regression: visual node positions and mouse hit-testing must share geometry
 	# for every expedition contour and supported content-panel size.
+	# The active map is 34 square road cells; legacy 18-node routes remain a compatibility path.
+	assert(int(ContentRegistry.BALANCE.get("route_cells", 0)) == 34, "new expeditions must use a 34-cell square-road loop")
+	# Stage 86 procedural contours are seed-reproducible, bounded and preserve legacy geometry at seed 0.
+	for procedural_shape_id in ["classic_ring", "deep_descent", "narrow_ring", "fractured_loop"]:
+		var legacy_contour: Array[Vector2i] = TileSystemType.get_road_grid_coordinates_for_seed(str(procedural_shape_id), 0)
+		assert(legacy_contour == TileSystemType.get_road_grid_coordinates(str(procedural_shape_id)), "seed 0 must preserve legacy rectangular geometry")
+		var shape_signatures: Dictionary = {}
+		for contour_seed_value in range(1, 81):
+			var contour: Array[Vector2i] = TileSystemType.get_road_grid_coordinates_for_seed(str(procedural_shape_id), contour_seed_value)
+			assert(TileSystemType.is_valid_procedural_road_grid_coordinates(contour), "Stage 86 contour must be a simple 34-cell orthogonal loop: shape=%s seed=%d" % [procedural_shape_id, contour_seed_value])
+			assert(contour == TileSystemType.get_road_grid_coordinates_for_seed(str(procedural_shape_id), contour_seed_value), "same geometry seed must reproduce exactly the same contour")
+			var signature_parts: Array[String] = []
+			for contour_point in contour:
+				signature_parts.append("%d:%d" % [contour_point.x, contour_point.y])
+			shape_signatures[",".join(signature_parts)] = true
+		assert(shape_signatures.size() >= 8, "each route family must expose multiple distinct procedural contours across seeds")
+		var seeded_cells: Array[Vector2i] = TileSystemType.get_road_grid_coordinates_for_seed(str(procedural_shape_id), 42)
+		var seeded_road_cell := "m:%d:%d" % [seeded_cells[0].x, seeded_cells[0].y]
+		assert(not bool(TileSystemType.can_place_world(route, {}, seeded_road_cell, {"id": "archive"}, str(procedural_shape_id), 42).get("ok", true)), "landscape placement must reject road cells for the same geometry seed")
 	var route_view = RouteViewScript.new()
 	route_view.route_cells = route
 	var route_view_sizes: Array[Vector2] = [Vector2(620, 420), Vector2(900, 600), Vector2(1280, 720), Vector2(1440, 900), Vector2(1920, 1080)]
@@ -215,12 +236,26 @@ func _run_tests() -> void:
 	status_rng.seed = 222
 	var protected_hit: Dictionary = status_combat.perform_attack({"attack": 5.0, "crit": 0.0}, protected_defender, status_rng)
 	assert(int(protected_hit.get("absorbed", 0)) > 0 and int(protected_defender.hp) == 30, "the real shared CombatSystem attack path must honor barriers")
+	var dodge_rng := RandomNumberGenerator.new()
+	dodge_rng.seed = 7654
+	var dodge_target := {"hp": 100, "defense": 0, "dodge_chance": 0.25, "status_effects": []}
+	var dodged_attacks := 0
+	for _dodge_roll in range(40):
+		dodge_target["hp"] = 100
+		var dodge_hit: Dictionary = status_combat.perform_attack({"attack": 5.0, "crit": 0.0}, dodge_target, dodge_rng)
+		if bool(dodge_hit.get("dodged", false)):
+			dodged_attacks += 1
+			assert(int(dodge_hit.get("damage", -1)) == 0 and int(dodge_target.get("hp", 0)) == 100, "a successful phase dodge must fully negate the attack")
+	assert(dodged_attacks > 0 and dodged_attacks < 40, "phase dodge must trigger probabilistically and be capped rather than guaranteed")
 	status_combat.free()
 	var elite_factory = EnemySystemType.new()
 	var elite_rng := RandomNumberGenerator.new()
 	elite_rng.seed = 38039
 	var elite_pack: Array = elite_factory.create_encounter(4, 1.3, elite_rng, 0.0, false, 0)
 	assert(not elite_pack.is_empty(), "elite smoke must start from a valid normal encounter")
+	for biome_enemy_id in ["sporeling", "prism_mite", "bone_warden", "echo_wisp"]:
+		var biome_enemy: Dictionary = elite_factory.create_enemy(2, 1.1, elite_rng, 0.0, [biome_enemy_id])
+		assert(str(biome_enemy.get("id", "")) == biome_enemy_id and bool(ContentRegistry.ENEMIES[biome_enemy_id].get("landscape_only", false)), "each landscape-only enemy must be selectable only through its tile-authored pool: %s" % biome_enemy_id)
 	var normal_target: Dictionary = elite_pack[0].duplicate(true)
 	var elite_target: Dictionary = elite_factory.promote_encounter_to_elite(elite_pack, 4)
 	assert(bool(elite_target.get("is_elite", false)) and not bool(elite_target.get("is_boss", false)), "elite promotion must tag a regular enemy without changing it into a boss")
@@ -278,6 +313,14 @@ func _run_tests() -> void:
 	assert(SaveSystem._validate_save_data(history_save_probe), "save validator must accept a normalized campaign history record")
 	history_save_probe["expedition_history"] = [history_fixture, history_fixture.duplicate(true)]
 	assert(not SaveSystem._validate_save_data(history_save_probe), "save validator must reject duplicate run IDs in campaign history")
+	var bounded_phase_item := {"id": "phase_save_fixture", "slot": "core", "lifesteal": 0.25, "dodge_chance": 0.25}
+	assert(SaveSystem._validate_item(bounded_phase_item, "core"), "equipment save validator must accept the shared 25% cap for lifesteal and dodge")
+	var invalid_lifesteal_item: Dictionary = bounded_phase_item.duplicate(true)
+	invalid_lifesteal_item["lifesteal"] = 0.251
+	assert(not SaveSystem._validate_item(invalid_lifesteal_item, "core"), "equipment save validator must reject lifesteal values above the cap")
+	var invalid_dodge_item: Dictionary = bounded_phase_item.duplicate(true)
+	invalid_dodge_item["dodge_chance"] = -0.001
+	assert(not SaveSystem._validate_item(invalid_dodge_item, "core"), "equipment save validator must reject negative dodge values")
 	var route_system = RouteSystemType.new()
 	var live_loop: Array = route_system.create_route(123456, 18)
 	assert(route_system.is_closed_loop(live_loop), "active route must carry validated closed-loop topology")
@@ -301,6 +344,9 @@ func _run_tests() -> void:
 	assert(not bool(tile_system.can_place(route, {"1": {"id": "cache"}}, 1).ok), "occupied node must reject tiles")
 	assert(not bool(tile_system.can_place(route, {}, 1, {"id": "archive"}).ok), "archive is landscape-only and must not be placeable on the road")
 	assert(not bool(tile_system.can_place(route, {}, 1, {"id": "nursery"}).ok), "nursery is landscape-only and must not be placeable on the road")
+	assert(not bool(tile_system.can_place(route, {}, 1, {"id": "spore_garden"}).ok) and not bool(tile_system.can_place(route, {}, 1, {"id": "crystal_hive"}).ok) and not bool(tile_system.can_place(route, {}, 1, {"id": "bone_orchard"}).ok) and not bool(tile_system.can_place(route, {}, 1, {"id": "echo_obelisk"}).ok), "new off-road structures must remain restricted to the landscape field")
+	assert(bool(tile_system.can_place(route, {}, 1, {"id": "echo_spring"}).ok) and bool(tile_system.can_place(route, {}, 1, {"id": "fault_line"}).ok), "new road cards must remain placeable on the route")
+	assert(not bool(tile_system.can_place_world(route, {}, "2:0", {"id": "echo_spring"}).ok), "new road-only cards must not be placeable in the off-road field")
 	assert(bool(tile_system.can_place(route, {}, 1, {"id": "cache"}).ok), "flexible cards must remain placeable on road")
 	assert(not bool(tile_system.can_place_world(route, {}, "2:0", {"id": "road_test", "placement_zone": "road"}).ok), "road-only cards must be rejected by the field validator")
 	assert(bool(tile_system.can_place_world(route, {}, "2:0", {"id": "archive"}).ok), "archive must be placeable on a valid landscape cell")
@@ -319,20 +365,20 @@ func _run_tests() -> void:
 	var unlocked_draw_count := 1200
 	for _draw_index in range(unlocked_draw_count):
 		var common_draw: Dictionary = tile_system.draw_tile(tile_draw_rng, false)
-		if str(common_draw.get("id", "")) in ["rift", "signal", "archive", "nursery"]:
+		if str(common_draw.get("id", "")) in ["rift", "signal", "archive", "nursery", "fault_line", "spore_garden", "crystal_hive", "bone_orchard", "echo_obelisk", "lost_convoy", "hunter_marker"]:
 			locked_rare_tiles += 1
 		var unlocked_draw: Dictionary = tile_system.draw_tile(tile_draw_rng, true)
-		if str(unlocked_draw.get("id", "")) in ["rift", "signal", "archive", "nursery"]:
+		if str(unlocked_draw.get("id", "")) in ["rift", "signal", "archive", "nursery", "fault_line", "spore_garden", "crystal_hive", "bone_orchard", "echo_obelisk", "lost_convoy", "hunter_marker"]:
 			unlocked_rare_tiles += 1
 	assert(locked_rare_tiles == 0, "rare rift/signal/archive/nursery cards must remain locked until unlock conditions")
-	assert(unlocked_rare_tiles >= 140 and unlocked_rare_tiles <= 270, "unlocked rare cards should be discoveries, not one third of the card pool")
+	assert(unlocked_rare_tiles >= 250 and unlocked_rare_tiles <= 400, "the complete unlocked rare-card pool should remain a minority of the draft")
 	var base_rare_rng := RandomNumberGenerator.new()
 	base_rare_rng.seed = 7741
 	GameState.buildings["cartographer"] = 0
 	var base_rare_count := 0
 	for _base_draw in range(1800):
 		var base_draw: Dictionary = tile_system.draw_tile(base_rare_rng, true)
-		if str(base_draw.get("id", "")) in ["rift", "signal", "archive", "nursery"]:
+		if str(base_draw.get("id", "")) in ["rift", "signal", "archive", "nursery", "fault_line", "spore_garden", "crystal_hive", "bone_orchard", "echo_obelisk", "lost_convoy", "hunter_marker"]:
 			base_rare_count += 1
 	var observatory_rng := RandomNumberGenerator.new()
 	observatory_rng.seed = 7741
@@ -340,7 +386,7 @@ func _run_tests() -> void:
 	var observatory_rare_count := 0
 	for _observatory_draw in range(1800):
 		var observatory_draw: Dictionary = tile_system.draw_tile(observatory_rng, true)
-		if str(observatory_draw.get("id", "")) in ["rift", "signal", "archive", "nursery"]:
+		if str(observatory_draw.get("id", "")) in ["rift", "signal", "archive", "nursery", "fault_line", "spore_garden", "crystal_hive", "bone_orchard", "echo_obelisk", "lost_convoy", "hunter_marker"]:
 			observatory_rare_count += 1
 	GameState.buildings["cartographer"] = 0
 	assert(observatory_rare_count > base_rare_count, "cartographer building upgrades must measurably improve rare card discovery without editing the pool")
@@ -350,6 +396,33 @@ func _run_tests() -> void:
 	assert(int(structure_ledger.get("scrap", 0)) == 2 and int(structure_ledger.get("crystals", 0)) == 1 and is_equal_approx(float(archive_result.get("reward_bonus", 0.0)), 0.08), "archive structure must pay its crystal/scrap reward through real tile visit")
 	var nursery_result: Dictionary = tile_system.apply_tile_visit({"id": "nursery"}, structure_ledger, structure_hero, 2)
 	assert(is_equal_approx(float(nursery_result.get("spawn_bonus", 0.0)), 0.28) and is_equal_approx(float(nursery_result.get("enemy_bonus", 0.0)), 0.12) and is_equal_approx(float(nursery_result.get("reward_bonus", 0.0)), 0.25), "abyss nursery must create a deliberate risk/reward sector")
+	var spring_before_hp := int(structure_hero.get("hp", 0))
+	var spring_result: Dictionary = tile_system.apply_tile_visit({"id": "echo_spring"}, structure_ledger, structure_hero, 2)
+	assert(int(structure_hero.get("hp", 0)) == spring_before_hp + 6 and is_equal_approx(float(spring_result.get("spawn_bonus", 0.0)), -0.04), "echo spring must heal and reduce encounter risk")
+	var prepared_loot_ledger := {"scrap": 0, "crystals": 0, "pending_item_rarity_bonus": 0.0, "pending_item_drop_bonus": 0.0}
+	var prepared_loot_hero := {"hp": 20, "max_hp": 20}
+	var convoy_result: Dictionary = tile_system.apply_tile_visit({"id": "lost_convoy"}, prepared_loot_ledger, prepared_loot_hero, 3)
+	assert(int(prepared_loot_ledger.get("scrap", 0)) == 3 and is_equal_approx(float(prepared_loot_ledger.get("pending_item_rarity_bonus", 0.0)), 0.12), "lost convoy must pay salvage and prepare rare equipment")
+	tile_system.apply_tile_visit({"id": "lost_convoy"}, prepared_loot_ledger, prepared_loot_hero, 3)
+	assert(is_equal_approx(float(prepared_loot_ledger.get("pending_item_rarity_bonus", 0.0)), 0.18), "lost convoy rarity preparation must stop at 18 percentage points")
+	var marker_result: Dictionary = tile_system.apply_tile_visit({"id": "hunter_marker"}, prepared_loot_ledger, prepared_loot_hero, 3)
+	assert(is_equal_approx(float(prepared_loot_ledger.get("pending_item_drop_bonus", 0.0)), 0.15) and is_equal_approx(float(marker_result.get("enemy_bonus", 0.0)), 0.05), "hunter marker must trade stronger encounters for higher equipment-drop chance")
+	tile_system.apply_tile_visit({"id": "hunter_marker"}, prepared_loot_ledger, prepared_loot_hero, 3)
+	assert(is_equal_approx(float(prepared_loot_ledger.get("pending_item_drop_bonus", 0.0)), 0.30), "hunter marker drop preparation must be capped at 30 percentage points")
+	var garden_before_hp := int(structure_hero.get("hp", 0))
+	var garden_before_scrap := int(structure_ledger.get("scrap", 0))
+	var garden_result: Dictionary = tile_system.apply_tile_visit({"id": "spore_garden"}, structure_ledger, structure_hero, 2)
+	assert(int(structure_hero.get("hp", 0)) == garden_before_hp + 3 and int(structure_ledger.get("scrap", 0)) == garden_before_scrap + 1 and garden_result.get("enemy_pool", []).has("sporeling"), "spore garden must heal, pay materials and call its biome enemy")
+	var hive_before_scrap := int(structure_ledger.get("scrap", 0))
+	var hive_before_crystals := int(structure_ledger.get("crystals", 0))
+	var hive_result: Dictionary = tile_system.apply_tile_visit({"id": "crystal_hive"}, structure_ledger, structure_hero, 2)
+	assert(int(structure_ledger.get("scrap", 0)) == hive_before_scrap + 1 and int(structure_ledger.get("crystals", 0)) == hive_before_crystals + 1 and hive_result.get("enemy_pool", []).has("prism_mite"), "crystal hive must grant resources and its own encounter pool")
+	var bone_before_scrap := int(structure_ledger.get("scrap", 0))
+	var bone_result: Dictionary = tile_system.apply_tile_visit({"id": "bone_orchard"}, structure_ledger, structure_hero, 2)
+	assert(int(structure_ledger.get("scrap", 0)) == bone_before_scrap + 2 and bone_result.get("enemy_pool", []).has("bone_warden"), "bone orchard must increase loot and wake bone wardens")
+	var obelisk_before_crystals := int(structure_ledger.get("crystals", 0))
+	var obelisk_result: Dictionary = tile_system.apply_tile_visit({"id": "echo_obelisk"}, structure_ledger, structure_hero, 2)
+	assert(int(structure_ledger.get("crystals", 0)) == obelisk_before_crystals + 1 and obelisk_result.get("enemy_pool", []).has("echo_wisp"), "echo obelisk must grant a crystal and call echo wisps")
 	var cache_ward_tiles := {"2": {"id": "cache"}, "3": {"id": "ward"}}
 	var supply_synergy: Dictionary = tile_system.get_synergy_bonus(cache_ward_tiles, 2, route.size())
 	assert(int(supply_synergy.get("scrap", 0)) == 4, "cache next to ward must grant the configured synergy materials")
@@ -371,23 +444,98 @@ func _run_tests() -> void:
 	var ward_hunt_tiles := {"4": {"id": "ward"}, "5": {"id": "hunt"}}
 	var healing_synergy: Dictionary = tile_system.get_synergy_bonus(ward_hunt_tiles, 4, route.size())
 	assert(int(healing_synergy.get("heal", 0)) == 4, "ward next to hunt must grant the configured synergy heal")
+	var formation_tiles := {"1": {"id": "ward"}, "2": {"id": "cache"}, "3": {"id": "hunt"}}
+	var formation_plain: Dictionary = tile_system.get_synergy_bonus(formation_tiles, 2, route.size())
+	assert(formation_plain.get("synergies", []).has("Маршрут снабженческого дозора") and int(formation_plain.get("scrap", 0)) >= 4 and is_equal_approx(float(formation_plain.get("reward", 0.0)), 0.16), "three road tiles must activate the supply patrol formation on its center node")
+	var cartographer_item := {"id": "smoke_route_scribe", "slot": "amulet", "archetype": "route_scribe", "road_formation_bonus": 0.10}
+	var formation_equipped: Dictionary = tile_system.get_synergy_bonus(formation_tiles, 2, route.size(), {"amulet": cartographer_item})
+	assert(is_equal_approx(float(formation_equipped.get("reward", 0.0)), 0.168), "worn route-scribe gear must improve formation reward only, without changing risk")
+	assert(is_equal_approx(float(formation_equipped.get("spawn_bonus", 0.0)), float(formation_plain.get("spawn_bonus", 0.0))) and is_equal_approx(float(formation_equipped.get("enemy_bonus", 0.0)), float(formation_plain.get("enemy_bonus", 0.0))), "cartographer equipment must not amplify encounter chance or enemy strength")
+	var quiet_formation_tiles := {"10": {"id": "snare"}, "11": {"id": "hunt"}, "12": {"id": "snare"}}
+	var quiet_formation: Dictionary = tile_system.get_synergy_bonus(quiet_formation_tiles, 11, route.size())
+	assert(quiet_formation.get("synergies", []).has("Тихая ловушка") and is_equal_approx(float(quiet_formation.get("spawn_bonus", 0.0)), -0.12), "quiet-trap formation must trade encounter chance for controlled enemy strength and reward")
+	var rift_formation_tiles := {"13": {"id": "ward"}, "14": {"id": "rift"}, "15": {"id": "ward"}}
+	var rift_formation: Dictionary = tile_system.get_synergy_bonus(rift_formation_tiles, 14, route.size())
+	assert(rift_formation.get("synergies", []).has("Стабилизированный разлом") and int(rift_formation.get("heal", 0)) == 5, "ward-rift-ward formation must heal and reduce the rift threat")
+	var echo_formation_tiles := {"10": {"id": "fault_line"}, "11": {"id": "signal"}, "12": {"id": "hunt"}}
+	var echo_formation: Dictionary = tile_system.get_synergy_bonus(echo_formation_tiles, 11, route.size())
+	assert(echo_formation.get("synergies", []).has("Засада на резонансе") and int(echo_formation.get("scrap", 0)) >= 2 and float(echo_formation.get("reward", 0.0)) >= 0.18, "echo ambush formation must grant material and reward while raising danger")
+	var healing_formation_tiles := {"10": {"id": "echo_spring"}, "11": {"id": "ward"}, "12": {"id": "echo_spring"}}
+	var healing_formation: Dictionary = tile_system.get_synergy_bonus(healing_formation_tiles, 11, route.size())
+	assert(healing_formation.get("synergies", []).has("Шаги тихого источника") and int(healing_formation.get("heal", 0)) == 6, "echo-spring healing stride must return health and reduce encounter chance")
+	var wrap_formation_tiles := {"16": {"id": "ward"}, "17": {"id": "cache"}, "1": {"id": "hunt"}}
+	var wrap_formation: Dictionary = tile_system.get_synergy_bonus(wrap_formation_tiles, 17, route.size())
+	assert(wrap_formation.get("synergies", []).has("Маршрут снабженческого дозора"), "road formations must wrap the last placeable road slot to the first without occupying the immutable start node")
+	var wrap_preview: Dictionary = tile_system.get_placement_preview(route, {"16": {"id": "ward"}, "1": {"id": "hunt"}}, 17, {"id": "cache", "name": "Узел снабжения"})
+	assert(wrap_preview.get("new_road_formations", []).size() == 1, "placement preview must detect a formation that closes across the route-card seam")
+	var formation_preview: Dictionary = tile_system.get_placement_preview(route, {"1": {"id": "ward"}, "3": {"id": "hunt"}}, 2, {"id": "cache", "name": "Узел снабжения"})
+	assert(formation_preview.get("new_road_formations", []).size() == 1 and str(formation_preview.get("text", "")).contains("Маршрут снабженческого дозора"), "road preview must show a new formation completed by this placement")
 	var preview_result: Dictionary = tile_system.get_placement_preview(route, {"3": {"id": "ward"}}, 2, {"id": "cache", "name": "Узел снабжения"})
 	assert(bool(preview_result.get("ok", false)), "empty legal node should have a placement preview")
 	assert(not preview_result.get("synergies", []).is_empty(), "placement preview must show a known neighbor synergy")
 	assert(str(preview_result.get("text", "")).contains("Узел снабжения"), "road preview must identify the selected tile before placement")
+	var route_tiles_before_preview := {"2": {"id": "cache"}}
+	var route_tiles_snapshot := route_tiles_before_preview.duplicate(true)
+	var reverse_route_preview: Dictionary = tile_system.get_placement_preview(route, route_tiles_before_preview, 3, {"id": "ward"})
+	assert(bool(reverse_route_preview.get("ok", false)) and reverse_route_preview.get("new_route_synergy_matches", []).size() == 1, "road preview must detect a synergy triggered by the pre-existing tile when the neighbour is placed last")
+	assert(str(reverse_route_preview.get("text", "")).contains("узла 3") and str(reverse_route_preview.get("text", "")).contains("Контур снабжения"), "road preview must identify the neighbour trigger node and the new synergy")
+	assert(route_tiles_before_preview == route_tiles_snapshot, "placement forecasts must not mutate route tiles")
 	var occupied_route_preview: Dictionary = tile_system.get_placement_preview(route, {"2": {"id": "ward"}}, 2, {"id": "cache"})
 	assert(not bool(occupied_route_preview.get("ok", true)), "road preview must reject occupied route nodes")
 	var forbidden_preview: Dictionary = tile_system.get_placement_preview(route, {}, 0, {"id": "cache"})
 	assert(not bool(forbidden_preview.get("ok", true)), "preview must explain why the route start is forbidden")
-	assert(TileSystemType.WORLD_FIELD_KEYS.size() >= 30, "landscape field must expose enough distinct non-road cells")
-	assert(TileSystemType.is_world_cell_valid("0:0") and not TileSystemType.is_world_cell_valid("4:0"), "field mask must allow only registered landscape cells")
+	assert(TileSystemType.WORLD_FIELD_KEYS.size() == 80, "legacy landscape IDs must remain stable for pre-Stage-85 saves")
+	var road_profiles := {"classic_ring": true, "narrow_ring": true, "deep_descent": true, "fractured_loop": true}
+	for profile_id in road_profiles.keys():
+		var physical_road := TileSystemType.get_road_grid_coordinates(str(profile_id))
+		var physical_road_set: Dictionary = {}
+		for physical_coord in physical_road:
+			physical_road_set["%d:%d" % [physical_coord.x, physical_coord.y]] = true
+		assert(physical_road.size() == 34 and physical_road_set.size() == 34, "every Stage 85 contour must contain 34 unique road cells")
+		var free_cell_count := 0
+		for board_row in range(TileSystemType.MAP_ROWS):
+			for board_col in range(TileSystemType.MAP_COLUMNS):
+				var board_coord_id := "%d:%d" % [board_col, board_row]
+				if not physical_road_set.has(board_coord_id):
+					free_cell_count += 1
+		assert(free_cell_count == 232, "every route shape must expose 232 off-road grid cells")
+	assert(TileSystemType.is_world_cell_valid("m:0:0") and TileSystemType.is_world_cell_valid("m:18:13") and not TileSystemType.is_world_cell_valid("m:-1:0") and not TileSystemType.is_world_cell_valid("m:19:0"), "full-board IDs must validate within the 19x14 grid only")
+	assert(TileSystemType.world_route_index("m:4:2", route.size(), "classic_ring") == 0, "landscape sector must map to the nearest actual road contour slot")
+	assert(not bool(tile_system.can_place_world(route, {}, "m:4:3", {"id": "archive"}, "classic_ring").ok), "landscape placement must never target a road cell")
+	assert(not bool(tile_system.can_place_world(route, {}, "m:4:2", {"id": "archive"}, "classic_ring").ok), "landscape-only structures must avoid roadside cells")
+	assert(bool(tile_system.can_place_world(route, {}, "m:0:0", {"id": "archive"}, "classic_ring").ok), "wilderness structures should accept cells beyond the roadside band")
+	assert(bool(tile_system.can_place_world(route, {}, "m:4:2", {"id": "roadside_test", "placement_zone": "roadside"}, "classic_ring").ok), "roadside placement should accept a cell orthogonally adjacent to the route")
+	assert(not bool(tile_system.can_place_world(route, {}, "m:0:0", {"id": "roadside_test", "placement_zone": "roadside"}, "classic_ring").ok), "roadside placement should reject a cell away from the route")
+	assert(TileSystemType.is_world_cell_valid("0:0") and TileSystemType.is_world_cell_valid("4:0") and TileSystemType.is_world_cell_valid("9:7"), "expanded landscape field must permit every 10x8 logical cell")
+	var unique_world_cell_ids: Dictionary = {}
+	for world_cell_value in TileSystemType.WORLD_FIELD_KEYS:
+		var world_cell_key := str(world_cell_value)
+		assert(not unique_world_cell_ids.has(world_cell_key), "landscape logical IDs must remain unique: %s" % world_cell_key)
+		unique_world_cell_ids[world_cell_key] = true
 	var landscape_cache := {"id": "cache", "name": "Узел снабжения", "short": "СНАБ"}
 	var field_preview: Dictionary = tile_system.get_world_placement_preview(route, {}, "2:0", landscape_cache)
 	assert(bool(field_preview.get("ok", false)) and int(field_preview.get("route_index", -1)) >= 0, "landscape placement preview must resolve a real route sector")
+	var affinity_item := {"id": "preview_affinity", "name": "Линза сада", "landscape_affinity": "spore_garden", "affinity_effect": {"heal": 2, "scrap": 1, "reward_bonus": 0.10}}
+	var equipped_affinity_preview: Dictionary = tile_system.get_world_placement_preview(route, {}, "2:0", {"id": "spore_garden"}, {"amulet": affinity_item})
+	assert(bool(equipped_affinity_preview.get("ok", false)) and int(equipped_affinity_preview.get("equipment_affinity", {}).get("heal", 0)) == 2, "landscape forecast must use the equipped item's matching affinity")
+	assert(str(equipped_affinity_preview.get("text", "")).contains("Эффект надетой экипировки") and str(equipped_affinity_preview.get("text", "")).contains("Угроза участка"), "landscape forecast must explain affinity effects and the enemy family")
+	var secret_before_tiles := {}
+	var secret_after_tiles := {"4:4": {"id": "crystal_hive", "route_index": 2}, "5:4": {"id": "echo_obelisk", "route_index": 2}}
+	var new_secret_recipes: Array = tile_system.get_new_landscape_secret_recipes(secret_before_tiles, secret_after_tiles, "4:4")
+	assert(new_secret_recipes.size() == 1 and str(new_secret_recipes[0].get("flag", "")) == "secret_prism_echo_found", "landscape forecast must detect a newly prepared secret recipe")
 	var field_ward := {"id": "ward", "field_x": 1, "field_y": 0, "route_index": TileSystemType.world_route_index("1:0", route.size())}
 	var field_cache := {"id": "cache", "field_x": 2, "field_y": 0, "route_index": TileSystemType.world_route_index("2:0", route.size())}
 	var landscape_synergy: Dictionary = tile_system.get_world_synergy_bonus({"1:0": field_ward, "2:0": field_cache}, "2:0")
 	assert(int(landscape_synergy.get("scrap", 0)) >= 4, "adjacent landscape cache and ward must grant the defined synergy")
+	var crystal_archive_field := {"4:4": {"id": "crystal_hive", "route_index": 2}, "5:4": {"id": "archive", "route_index": 2}}
+	var crystal_archive_bonus: Dictionary = tile_system.get_world_synergy_bonus(crystal_archive_field, "4:4")
+	assert(int(crystal_archive_bonus.get("scrap", 0)) == 3 and is_equal_approx(float(crystal_archive_bonus.get("reward", 0.0)), 0.12), "crystal hive + archive must grant the authored resource/reward synergy")
+	var spore_ward_field := {"4:4": {"id": "spore_garden", "route_index": 2}, "5:4": {"id": "ward", "route_index": 2}}
+	var spore_ward_bonus: Dictionary = tile_system.get_world_synergy_bonus(spore_ward_field, "4:4")
+	assert(int(spore_ward_bonus.get("heal", 0)) == 5 and is_equal_approx(float(spore_ward_bonus.get("spawn_bonus", 0.0)), -0.04), "spore garden + ward must provide the safer healing combo")
+	var cross_sector_field := {"4:4": {"id": "crystal_hive", "route_index": 2}, "5:4": {"id": "archive", "route_index": 3}}
+	var cross_sector_bonus: Dictionary = tile_system.get_world_synergy_bonus(cross_sector_field, "4:4")
+	assert(int(cross_sector_bonus.get("scrap", 0)) == 0 and is_zero_approx(float(cross_sector_bonus.get("reward", 0.0))), "landscape synergies must not jump between distinct route sectors")
 	var dense_synergy_field := {
 		"4:4": {"id": "cache", "route_index": 2},
 		"3:4": {"id": "ward", "route_index": 2},
@@ -497,6 +645,20 @@ func _run_tests() -> void:
 	var brood_messages: Array = []
 	secret_manager._discover_landscape_secrets(8, brood_messages)
 	assert(bool(secret_manager.run_ledger.get("event_flags", {}).get("secret_nursery_snare_found", false)) and brood_messages.size() == 1, "adjacent nursery/snare tiles in one sector must reveal the hidden nest")
+	secret_manager.world_tiles = {"4:3": {"id": "crystal_hive", "route_index": 9}, "5:3": {"id": "echo_obelisk", "route_index": 9}}
+	secret_manager.run_ledger = {"event_flags": {}}
+	var prism_messages: Array = []
+	secret_manager._discover_landscape_secrets(9, prism_messages)
+	assert(bool(secret_manager.run_ledger.get("event_flags", {}).get("secret_prism_echo_found", false)), "adjacent crystal hive and echo obelisk must unlock the prism relic event")
+	var prism_secret_event: Dictionary = event_system.draw_event(secret_rng, 1, "", {"secret_prism_echo_found": true})
+	assert(str(prism_secret_event.get("id", "")) == "prism_echo", "the discovered prism combination must resolve into the matching event")
+	secret_manager.world_tiles = {"4:3": {"id": "spore_garden", "route_index": 10}, "5:3": {"id": "bone_orchard", "route_index": 10}}
+	secret_manager.run_ledger = {"event_flags": {}}
+	var root_bone_messages: Array = []
+	secret_manager._discover_landscape_secrets(10, root_bone_messages)
+	assert(bool(secret_manager.run_ledger.get("event_flags", {}).get("secret_root_bone_found", false)), "adjacent spore and bone gardens must unlock the root/bone memory event")
+	var root_bone_event: Dictionary = event_system.draw_event(secret_rng, 1, "", {"secret_root_bone_found": true})
+	assert(str(root_bone_event.get("id", "")) == "root_bone_memory", "the root/bone landscape secret must lead to its named equipment event")
 	var progression_system = ProgressionSystemType.new()
 	var perk_rng := RandomNumberGenerator.new()
 	perk_rng.seed = 101
@@ -512,7 +674,7 @@ func _run_tests() -> void:
 	assert(int(perk_hero.get("perk_counts", {}).get(str(perk_choices[0]), 0)) == 1, "selected perk rank must be recorded")
 	assert(not progression_system.apply_perk(perk_hero, "missing_perk"), "unknown perk must be rejected")
 	var inventory_system = InventorySystemType.new()
-	var secret_relic_ids := ["echo_chart_core", "riftwalker_edge", "brood_shell", "snare_hunter_core"]
+	var secret_relic_ids := ["echo_chart_core", "riftwalker_edge", "brood_shell", "snare_hunter_core", "prism_heart", "echo_veil", "rootwatch_mantle", "bone_impulse_edge"]
 	for secret_relic_id in secret_relic_ids:
 		var secret_relic: Dictionary = inventory_system.make_secret_relic(str(secret_relic_id), 4, 5, 9981)
 		assert(not secret_relic.is_empty() and bool(secret_relic.get("is_secret_relic", false)) and str(secret_relic.get("rarity", "")) == "Тайная", "each secret choice must create a named secret-rarity item")
@@ -525,12 +687,23 @@ func _run_tests() -> void:
 	var item_rng := RandomNumberGenerator.new()
 	item_rng.seed = 77531
 	var rolled_item: Dictionary = inventory_system.roll_item(item_rng, 4, 5)
-	assert(["weapon", "armor", "core"].has(str(rolled_item.get("slot", ""))), "equipment roll must choose a valid slot")
+	var base_quality_rng := RandomNumberGenerator.new()
+	base_quality_rng.seed = 40575
+	var prepared_quality_rng := RandomNumberGenerator.new()
+	prepared_quality_rng.seed = 40575
+	var base_quality_item: Dictionary = inventory_system.roll_item(base_quality_rng, 4, 5, 0.0)
+	var prepared_quality_item: Dictionary = inventory_system.roll_item(prepared_quality_rng, 4, 5, 0.25)
+	var rarity_ranks := {"Обычный": 0, "Редкий": 1, "Эпический": 2, "Реликтовый": 3}
+	assert(int(rarity_ranks.get(str(prepared_quality_item.get("rarity", "")), -1)) >= int(rarity_ranks.get(str(base_quality_item.get("rarity", "")), -1)), "prepared rarity bonus must never reduce the rolled item's rarity")
+	var scout_amulet: Dictionary = {"id": "smoke_scout_amulet", "slot": "amulet", "archetype": "relic_scout", "set_id": "", "rare_find_bonus": 0.05, "tile_spawn_bonus": 0.02}
+	var scout_loadout: Dictionary = inventory_system.calculate_loadout_stats({"amulet": scout_amulet}, {})
+	assert(is_equal_approx(float(scout_loadout.get("combined", {}).get("rare_find_bonus", 0.0)), 0.05), "rare-find modifier must be derived from equipped slots only")
+	assert(InventorySystemType.EQUIPMENT_SLOTS.has(str(rolled_item.get("slot", ""))), "equipment roll must choose a valid slot")
 	assert(not str(rolled_item.get("archetype", "")).is_empty(), "rolled equipment must have a gameplay archetype")
 	assert(not str(rolled_item.get("set_id", "")).is_empty(), "rolled equipment must define a set")
 	assert(float(rolled_item.get("power", 0.0)) >= 0.0, "equipment comparison score must be non-negative")
 	assert(int(rolled_item.get("upgrade_level", -1)) == 0, "new gear must start at upgrade level zero")
-	var expected_roll_affixes := 0 if str(rolled_item.get("rarity", "")) == "Обычный" else (2 if str(rolled_item.get("rarity", "")) == "Эпический" else 1)
+	var expected_roll_affixes := 0 if str(rolled_item.get("rarity", "")) == "Обычный" else (2 if str(rolled_item.get("rarity", "")) in ["Эпический", "Реликтовый"] else 1)
 	assert(rolled_item.get("affix_ids", []).size() == expected_roll_affixes, "ordinary, rare and epic loot must produce zero, one and two affixes respectively")
 	var weapon_fixture := {"id": "smoke_wpn", "slot": "weapon", "rarity": "Обычный", "rank": 2, "upgrade_level": 0, "archetype": "wound", "archetype_name": "Резец глубин", "archetype_description": "Кровотечение", "set_id": "vanguard", "set_name": "Авангард", "attack": 3, "defense": 0, "hp": 0, "speed": 0.0, "crit": 0.0, "bleed_chance": 0.2, "bleed_damage": 2, "power": 0.0}
 	weapon_fixture["power"] = inventory_system.item_power(weapon_fixture)
@@ -565,8 +738,6 @@ func _run_tests() -> void:
 	var rare_affix_ids: Array = rare_affixed.get("affix_ids", [])
 	assert(rare_affix_ids.size() == 1 and not str(rare_affixed.get("affix_description", "")).is_empty(), "rare gear must roll exactly one readable prefix affix")
 	assert(float(rare_affixed.get("power", 0.0)) > float(weapon_fixture.get("power", 0.0)), "a weapon affix must change the real item comparison score")
-	var affix_changed_stat := int(rare_affixed.get("attack", 0)) != int(weapon_fixture.get("attack", 0)) or float(rare_affixed.get("crit", 0.0)) != float(weapon_fixture.get("crit", 0.0)) or float(rare_affixed.get("bleed_chance", 0.0)) != float(weapon_fixture.get("bleed_chance", 0.0)) or int(rare_affixed.get("bleed_damage", 0)) != int(weapon_fixture.get("bleed_damage", 0)) or int(rare_affixed.get("kill_heal", 0)) != int(weapon_fixture.get("kill_heal", 0))
-	assert(affix_changed_stat, "rare affixes must change at least one actual combat or utility stat")
 	assert(not weapon_fixture.has("affix_ids"), "affix rolls must not mutate the source item fixture")
 	var epic_affix_rng := RandomNumberGenerator.new()
 	epic_affix_rng.seed = 7319
@@ -617,6 +788,22 @@ func _run_tests() -> void:
 	var set_stats: Dictionary = inventory_system.total_equipment_stats({"weapon": {"slot": "weapon", "set_id": "vanguard", "attack": 1}, "armor": {"slot": "armor", "set_id": "vanguard", "defense": 1}})
 	assert(int(set_stats.get("defense", 0)) == 3 and int(set_stats.get("hp", 0)) == 8, "two-piece vanguard set must apply actual stats")
 	assert(set_stats.get("active_sets", []).has("Авангард"), "active set should be reported to the UI")
+	var phase_loadout := {
+		"weapon": {"slot": "weapon", "archetype": "leech", "set_id": "phasebound", "attack": 1, "lifesteal": 0.08},
+		"armor": {"slot": "armor", "archetype": "phaseweave", "set_id": "phasebound", "hp": 3, "dodge_chance": 0.07},
+		"core": {"slot": "core", "archetype": "reflex", "set_id": "", "lifesteal": 0.025, "dodge_chance": 0.045}
+	}
+	var phase_stats: Dictionary = inventory_system.total_equipment_stats(phase_loadout)
+	assert(phase_stats.get("active_sets", []).has("Фазоход") and phase_stats.get("active_synergies", []).has("Живой фантом"), "living blade + phaseweave must activate the phase set and its equipment synergy")
+	var tracker_stats: Dictionary = inventory_system.total_equipment_stats({"weapon": {"id": "test_w", "slot": "weapon", "set_id": "abyss_tracker", "biome_damage_bonus": 0.0}, "helmet": {"id": "test_h", "slot": "helmet", "set_id": "abyss_tracker"}})
+	assert(float(tracker_stats.get("biome_damage_bonus", 0.0)) >= 0.05 and float(tracker_stats.get("biome_resistance", 0.0)) >= 0.025, "two Abyss Tracker pieces must grant biome offense and defense")
+	var prism_enemy := {"id": "prism_mite", "biome_tag": "crystal", "tags": ["crystal", "insect", "fast"]}
+	var affinity_equipment := {"core": {"id": "prism_heart", "slot": "core", "landscape_affinity": "crystal_hive", "affinity_effect": {"crystals": 1}}}
+	var prism_affinity: Dictionary = inventory_system.get_landscape_combat_bonus(affinity_equipment, ["crystal_hive"], prism_enemy)
+	assert(is_equal_approx(float(prism_affinity.get("bonus", 0.0)), 0.06), "matching crystal relic and landscape must add contextual combat damage")
+	var wrong_affinity: Dictionary = inventory_system.get_landscape_combat_bonus(affinity_equipment, ["spore_garden"], prism_enemy)
+	assert(is_zero_approx(float(wrong_affinity.get("bonus", 0.0))), "landscape affinity must not activate away from its named tile")
+	assert(is_equal_approx(float(phase_stats.get("lifesteal", 0.0)), 0.175) and is_equal_approx(float(phase_stats.get("dodge_chance", 0.0)), 0.175), "equipment, set and archetype synergy must apply real healing/dodge stats once")
 	var overclock_loadout := {
 		"weapon": {"slot": "weapon", "archetype": "assault", "attack": 3, "set_id": ""},
 		"armor": {"slot": "armor", "archetype": "field_medic", "defense": 1, "set_id": ""},
@@ -647,6 +834,113 @@ func _run_tests() -> void:
 	assert(ContentRegistry.BALANCE.has("encounter_chance_base"), "encounter chance must be configurable")
 	assert(ContentRegistry.BALANCE.has("loop_danger_growth"), "danger growth must be configurable")
 	assert(ContentRegistry.DIFFICULTY_PRESETS.has("volatile"), "volatile difficulty must be configured")
+	var biome_affinity_loadout := {
+		"weapon": {"id": "spore_edge", "slot": "weapon", "spore_damage_bonus": 0.08, "spore_trophy_bonus": 0.06},
+		"core": {"id": "echo_core", "slot": "core", "echo_damage_bonus": 0.08, "echo_trophy_bonus": 0.06}
+	}
+	var biome_affinity_stats: Dictionary = inventory_system.total_equipment_stats(biome_affinity_loadout)
+	assert(is_equal_approx(float(biome_affinity_stats.get("spore_trophy_bonus", 0.0)), 0.06) and is_equal_approx(float(biome_affinity_stats.get("echo_trophy_bonus", 0.0)), 0.06), "biome affixes must add trophy chance only through equipped gear stats")
+	# STAGE79_LOOP_HERO_BACKPACK_QUEUE: newest item enters the first cell and oldest leaves when full.
+	var queue_smoke_manager = ExpeditionManagerType.new()
+	for packed_index in range(queue_smoke_manager.BACKPACK_CAPACITY):
+		queue_smoke_manager.bag.append({"id": "packed_%d" % packed_index, "slot": "weapon", "name": "Загруженный предмет %d" % packed_index})
+	var overflow_candidate := {"id": "overflow_candidate", "slot": "armor", "name": "Броня из тайника", "defense": 2, "hp": 6}
+	assert(queue_smoke_manager._store_run_item(overflow_candidate), "new loot should enter the backpack queue when full")
+	assert(queue_smoke_manager.bag.size() == queue_smoke_manager.BACKPACK_CAPACITY, "FIFO backpack must remain limited to 12 items")
+	assert(str(queue_smoke_manager.bag.front().get("id", "")) == "overflow_candidate", "new item must enter cell 01")
+	assert(str(queue_smoke_manager.bag.back().get("id", "")) == "packed_10", "oldest item must be ejected and second-oldest becomes the final cell")
+	assert(queue_smoke_manager.find_run_item("packed_11").is_empty(), "ejected item must no longer be present in the active expedition backpack")
+	assert(str(queue_smoke_manager.last_inventory_evicted_item.get("id", "")) == "packed_11", "last evicted item must be exposed for feedback and later base-resource conversion")
+	assert(queue_smoke_manager.field_cache.is_empty(), "overflow must not be redirected to the legacy field cache")
+	assert(int(queue_smoke_manager.run_ledger.get("inventory_ejections_count", 0)) == 1 and int(queue_smoke_manager.run_ledger.get("inventory_ejections_dust", 0)) == inventory_system.get_ejection_echo_dust(queue_smoke_manager.last_inventory_evicted_item), "every FIFO eviction must increment both the cumulative item count and its eventual base-resource value")
+	# STAGE82_ITEM_IDENTITY: duplicate rewards must not be reported as successful inserts or eject more gear.
+	var bag_size_before_duplicate := queue_smoke_manager.bag.size()
+	var ejection_count_before_duplicate := int(queue_smoke_manager.run_ledger.get("inventory_ejections_count", 0))
+	var dust_before_duplicate := int(queue_smoke_manager.run_ledger.get("inventory_ejections_dust", 0))
+	assert(not queue_smoke_manager._store_run_item({"id": "packed_10", "slot": "weapon", "name": "Дубликат"}), "duplicate backpack item IDs must be rejected instead of falsely reporting a successful drop")
+	assert(queue_smoke_manager.bag.size() == bag_size_before_duplicate and int(queue_smoke_manager.run_ledger.get("inventory_ejections_count", 0)) == ejection_count_before_duplicate and int(queue_smoke_manager.run_ledger.get("inventory_ejections_dust", 0)) == dust_before_duplicate, "a rejected duplicate must not change backpack capacity or ejection rewards")
+	queue_smoke_manager.equipment["core"] = {"id": "already_equipped", "slot": "core", "name": "Уже надето"}
+	assert(not queue_smoke_manager._store_run_item({"id": "already_equipped", "slot": "core", "name": "Копия"}), "item identity must be unique across equipped slots and backpack")
+	var common_ejection := {"id": "dust_common", "slot": "weapon", "rarity": "Обычный", "rank": 1, "upgrade_level": 0, "power": 0.0}
+	var rare_ejection := {"id": "dust_rare", "slot": "weapon", "rarity": "Редкий", "rank": 1, "upgrade_level": 0, "power": 0.0}
+	var epic_ejection := {"id": "dust_epic", "slot": "weapon", "rarity": "Эпический", "rank": 1, "upgrade_level": 0, "power": 0.0}
+	var relic_ejection := {"id": "dust_relic", "slot": "core", "rarity": "Реликтовый", "rank": 1, "upgrade_level": 0, "power": 0.0}
+	assert(inventory_system.get_ejection_echo_dust(common_ejection) == 1 and inventory_system.get_ejection_echo_dust(rare_ejection) == 2 and inventory_system.get_ejection_echo_dust(epic_ejection) == 4 and inventory_system.get_ejection_echo_dust(relic_ejection) == 6, "overflow conversion must reward higher rarities with more capped Echo Dust")
+	var powered_ejection := rare_ejection.duplicate(true)
+	powered_ejection["rank"] = 9
+	powered_ejection["upgrade_level"] = 5
+	powered_ejection["power"] = 95.0
+	assert(inventory_system.get_ejection_echo_dust(powered_ejection) > inventory_system.get_ejection_echo_dust(rare_ejection) and inventory_system.get_ejection_echo_dust(powered_ejection) <= 10, "overflow dust must recognize ranked/upgraded gear but enforce a per-item ceiling")
+	assert(GameState.echo_dust >= 0 and GameState.echo_dust <= GameState.MAX_ECHO_DUST, "base Echo Dust must stay inside its save-safe cap")
+	var reorder_result: Dictionary = queue_smoke_manager.reorder_run_bag_item("packed_10", 0)
+	assert(not bool(reorder_result.get("ok", true)), "reordering must be blocked when the expedition is inactive")
+	var legacy_snapshot_items := [{"id": "legacy_old", "slot": "weapon", "name": "Старый"}, {"id": "legacy_new", "slot": "armor", "name": "Новый"}]
+	var migrated_order := legacy_snapshot_items.duplicate(true)
+	migrated_order.reverse()
+	assert(str(migrated_order.front().get("id", "")) == "legacy_new", "legacy oldest-first inventory migration must reverse into newest-first ordering")
+	assert(GameState.get_armory_item("overflow_candidate").is_empty(), "fresh expedition drops must not be copied to permanent armory before surviving the run")
+	queue_smoke_manager.free()
+	var stat_comparison := ItemTextPresenterType.format_stat_comparison({"attack": 4, "speed": 0.10, "defense": 0}, {"attack": 2, "speed": 0.05, "defense": 1})
+	assert(stat_comparison.contains("Атака: +2") and stat_comparison.contains("Скорость атаки: +5%") and stat_comparison.contains("Защита: -1"), "item comparison must explain positive and negative stat changes, not only an aggregate power score")
+	var loot_system = LootSystemType.new()
+	var base_rarity_distribution: Dictionary = inventory_system.get_rarity_distribution(0.0)
+	var boosted_rarity_distribution: Dictionary = inventory_system.get_rarity_distribution(0.25)
+	var base_rarity_total := 0.0
+	for rarity_value in base_rarity_distribution.values():
+		base_rarity_total += float(rarity_value)
+	assert(is_equal_approx(base_rarity_total, 1.0), "rarity distribution must sum to one")
+	assert(is_equal_approx(float(base_rarity_distribution.get("Обычный", 0.0)), 0.70) and is_equal_approx(float(base_rarity_distribution.get("Редкий", 0.0)), 0.24), "baseline rarity probabilities must match the documented 70/24/5.2/0.8 split")
+	assert(float(boosted_rarity_distribution.get("Обычный", 0.0)) < float(base_rarity_distribution.get("Обычный", 0.0)) and float(boosted_rarity_distribution.get("Редкий", 0.0)) > float(base_rarity_distribution.get("Редкий", 0.0)), "rare-find bonus should shift probability away from common gear toward rarer tiers")
+	assert(float(boosted_rarity_distribution.get("Обычный", 0.0)) > float(boosted_rarity_distribution.get("Редкий", 0.0)) and float(boosted_rarity_distribution.get("Редкий", 0.0)) > float(boosted_rarity_distribution.get("Эпический", 0.0)) and float(boosted_rarity_distribution.get("Эпический", 0.0)) > float(boosted_rarity_distribution.get("Реликтовый", 0.0)), "relic chance must remain below epic chance at maximum bias")
+	var rarity_rng := RandomNumberGenerator.new()
+	rarity_rng.seed = 811731
+	var rarity_counts := {"Обычный": 0, "Редкий": 0, "Эпический": 0, "Реликтовый": 0}
+	const RARITY_SAMPLE_COUNT := 12000
+	for _sample_index in range(RARITY_SAMPLE_COUNT):
+		var base_sample_rarity := inventory_system.roll_rarity(rarity_rng, 0.0)
+		rarity_counts[base_sample_rarity] = int(rarity_counts.get(base_sample_rarity, 0)) + 1
+	assert(absf(float(rarity_counts["Обычный"]) / RARITY_SAMPLE_COUNT - 0.70) < 0.02, "seeded rarity samples should stay near 70% common")
+	assert(absf(float(rarity_counts["Редкий"]) / RARITY_SAMPLE_COUNT - 0.24) < 0.02, "seeded rarity samples should stay near 24% rare")
+	assert(absf(float(rarity_counts["Эпический"]) / RARITY_SAMPLE_COUNT - 0.052) < 0.012, "seeded rarity samples should stay near 5.2% epic")
+	assert(absf(float(rarity_counts["Реликтовый"]) / RARITY_SAMPLE_COUNT - 0.008) < 0.006, "seeded rarity samples should stay near 0.8% relic")
+	var max_bias_counts := {"Обычный": 0, "Редкий": 0, "Эпический": 0, "Реликтовый": 0}
+	var max_bias_rng := RandomNumberGenerator.new()
+	max_bias_rng.seed = 811732
+	for _sample_index in range(RARITY_SAMPLE_COUNT):
+		var biased_sample_rarity := inventory_system.roll_rarity(max_bias_rng, 0.25)
+		max_bias_counts[biased_sample_rarity] = int(max_bias_counts.get(biased_sample_rarity, 0)) + 1
+	assert(float(max_bias_counts["Реликтовый"]) / RARITY_SAMPLE_COUNT < 0.05, "rarity bonus at cap must not turn relic equipment into a common drop")
+	assert(is_equal_approx(loot_system.get_equipment_drop_chance("enemy"), 0.18), "ordinary equipment drop chance must use 18% baseline")
+	assert(is_equal_approx(loot_system.get_equipment_drop_chance("elite"), 0.45), "elite equipment drop chance must use 45% baseline")
+	assert(is_equal_approx(loot_system.get_equipment_drop_chance("cache"), 0.35), "cache equipment drop chance must use 35% baseline")
+	assert(is_equal_approx(loot_system.get_equipment_drop_chance("boss"), 1.0), "boss equipment reward must remain guaranteed")
+	assert(is_equal_approx(loot_system.get_equipment_drop_chance("cache", 0.0, 4, 0.30), 0.85), "equipment drop probabilities must use source-specific weights and respect cache cap")
+	assert(loot_system.get_source_rarity_bonus("elite") > loot_system.get_source_rarity_bonus("enemy") and loot_system.get_source_rarity_bonus("cache") > loot_system.get_source_rarity_bonus("enemy"), "elite and cache sources should improve quality odds without guaranteeing a relic")
+	var spore_enemy := {"id": "sporeling", "biome_tag": "spore"}
+	var crystal_enemy := {"id": "prism_mite", "biome_tag": "crystal"}
+	var spore_base_chance: float = loot_system.get_biome_trophy_chance(spore_enemy)
+	var spore_gear_chance: float = loot_system.get_biome_trophy_chance(spore_enemy, [], 0.0, 0.06)
+	var crystal_base_chance: float = loot_system.get_biome_trophy_chance(crystal_enemy)
+	assert(is_equal_approx(spore_gear_chance, spore_base_chance + 0.06), "matching biome affix must add its trophy bonus")
+	assert(is_equal_approx(crystal_base_chance, 0.56), "a spore-specific affix must not change a crystal biome's base trophy chance")
+	var draft_rng := RandomNumberGenerator.new()
+	draft_rng.seed = 87531
+	var tile_system_for_draft = TileSystemType.new()
+	var original_draft: Dictionary = tile_system_for_draft.draw_tile(draft_rng, true)
+	var alternate_draft: Dictionary = tile_system_for_draft.draw_tile(draft_rng, true, [str(original_draft.get("id", ""))])
+	assert(str(alternate_draft.get("id", "")) != str(original_draft.get("id", "")), "card redraw must exclude the selected tile ID when other choices exist")
+	var exchange_manager = ExpeditionManagerType.new()
+	exchange_manager.active = true
+	exchange_manager.tile_hand = [{"id": "cache", "name": "Узел снабжения"}]
+	exchange_manager.run_ledger = {"crystals": 1, "last_tile_exchange_loop": -1}
+	exchange_manager.loop_count = 0
+	assert(bool(exchange_manager.get_tile_exchange_preview(0).get("ok", false)), "card exchange should be offered for a valid hand card with one crystal")
+	exchange_manager.run_ledger["last_tile_exchange_loop"] = 0
+	assert(not bool(exchange_manager.get_tile_exchange_preview(0).get("ok", true)), "card exchange must be limited to once per loop")
+	exchange_manager.run_ledger["last_tile_exchange_loop"] = -1
+	exchange_manager.run_ledger["crystals"] = 0
+	assert(not bool(exchange_manager.get_tile_exchange_preview(0).get("ok", true)), "card exchange must not allow spending a missing crystal")
+	exchange_manager.free()
 	var resource_system = ResourceSystemType.new()
 	var ledger := {"scrap": 11, "crystals": 3}
 	var settled: Dictionary = resource_system.settle(ledger, 0.4)

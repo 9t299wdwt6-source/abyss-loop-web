@@ -18,7 +18,7 @@ checks = {
         < manager.index("if placed_tiles.has(str(index)):", manager.index("func _visit_cell"))
         < manager.index("for world_cell_value in world_tiles.keys():", manager.index("func _visit_cell"))
         < manager.index("get_world_synergy_bonus_for_route_index(world_tiles, index)", manager.index("func _visit_cell"))
-        < manager.index("get_synergy_bonus(placed_tiles, index, route.size())", manager.index("func _visit_cell"))
+        < manager.index("get_synergy_bonus(placed_tiles, index, route.size(), equipment)", manager.index("func _visit_cell"))
         < manager.index("tile_system.clamp_visit_modifiers", manager.index("func _visit_cell"))
         < manager.index("if should_offer_event:", manager.index("func _visit_cell"))
     ),
