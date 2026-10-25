@@ -260,36 +260,54 @@ func _place_one_legal_road_tile(manager: Variant) -> bool:
 
 func _place_landscape_tiles(manager: Variant, target_count: int) -> int:
 	var placed := 0
-	# Search the complete 19x14 board, not the legacy 10x8 ID set. Candidate
-	# previews must receive the actual card so placement-zone rules match execution.
-	while placed < target_count and not manager.tile_hand.is_empty():
+	var supplemental_draws := 0
+	# Exercise legal landscape placement even when a deterministic starting hand
+	# contains only road-zone cards. Any supplemental card is drawn by TileSystem's
+	# production draw method, tried against the real placement rules, and discarded
+	# from this QA fixture if it cannot fit. The helper never overrides placement.
+	while placed < target_count:
 		var placed_this_round := false
 		for hand_index in range(manager.tile_hand.size()):
-			var tile_value: Variant = manager.tile_hand[hand_index]
-			if typeof(tile_value) != TYPE_DICTIONARY:
-				continue
-			var tile: Dictionary = tile_value
-			for y in range(TileSystemScript.MAP_ROWS):
-				for x in range(TileSystemScript.MAP_COLUMNS):
-					var cell_id := TileSystemScript.map_world_cell_id(x, y)
-					var preview: Dictionary = manager.tile_system.can_place_world(
-						manager.route, manager.world_tiles, cell_id, tile,
-						manager.get_route_shape_id(), manager.get_route_geometry_seed()
-					)
-					if not bool(preview.get("ok", false)):
-						continue
-					var result: Dictionary = manager.place_world_tile(hand_index, cell_id)
-					if bool(result.get("ok", false)):
-						placed += 1
-						placed_this_round = true
-						break
-				if placed_this_round:
-					break
-			if placed_this_round:
+			if _try_place_landscape_from_hand_slot(manager, hand_index):
+				placed += 1
+				placed_this_round = true
 				break
-		if not placed_this_round:
+		if placed_this_round:
+			continue
+		if supplemental_draws >= 12:
 			break
+		var unlock_rare := manager.loop_count >= 3 or GameState.get_unlock_effect("unlock_rare_tiles") > 0.0
+		var supplemental_tile: Dictionary = manager.tile_system.draw_tile(manager._rng_for_draw(), unlock_rare)
+		var supplemental_index := manager.tile_hand.size()
+		manager.tile_hand.append(supplemental_tile)
+		supplemental_draws += 1
+		print("Stage71 QA placement draw %d: %s (%s)." % [supplemental_draws, str(supplemental_tile.get("id", "")), str(supplemental_tile.get("placement_zone", "any"))])
+		if _try_place_landscape_from_hand_slot(manager, supplemental_index):
+			placed += 1
+		else:
+			manager.tile_hand.remove_at(supplemental_index)
 	return placed
+
+func _try_place_landscape_from_hand_slot(manager: Variant, hand_index: int) -> bool:
+	if hand_index < 0 or hand_index >= manager.tile_hand.size():
+		return false
+	var tile_value: Variant = manager.tile_hand[hand_index]
+	if typeof(tile_value) != TYPE_DICTIONARY:
+		return false
+	var tile: Dictionary = tile_value
+	for y in range(TileSystemScript.MAP_ROWS):
+		for x in range(TileSystemScript.MAP_COLUMNS):
+			var cell_id := TileSystemScript.map_world_cell_id(x, y)
+			var preview: Dictionary = manager.tile_system.can_place_world(
+				manager.route, manager.world_tiles, cell_id, tile,
+				manager.get_route_shape_id(), manager.get_route_geometry_seed()
+			)
+			if not bool(preview.get("ok", false)):
+				continue
+			var result: Dictionary = manager.place_world_tile(hand_index, cell_id)
+			if bool(result.get("ok", false)):
+				return true
+	return false
 
 func _best_available_event_choice(manager: Variant) -> String:
 	var choices_value: Variant = manager.pending_event.get("choices", [])
