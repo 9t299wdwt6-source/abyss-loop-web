@@ -1931,13 +1931,22 @@ func place_tile(hand_index: int, cell_index: int) -> Dictionary:
 		return {"ok": false, "reason": "Выберите тайл из руки."}
 	var tile: Dictionary = tile_hand[hand_index].duplicate(true)
 	var can_place: Dictionary = tile_system.can_place(route, placed_tiles, cell_index, tile)
-	if not bool(can_place.ok):
+	if not bool(can_place.get("ok", false)):
 		return can_place
+	# Placement is a small transaction: never report success until the new hand
+	# and board state are durably snapshotted.
+	var previous_hand: Array = tile_hand.duplicate(true)
+	var previous_placed_tiles: Dictionary = placed_tiles.duplicate(true)
+	var previous_event_log: Array = event_log.duplicate(true)
 	placed_tiles[str(cell_index)] = tile
 	tile_hand.remove_at(hand_index)
-	_log("Размещён тайл «%s» на дорожном узле %d. Рука теперь содержит %d тайла(ов)." % [tile.name, cell_index + 1, tile_hand.size()])
+	_log("Размещён тайл «%s» на дорожном узле %d. Рука теперь содержит %d тайла(ов)." % [str(tile.get("name", "Тайл")), cell_index + 1, tile_hand.size()])
+	if not save_run_snapshot():
+		tile_hand = previous_hand
+		placed_tiles = previous_placed_tiles
+		event_log = previous_event_log
+		return {"ok": false, "reason": "Не удалось сохранить размещение. Карта возвращена в руку, поле восстановлено."}
 	changed.emit()
-	save_run_snapshot()
 	return {"ok": true, "reason": "Тайл размещён на дорожном узле.", "tile": tile}
 
 func place_world_tile(hand_index: int, cell_id: String) -> Dictionary:
@@ -1955,6 +1964,10 @@ func place_world_tile(hand_index: int, cell_id: String) -> Dictionary:
 	var placement: Dictionary = tile_system.can_place_world(route, world_tiles, cell_id, tile, get_route_shape_id(), get_route_geometry_seed())
 	if not bool(placement.get("ok", false)):
 		return placement
+	var previous_hand: Array = tile_hand.duplicate(true)
+	var previous_world_tiles: Dictionary = world_tiles.duplicate(true)
+	var previous_discovered_cells: Dictionary = discovered_world_cells.duplicate(true)
+	var previous_event_log: Array = event_log.duplicate(true)
 	var field_coord: Vector2i = TileSystemScript.world_cell_coordinates(cell_id)
 	tile["field_x"] = field_coord.x
 	tile["field_y"] = field_coord.y
@@ -1965,8 +1978,13 @@ func place_world_tile(hand_index: int, cell_id: String) -> Dictionary:
 		discovered_world_cells[cell_id] = true
 	tile_hand.remove_at(hand_index)
 	_log("Тайл «%s» размещён на ландшафте (%d, %d), сектор маршрута %d." % [str(tile.get("name", "Тайл")), int(tile.field_x) + 1, int(tile.field_y) + 1, int(tile.route_index) + 1])
+	if not save_run_snapshot():
+		tile_hand = previous_hand
+		world_tiles = previous_world_tiles
+		discovered_world_cells = previous_discovered_cells
+		event_log = previous_event_log
+		return {"ok": false, "reason": "Не удалось сохранить размещение. Карта возвращена в руку, ландшафт восстановлен."}
 	changed.emit()
-	save_run_snapshot()
 	return {"ok": true, "reason": "Тайл размещён на ландшафте.", "tile": tile, "route_index": int(tile.route_index)}
 
 func set_pause(value: bool) -> void:
