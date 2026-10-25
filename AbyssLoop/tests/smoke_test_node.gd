@@ -73,7 +73,8 @@ func _run_tests() -> void:
 				var next_point: Vector2 = route_points[(point_index + 1) % route_points.size()]
 				var road_midpoint := point.lerp(next_point, 0.5)
 				assert(route_view._find_world_cell(road_midpoint).is_empty(), "road segments must never be treated as landscape placement cells")
-			for world_cell_value in TileSystemType.WORLD_FIELD_KEYS:
+			var displayed_world_cells: Dictionary = route_geometry.get("world_display_cells", {})
+			for world_cell_value in displayed_world_cells.keys():
 				var world_cell_id := str(world_cell_value)
 				var field_center := route_view._field_cell_rect(world_cell_id).get_center()
 				assert(route_view._find_closest_cell(field_center) < 0 and not route_view._is_near_route_line(field_center), "landscape cell center must stay outside the route hit zone: cell=%s shape=%s size=%s" % [world_cell_id, shape_id, view_size])
