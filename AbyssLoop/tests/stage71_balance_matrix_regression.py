@@ -15,6 +15,7 @@ checks = {
     "matrix has repeat groups for the three non-standard modifiers": all(f'"modifier_{modifier}"' in capture for modifier in ["resonance", "scarce", "unstable"]),
     "matrix has repeat groups for three separately identified contracts": all(f'"contract_{contract}"' in capture for contract in ["bounty_hunter", "event_archive", "landscape_survey"]),
     "landscape survey really attempts three legal landscape placements": '"landscape_survey", "standard", 3, 3, LANDSCAPE_SEEDS' in capture and "func _place_landscape_tiles(manager: Variant, target_count: int) -> int:" in capture,
+    "placement capture passes the actual candidate tile to road and modern-grid previews": "can_place(manager.route, manager.placed_tiles, route_index, tile)" in capture and "can_place_world(" in capture and "manager.route, manager.world_tiles, cell_id, tile," in capture and "TileSystemScript.map_world_cell_id(x, y)" in capture and "for hand_index in range(manager.tile_hand.size()):" in capture,
     "each case uses the actual ExpeditionManager with a deterministic seed": 'manager.start_run(difficulty_id, seed_value, modifier_id, contract_id, mode_id)' in capture and 'GameState.reset_progress()' in capture,
     "test leaves game combat and reward formulas unmodified": 'manager.hero["hp"] =' not in capture and 'fighter["hp"] =' not in capture and 'manager.enemy["hp"]' not in capture,
     "matrix captures contract and modifier challenge IDs separately": '"capture_contract_id"' in capture and '"capture_challenge_id"' in capture,
