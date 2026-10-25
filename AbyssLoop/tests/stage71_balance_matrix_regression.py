@@ -7,6 +7,7 @@ capture = (ROOT / "tests/stage71_balance_matrix_capture.gd").read_text(encoding=
 scene = (ROOT / "tests/stage71_balance_matrix_runner.tscn").read_text(encoding="utf-8")
 workflow = (ROOT / ".github/workflows/abyssloop-web.yml").read_text(encoding="utf-8")
 analyzer = (ROOT / "tools/real_run_balance.py").read_text(encoding="utf-8")
+manager = (ROOT / "scripts/systems/expedition_manager.gd").read_text(encoding="utf-8")
 
 checks = {
     "matrix covers all four registered difficulty presets": all(f'"{difficulty}"' in capture for difficulty in ["standard", "volatile", "attrition", "abyssal"]),
@@ -23,6 +24,8 @@ checks = {
     "scene runs the Stage71 capture node": 'path="res://tests/stage71_balance_matrix_capture.gd"' in scene,
     "CI executes the matrix with a bounded timeout and preserves output": 'Capture Stage71 real-engine balance matrix' in workflow and 'timeout 900s' in workflow and 'STAGE71_BALANCE_MATRIX.json' in workflow and 'STAGE71_BALANCE_MATRIX_REPORT.md' in workflow,
     "analysis separates contracts and challenges into comparison groups": 'row["contract_id"]' in analyzer and 'row["challenge_id"]' in analyzer and '"contract_id"]' in analyzer and '"challenge_id"]' in analyzer,
+    "road placement rolls back hand, board, and log if snapshot persistence fails": "var previous_placed_tiles: Dictionary = placed_tiles.duplicate(true)" in manager and "if not save_run_snapshot():" in manager and 'return {"ok": false, "reason": "Не удалось сохранить размещение. Карта возвращена в руку, поле восстановлено."}' in manager,
+    "landscape placement also rolls back discovery state when snapshot persistence fails": "var previous_world_tiles: Dictionary = world_tiles.duplicate(true)" in manager and "var previous_discovered_cells: Dictionary = discovered_world_cells.duplicate(true)" in manager and 'return {"ok": false, "reason": "Не удалось сохранить размещение. Карта возвращена в руку, ландшафт восстановлен."}' in manager,
 }
 failed = [name for name, passed in checks.items() if not passed]
 for name, passed in checks.items():
