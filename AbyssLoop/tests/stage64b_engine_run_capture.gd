@@ -1,6 +1,7 @@
 extends Node
 
 const ExpeditionManagerScript = preload("res://scripts/systems/expedition_manager.gd")
+const TileSystemScript = preload("res://scripts/systems/tile_system.gd")
 const RUN_SEEDS: Array[int] = [8675309, 8675311, 8675313, 8675317, 8675323]
 const DIFFICULTY_IDS: Array[String] = ["standard", "volatile", "attrition", "abyssal"]
 const MODE_IDS: Array[String] = ["standard", "long_expedition"]
@@ -288,28 +289,76 @@ func _case_label(case_data: Dictionary) -> String:
 	]
 
 func _place_one_legal_road_tile(manager) -> bool:
-	if manager.tile_hand.is_empty():
+	# Respect each card's declared placement zone instead of checking only whether
+	# a route slot is free. Search the full hand, then use bounded production draws
+	# when a deterministic QA seed starts with landscape-only cards.
+	for hand_index in range(manager.tile_hand.size()):
+		var tile_value: Variant = manager.tile_hand[hand_index]
+		if typeof(tile_value) != TYPE_DICTIONARY:
+			continue
+		var tile: Dictionary = tile_value
+		if _try_place_road_from_hand_slot(manager, hand_index, tile):
+			return true
+	var supplemental_draws := 0
+	while supplemental_draws < 12:
+		var unlock_rare := manager.loop_count >= 3 or GameState.get_unlock_effect("unlock_rare_tiles") > 0.0
+		var supplemental_tile: Dictionary = manager.tile_system.draw_tile(manager._rng_for_draw(), unlock_rare)
+		var supplemental_index := manager.tile_hand.size()
+		manager.tile_hand.append(supplemental_tile)
+		supplemental_draws += 1
+		if _try_place_road_from_hand_slot(manager, supplemental_index, supplemental_tile):
+			return true
+		manager.tile_hand.remove_at(supplemental_index)
+	return false
+
+func _try_place_road_from_hand_slot(manager, hand_index: int, tile: Dictionary) -> bool:
+	if hand_index < 0 or hand_index >= manager.tile_hand.size():
 		return false
 	for route_index in range(1, manager.route.size()):
-		var placement_preview: Dictionary = manager.tile_system.can_place(manager.route, manager.placed_tiles, route_index)
+		var placement_preview: Dictionary = manager.tile_system.can_place(manager.route, manager.placed_tiles, route_index, tile)
 		if not bool(placement_preview.get("ok", false)):
 			continue
-		var placement_result: Dictionary = manager.place_tile(0, route_index)
+		var placement_result: Dictionary = manager.place_tile(hand_index, route_index)
 		if bool(placement_result.get("ok", false)):
 			manager._update_objective_progress()
 			return true
 	return false
 
 func _place_one_legal_landscape_tile(manager) -> bool:
-	if manager.tile_hand.is_empty():
+	# Search all actual modern map cells. The preview must receive the exact card,
+	# route shape and seed so a roadside/landscape restriction is never bypassed.
+	for hand_index in range(manager.tile_hand.size()):
+		if _try_place_landscape_from_hand_slot(manager, hand_index):
+			return true
+	var supplemental_draws := 0
+	while supplemental_draws < 12:
+		var unlock_rare := manager.loop_count >= 3 or GameState.get_unlock_effect("unlock_rare_tiles") > 0.0
+		var supplemental_tile: Dictionary = manager.tile_system.draw_tile(manager._rng_for_draw(), unlock_rare)
+		var supplemental_index := manager.tile_hand.size()
+		manager.tile_hand.append(supplemental_tile)
+		supplemental_draws += 1
+		if _try_place_landscape_from_hand_slot(manager, supplemental_index):
+			return true
+		manager.tile_hand.remove_at(supplemental_index)
+	return false
+
+func _try_place_landscape_from_hand_slot(manager, hand_index: int) -> bool:
+	if hand_index < 0 or hand_index >= manager.tile_hand.size():
 		return false
-	for y in range(8):
-		for x in range(10):
-			var cell_id := "%d:%d" % [x, y]
-			var placement_preview: Dictionary = manager.tile_system.can_place_world(manager.route, manager.world_tiles, cell_id)
+	var tile_value: Variant = manager.tile_hand[hand_index]
+	if typeof(tile_value) != TYPE_DICTIONARY:
+		return false
+	var tile: Dictionary = tile_value
+	for y in range(TileSystemScript.MAP_ROWS):
+		for x in range(TileSystemScript.MAP_COLUMNS):
+			var cell_id := TileSystemScript.map_world_cell_id(x, y)
+			var placement_preview: Dictionary = manager.tile_system.can_place_world(
+				manager.route, manager.world_tiles, cell_id, tile,
+				manager.get_route_shape_id(), manager.get_route_geometry_seed()
+			)
 			if not bool(placement_preview.get("ok", false)):
 				continue
-			var placement_result: Dictionary = manager.place_world_tile(0, cell_id)
+			var placement_result: Dictionary = manager.place_world_tile(hand_index, cell_id)
 			if bool(placement_result.get("ok", false)):
 				manager._update_objective_progress()
 				return true
