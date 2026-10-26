@@ -1475,11 +1475,17 @@ func _sync_expedition_view(rebuild_tiles: bool) -> void:
 	if route_view.has_method("configure_accessibility"):
 		route_view.configure_accessibility(bool(GameState.settings.get("reduced_motion", false)), bool(GameState.settings.get("reduce_flashes", true)), bool(GameState.settings.get("high_contrast", false)), float(GameState.settings.get("animation_speed", 1.0)))
 	var selected_tile_id := ""
+	var selected_tile_name := ""
+	var selected_tile_zone := "any"
 	if selected_tile_hand_index >= 0 and selected_tile_hand_index < manager.tile_hand.size():
-		selected_tile_id = str(manager.tile_hand[selected_tile_hand_index].get("name", "тайл"))
+		var selected_tile: Dictionary = manager.tile_hand[selected_tile_hand_index]
+		selected_tile_id = str(selected_tile.get("id", ""))
+		selected_tile_name = str(selected_tile.get("name", selected_tile_id))
+		var selected_definition: Dictionary = ContentRegistry.TILE_DEFS.get(selected_tile_id, {})
+		selected_tile_zone = str(selected_tile.get("placement_zone", selected_definition.get("placement_zone", "any")))
 	var current_is_boss: bool = not manager.enemy.is_empty() and bool(manager.enemy.get("is_boss", false))
 	var current_is_elite: bool = not manager.enemy.is_empty() and bool(manager.enemy.get("is_elite", false))
-	route_view.configure(manager.route, manager.hero_progress_for_draw(), manager.placed_tiles, int(manager.combat_cell), selected_tile_hand_index >= 0, selected_tile_id, current_is_boss, manager.get_route_shape_id(), manager.world_tiles, current_is_elite, _get_tile_placement_block_reason().is_empty(), manager.get_route_geometry_seed(), manager.discovered_world_cells)
+	route_view.configure(manager.route, manager.hero_progress_for_draw(), manager.placed_tiles, int(manager.combat_cell), not selected_tile_id.is_empty(), selected_tile_id, current_is_boss, manager.get_route_shape_id(), manager.world_tiles, current_is_elite, _get_tile_placement_block_reason().is_empty(), manager.get_route_geometry_seed(), manager.discovered_world_cells, selected_tile_name, selected_tile_zone)
 	if objective_label != null:
 		var objective: Dictionary = manager.run_objective
 		if not objective.is_empty():
