@@ -27,7 +27,7 @@ OPTIONAL_INT_FIELDS = (
     "start_attack", "start_defense", "start_profile_scrap", "start_profile_crystals",
     "contract_scrap_cost", "contract_crystal_cost", "end_hp", "end_max_hp",
     "end_attack", "end_defense", "road_placements", "world_placements",
-    "route_cells", "processed_steps", "telemetry_schema",
+    "route_cells", "processed_steps", "telemetry_schema", "floor_number",
 )
 OPTIONAL_NUMBER_FIELDS = ("danger",)
 CAPTURE_KINDS = {"profile_history", "automated_engine_run", "manual_playtest", "unknown_source"}
@@ -91,6 +91,8 @@ def normalize_runs(raw_rows: list[Any]) -> tuple[list[dict[str, Any]], list[str]
         run_id = str(row.get("run_id", "")).strip()
         outcome = str(row.get("outcome", "")).strip().lower()
         version = str(row.get("game_version", "unknown")).strip() or "unknown"
+        floor_number_value = row.get("floor_number", row.get("capture_floor_number", 1))
+        floor_name = str(row.get("floor_name", f"Этаж {floor_number_value}")).strip() or f"Этаж {floor_number_value}"
         difficulty = str(row.get("difficulty_id", "standard")).strip() or "standard"
         mode = str(row.get("expedition_mode_id", "standard")).strip() or "standard"
         modifier = str(row.get("modifier_id", row.get("modifier_name", "unknown"))).strip() or "unknown"
@@ -141,6 +143,7 @@ def normalize_runs(raw_rows: list[Any]) -> tuple[list[dict[str, Any]], list[str]
         row["run_id"] = run_id
         row["outcome"] = outcome
         row["game_version"] = version
+        row["floor_name"] = floor_name
         row["difficulty_id"] = difficulty
         row["expedition_mode_id"] = mode
         row["modifier_id"] = modifier
@@ -171,22 +174,21 @@ def _fmt(value: Any) -> str:
     return "—" if value is None else str(value)
 
 
-def _group_key(row: dict[str, Any]) -> tuple[str, str, str, str, str, str, str]:
+def _group_key(row: dict[str, Any]) -> tuple[str, int, str, str, str, str, str]:
     return (
-        row["game_version"], row["difficulty_id"], row["modifier_id"],
-        row["expedition_mode_id"], row["contract_id"], row["challenge_id"],
-        row["capture_kind"],
+        row["game_version"], int(row.get("floor_number", 1)), row["floor_name"],
+        row["modifier_id"], row["contract_id"], row["challenge_id"], row["capture_kind"],
     )
 
 
 def _group_table(rows: list[dict[str, Any]], minimum_repeats: int) -> list[str]:
     if not rows:
         return ["Нет пригодных забегов.", ""]
-    grouped: dict[tuple[str, str, str, str, str, str, str], list[dict[str, Any]]] = defaultdict(list)
+    grouped: dict[tuple[str, int, str, str, str, str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         grouped[_group_key(row)].append(row)
     lines = [
-        "| Сборка | Сложность | Модификатор | Режим | Контракт | Испытание | Источник | N | Seed | Возврат | Медиана циклов | Медиана боссов | Материалы получены / сохранены | Кристаллы получены / сохранены | Медиана времени, сек. | Оценка выборки |",
+        "| Версия | Этаж | Название этажа | Облик маршрута | Контракт | Испытание | Источник | N | Seed | Возврат | Медиана циклов | Медиана боссов | Материалы получены / сохранены | Кристаллы получены / сохранены | Медиана времени, сек. | Оценка выборки |",
         "|---|---|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|",
     ]
     for key, group in sorted(grouped.items()):
@@ -205,7 +207,7 @@ def _group_table(rows: list[dict[str, Any]], minimum_repeats: int) -> list[str]:
         kept_crystals = _median(group, "kept_crystals")
         earned_crystals = _median(group, "earned_crystals")
         lines.append(
-            "| %s | %s | %s | %s | %s | %s | %s | %d | %d | %d/%d (%.0f%%) | %s | %s | %s / %s | %s / %s | %s | %s |" % (
+            "| %s | %d/8 | %s | %s | %s | %s | %s | %d | %d | %d/%d (%.0f%%) | %s | %s | %s / %s | %s / %s | %s | %s |" % (
                 key[0], key[1], key[2], key[3], key[4], key[5], key[6], n, len(seeds), returned, n,
                 (returned / n * 100.0), _fmt(_median(group, "loops")),
                 _fmt(_median(group, "bosses_defeated")), _fmt(earned_scrap), _fmt(kept_scrap),
@@ -261,7 +263,7 @@ def build_report(metadata: dict[str, Any], rows: list[dict[str, Any]], warnings:
         "## Интерпретация и ограничения", "",
         "- Это наблюдения из указанного источника. automated_engine_run — скриптовые прогоны движка с детерминированными решениями, а не человеческое прохождение; ни один источник сам по себе не даёт автоматического решения об изменении баланса.",
         f"- Группа считается достаточно заполненной только для первичного просмотра при N≥{minimum_repeats} и минимум 3 разных seed. Даже такая группа не доказывает статистическую значимость.",
-        "- Сравнивать следует одинаковую версию игры, сложность, модификатор, режим, контракт, испытание и источник. Если эти условия различаются, строки намеренно разделены; автоматизированные QA-забеги не объединяются с историей пользователя.",
+        "- Сравнивать следует один и тот же этаж, версию игры, облик маршрута, контракт, испытание и источник. Этажи никогда не объединяются в один показатель; автоматизированные QA-забеги не объединяются с историей пользователя.",
         "- Время прохождения доступно только для телеметрии схемы 1. Старые записи не дополняются выдуманными значениями.",
         "- Баланс не оценён автоматически: решение требует гипотезы, повторов на одинаковых настройках и проверки соседнего диапазона сложности.",
         "",
