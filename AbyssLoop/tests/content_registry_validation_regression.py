@@ -6,6 +6,13 @@ enemies = (ROOT / "scripts/systems/enemy_system.gd").read_text(encoding="utf-8")
 manager = (ROOT / "scripts/systems/expedition_manager.gd").read_text(encoding="utf-8")
 smoke = (ROOT / "tests/smoke_test.gd").read_text(encoding="utf-8")
 checks = {
+    "late floors combine stronger enemies, rising pressure, group size, and reduced healing": (
+        '"floor": 8' in registry and
+        '"enemy_attack_multiplier": 1.55' in registry and
+        '"enemy_health_multiplier": 1.42' in registry and
+        '"extra_group_members": 2' in registry and
+        '"healing_multiplier": 0.62' in registry
+    ),
     "registry validator checks required data": "func validate_content_registry() -> Array[String]:" in registry and '"effects"' in registry and 'unknown prerequisite' in registry,
     "synergy ids resolve to known tile ids": 'TILE_DEFS.has(str(synergy.get("trigger_tile"' in registry and 'TILE_DEFS.has(str(synergy.get("neighbor_tile"' in registry,
     "event choices require unique stable ids": 'choice id is empty or duplicated' in registry,
