@@ -314,6 +314,24 @@ func _clamp_long_mode_danger(value: float) -> float:
 		return value
 	return clampf(value, 1.0, maxf(1.0, float(mode.get("max_danger", 6.0))))
 
+func _maybe_finish_floor_after_boss() -> void:
+	if not active or expedition_mode_id != "standard":
+		return
+	if not bool(run_ledger.get("floor_boss_defeated", false)):
+		return
+	if bool(run_ledger.get("floor_cleared", false)):
+		return
+	if pending_perk_count > 0 or not enemy.is_empty() or not pending_event.is_empty():
+		return
+	run_ledger["floor_cleared"] = true
+	if floor_number >= ContentRegistry.FLOOR_COUNT:
+		run_ledger["endgame_completed"] = true
+		run_ledger["endgame_completed_loop"] = loop_count
+		_log("СЕРДЦЕ БЕЗДНЫ ПОКОРЕНО. Все 8 этажей пройдены.")
+	else:
+		_log("ЭТАЖ %d/8 ПРОЙДЕН: %s. Следующий этаж %d теперь открыт." % [floor_number, get_floor_name(), floor_number + 1])
+	_finish_run("return")
+
 func _maybe_finish_long_expedition() -> void:
 	if not active or expedition_mode_id != "long_expedition":
 		return
@@ -1652,6 +1670,7 @@ func _on_victory() -> void:
 		return
 	var defeated_enemy := enemy.duplicate(true)
 	var is_boss := bool(defeated_enemy.get("is_boss", false))
+	var is_floor_guardian := is_boss and str(defeated_enemy.get("id", "")) == str(get_floor_config().get("boss_id", ""))
 	var is_elite := bool(defeated_enemy.get("is_elite", false)) and not is_boss
 	var reward_bonus := combat_reward_bonus + (float(ContentRegistry.BALANCE.get("boss_reward_bonus", 0.60)) if is_boss else 0.0)
 	if is_elite:
@@ -1694,6 +1713,9 @@ func _on_victory() -> void:
 	if is_boss:
 		run_ledger.bosses_defeated = int(run_ledger.get("bosses_defeated", 0)) + 1
 		GameState.record_boss_victory()
+		if is_floor_guardian:
+			run_ledger["floor_boss_defeated"] = true
+			_log("ХРАНИТЕЛЬ ЭТАЖА ПОВЕРЖЕН: %s." % get_floor_name())
 		_log("БОСС ПОВЕРЖЕН: +%d материалов, +%d редких ресурсов и гарантированная экипировка." % [int(reward.scrap), int(reward.crystals)])
 	elif is_elite:
 		run_ledger["elites_defeated"] = int(run_ledger.get("elites_defeated", 0)) + 1
@@ -1788,6 +1810,7 @@ func _on_victory() -> void:
 		combat_cell = -1
 		combat_reward_bonus = 0.0
 		current_tile_spawn_bonus = 0.0
+		_maybe_finish_floor_after_boss()
 		_maybe_finish_long_expedition()
 	changed.emit()
 	if active:
@@ -1878,6 +1901,7 @@ func choose_perk(perk_id: String) -> bool:
 		_prepare_perk_choice()
 	else:
 		pending_perk_choices.clear()
+		_maybe_finish_floor_after_boss()
 		_maybe_finish_long_expedition()
 	changed.emit()
 	if active:
@@ -2124,10 +2148,10 @@ func _finish_run(outcome: String) -> void:
 		"floor_cleared": bool(run_ledger.get("floor_cleared", false)),
 		"difficulty_id": difficulty_id,
 		"modifier_id": run_modifier_id,
-		"difficulty_name": str(ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, {}).get("name", "Стандарт")),
+		"difficulty_name": get_floor_name(),
 		"modifier_name": str(get_run_modifier().get("name", "Обычная экспедиция")),
 		"expedition_mode_id": expedition_mode_id,
-		"expedition_mode_name": str(get_expedition_mode().get("name", "Обычная экспедиция")),
+		"expedition_mode_name": "Этаж %d из %d" % [floor_number, ContentRegistry.FLOOR_COUNT],
 		"endgame_target_loops": int(endgame_goal.get("target_loops", 0)),
 		"endgame_target_bosses": int(endgame_goal.get("target_bosses", 0)),
 		"endgame_completed": bool(run_ledger.get("endgame_completed", false)),
