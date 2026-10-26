@@ -689,7 +689,8 @@ func _draw_world_field(route_geometry: Dictionary) -> void:
 				draw_rect(world_label_rect, Color("#f4f8ee") if high_contrast else Color("#071619", 0.88), true)
 				draw_string(ThemeDB.fallback_font, Vector2(world_label_rect.position.x, world_label_rect.end.y - 1.0), str(tile.get("short", Localization.text("route.tile.short"))), HORIZONTAL_ALIGNMENT_CENTER, world_label_rect.size.x, 6 if cell_size < 24.0 else 7, Color("#10191c") if high_contrast else Color("#f5f4e6"))
 			if cell_id == hovered_world_cell_id and placement_enabled:
-				draw_rect(tile_rect.grow(2.0), Color("#ec8a7d") if not world_target_is_valid else _placement_target_color(), false, 2.0)
+				# Occupied cells are always invalid placement targets; do not reuse the empty-cell validator state.
+				draw_rect(tile_rect.grow(2.0), Color("#ec8a7d"), false, 2.0)
 
 func _placement_target_color() -> Color:
 	match selected_tile_zone:
