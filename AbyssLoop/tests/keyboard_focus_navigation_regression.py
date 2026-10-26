@@ -10,7 +10,7 @@ checks = {
     "buttons advertise a visible high-contrast focus state": 'button.add_theme_stylebox_override("focus", focus_style)' in ui and 'focus_style.border_color = Color("#fff2a8")' in ui,
     "button commands use a short anti-double-activation guard": 'var action_guard := {"busy": false}' in ui and 'get_tree().create_timer(0.18)' in ui and 'callback.call()' in ui,
     "form controls use explicit high-contrast focus outlines": "func _apply_keyboard_focus_outline(control: Control)" in ui and 'control.add_theme_stylebox_override("focus", focus_style)' in ui,
-    "expedition selectors participate in keyboard focus": all(f"_apply_keyboard_focus_outline({name})" in ui for name in ("expedition_mode_option", "difficulty_option", "modifier_option", "contract_option")),
+    "floor and optional preparation selectors participate in keyboard focus": all(f"_apply_keyboard_focus_outline({name})" in ui for name in ("floor_option", "modifier_option", "contract_option")),
     "seed input participates in keyboard focus": "_apply_keyboard_focus_outline(seed_input)" in ui,
     "settings sliders and toggles participate in keyboard focus": "_apply_keyboard_focus_outline(slider)" in ui and "_apply_keyboard_focus_outline(toggle)" in ui,
     "modals remember where focus came from": "var _focus_before_overlay: Control" in ui and "_focus_before_overlay = focus_owner as Control" in ui,

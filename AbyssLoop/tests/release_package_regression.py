@@ -111,7 +111,7 @@ with tempfile.TemporaryDirectory() as directory:
         assert "Localization.text(\"route.header\")" in archive.read("AbyssLoop/scripts/ui/route_view.gd").decode("utf-8"), "route labels are not centralized"
         assert 'Localization="*res://scripts/core/localization.gd"' in project, "localization service autoload is missing"
         localized_ui = archive.read("AbyssLoop/scripts/ui/ui_controller.gd").decode("utf-8")
-        assert '_t("base.mode.label")' in localized_ui and '_t("help.body")' in localized_ui, "main preparation/help UI is not using localized catalog keys"
+        assert '_t("base.floor.label")' in localized_ui and '_t("help.body")' in localized_ui, "main preparation/help UI is not using localized floor/help catalog keys"
         smoke = archive.read("AbyssLoop/tests/smoke_test.gd").decode("utf-8")
         assert "Localization.catalog_size() >= 100" in smoke and 'Localization.text("help.body")' in smoke, "runtime smoke is missing localization catalog assertions"
         assert 'tile_short = "%s · %d/%d"' in localized_ui, "repeated tile cards lack a clear copy indicator"

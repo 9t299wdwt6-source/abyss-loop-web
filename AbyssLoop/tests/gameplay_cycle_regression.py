@@ -16,7 +16,7 @@ settle = state[settle_start:settle_end]
 
 checks = {
     "full result metadata is constructed before terminal persistence": finish.index("var summary_metadata: Dictionary") < finish.index("GameState.settle_expedition("),
-    "replay identity includes run counter seed and difficulty": '"run_id": "%d-%d-%s" % [GameState.runs_started, run_seed, difficulty_id]' in finish and '"seed": run_seed' in finish,
+    "replay identity includes run counter seed and difficulty": '"run_id": "%d-%d-floor%d" % [GameState.runs_started, run_seed, floor_number]' in finish and '"seed": run_seed' in finish,
     "score includes loops battles bosses elites events and objective rewards": all(token in finish for token in ['run_ledger.get(\"victories\"', 'run_ledger.get(\"bosses_defeated\"', 'run_ledger.get(\"elites_defeated\"', 'run_ledger.get(\"events_resolved\"', 'raw_score += 250']),
     "settlement atomically accepts rich metadata score difficulty and final loadout": "summary_metadata, record_key, challenge_score" in finish and "equipment" in finish[finish.index("GameState.settle_expedition("):],
     "checkpoint clear and reward addition precede exactly one durable save": all(token in settle for token in ["saved_expedition.clear()", "scrap += kept_scrap", "crystals += kept_crystals", "runs_completed += 1", "if not save_now():"]),
