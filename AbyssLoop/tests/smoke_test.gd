@@ -125,30 +125,35 @@ func _run_tests() -> void:
 			assert(objective_manager._objective_is_feasible_for_run(objective_a, modifier_id), "selected objective must be reachable under the selected modifier")
 			assert(int(objective_a.get("target", 0)) > 0 and str(objective_a.get("description", "")).length() > 0, "objective preview must show a real condition before launch")
 	objective_manager.free()
-	assert(ContentRegistry.DIFFICULTY_PRESETS.size() >= 4 and ContentRegistry.DIFFICULTY_PRESETS.has("abyssal"), "four gameplay difficulty profiles including the high-risk Abyss mode must exist")
-	var difficulty_smoke_manager = ExpeditionManagerType.new()
-	difficulty_smoke_manager.difficulty_id = "abyssal"
-	assert(difficulty_smoke_manager._scale_healing(100) == 55, "Abyss difficulty should apply its 55% healing factor deterministically")
-	assert(float(ContentRegistry.DIFFICULTY_PRESETS["abyssal"].get("defeat_keep_ratio", 1.0)) == 0.25, "Abyss difficulty should retain only a quarter of temporary loot on defeat")
-	difficulty_smoke_manager.free()
-	# Long expedition soft caps are isolated from the standard run's original formulas.
-	var long_expedition_smoke_manager = ExpeditionManagerType.new()
-	long_expedition_smoke_manager.expedition_mode_id = "long_expedition"
-	assert(int(long_expedition_smoke_manager.get_expedition_mode().get("goal_loops", 0)) == 12, "long expedition must expose a 12-loop endgame target")
-	assert(long_expedition_smoke_manager._effective_scaling_loop(50) == 12, "long expedition combat scaling must stop at loop 12")
-	assert(long_expedition_smoke_manager._clamp_long_mode_danger(99.0) == 6.0, "long expedition danger must respect its configured cap")
-	long_expedition_smoke_manager.loop_count = 3
-	long_expedition_smoke_manager.hero = {"hp": 35, "max_hp": 50}
-	long_expedition_smoke_manager.run_ledger = {"scrap": 20, "crystals": 3, "bosses_defeated": 1}
-	long_expedition_smoke_manager._record_long_expedition_checkpoint()
-	assert(long_expedition_smoke_manager.run_ledger.get("long_run_checkpoints", []).size() == 1, "long expedition checkpoint must be recorded at loop three")
-	long_expedition_smoke_manager._record_long_expedition_checkpoint()
-	assert(long_expedition_smoke_manager.run_ledger.get("long_run_checkpoints", []).size() == 1, "checkpoint must not duplicate when the same loop is recorded twice")
-	long_expedition_smoke_manager.free()
-	var standard_mode_smoke_manager = ExpeditionManagerType.new()
-	assert(standard_mode_smoke_manager._effective_scaling_loop(50) == 50, "standard expedition scaling must remain uncapped by endgame rules")
-	assert(standard_mode_smoke_manager._clamp_long_mode_danger(99.0) == 99.0, "standard expedition danger must not use the long-mode cap")
-	standard_mode_smoke_manager.free()
+	assert(ContentRegistry.FLOOR_COUNT == 8 and ContentRegistry.FLOOR_DEFS.size() == 8, "the campaign must define exactly eight floors, not selectable difficulty profiles")
+	var seen_floor_ids: Dictionary = {}
+	var prior_floor_attack: float = 0.0
+	var prior_floor_health: float = 0.0
+	for floor_index in range(ContentRegistry.FLOOR_DEFS.size()):
+		var floor_definition: Dictionary = ContentRegistry.FLOOR_DEFS[floor_index]
+		var floor_number: int = int(floor_definition.get("floor", 0))
+		assert(floor_number == floor_index + 1 and not seen_floor_ids.has(floor_number), "floor IDs must be ordered and unique")
+		seen_floor_ids[floor_number] = true
+		assert(ContentRegistry.BOSSES.has(str(floor_definition.get("boss_id", ""))), "each floor must register its guardian")
+		var floor_enemy_pool: Variant = floor_definition.get("enemy_pool", [])
+		assert(typeof(floor_enemy_pool) == TYPE_ARRAY and not (floor_enemy_pool as Array).is_empty(), "every floor must define an enemy pool")
+		for floor_enemy in floor_enemy_pool:
+			assert(ContentRegistry.ENEMIES.has(str(floor_enemy)), "floor enemy pool may reference only registered enemies")
+		assert(float(floor_definition.get("enemy_attack_multiplier", 0.0)) >= prior_floor_attack, "floor attack pressure must not trend down through the campaign")
+		assert(float(floor_definition.get("enemy_health_multiplier", 0.0)) >= prior_floor_health, "floor health pressure must not trend down through the campaign")
+		prior_floor_attack = float(floor_definition.get("enemy_attack_multiplier", 0.0))
+		prior_floor_health = float(floor_definition.get("enemy_health_multiplier", 0.0))
+	var floor_smoke_manager = ExpeditionManagerType.new()
+	floor_smoke_manager.floor_number = 1
+	assert(str(floor_smoke_manager.get_floor_config().get("boss_id", "")) == "warden", "floor one must use its configured guardian")
+	assert(floor_smoke_manager._scale_healing(100) == 100, "floor one should use its declared baseline healing rate")
+	floor_smoke_manager.floor_number = 8
+	assert(str(floor_smoke_manager.get_floor_config().get("boss_id", "")) == "bellkeeper", "floor eight must use the final guardian")
+	assert(floor_smoke_manager._scale_healing(100) == 88, "floor eight should apply its configured 88% healing rate")
+	assert(floor_smoke_manager._get_floor_seed(8675309, 8) != floor_smoke_manager._get_floor_seed(8675309, 7), "adjacent floors must have independent deterministic generation seeds")
+	floor_smoke_manager.free()
+	var ui_source_for_floor_smoke := FileAccess.get_file_as_string("res://scripts/ui/ui_controller.gd")
+	assert(not ui_source_for_floor_smoke.contains("difficulty_option") and not ui_source_for_floor_smoke.contains("expedition_mode_option"), "the preparation screen must not expose difficulty or long-mode selectors")
 	assert(ContentRegistry.RUN_MODIFIERS.size() >= 4, "four expedition modifier profiles must exist")
 	for modifier_id_value in ContentRegistry.RUN_MODIFIERS.keys():
 		var modifier_def: Dictionary = ContentRegistry.RUN_MODIFIERS[str(modifier_id_value)]

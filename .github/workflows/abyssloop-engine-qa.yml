@@ -73,13 +73,13 @@ jobs:
           rm -rf "$HOME/.local/share/godot/app_userdata/Abyss Loop CI Acceptance"
           timeout 30s "$GODOT_BIN" --headless --path "$test_root" res://tests/expedition_runtime_acceptance_runner.tscn 2>&1 | tee "${RUNNER_TEMP}/abyss-loop-engine-qa/expedition-runtime.log"
 
-      - name: Run 12-loop long expedition acceptance
+      - name: Run eight-floor campaign progression acceptance
         shell: bash
         run: |
           set -euo pipefail
           test_root="${RUNNER_TEMP}/AbyssLoopRuntimeAcceptance"
           test -d "$test_root"
-          timeout 90s "$GODOT_BIN" --headless --path "$test_root" res://tests/long_expedition_runtime_acceptance_runner.tscn 2>&1 | tee "${RUNNER_TEMP}/abyss-loop-engine-qa/long-expedition.log"
+          timeout 90s "$GODOT_BIN" --headless --path "$test_root" res://tests/floor_progression_runtime_acceptance_runner.tscn 2>&1 | tee "${RUNNER_TEMP}/abyss-loop-engine-qa/floor-progression.log"
 
       - name: Capture Stage64B real-engine balance observations
         shell: bash

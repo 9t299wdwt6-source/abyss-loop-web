@@ -1,33 +1,32 @@
-"""Stage 46 static guards for difficulty rules, scoring and profile records."""
+"""Regression guards for the eight-floor campaign progression and absence of difficulty selectors."""
 from pathlib import Path
 import sys
+
 ROOT = Path(__file__).resolve().parents[1]
 registry = (ROOT / "scripts/core/content_registry.gd").read_text(encoding="utf-8")
 manager = (ROOT / "scripts/systems/expedition_manager.gd").read_text(encoding="utf-8")
 state = (ROOT / "scripts/core/game_state.gd").read_text(encoding="utf-8")
 ui = (ROOT / "scripts/ui/ui_controller.gd").read_text(encoding="utf-8")
+enemy = (ROOT / "scripts/systems/enemy_system.gd").read_text(encoding="utf-8")
 project = (ROOT / "project.godot").read_text(encoding="utf-8")
 checks = {
-    "four named difficulties provide explicit rule descriptions": all(f'"{key}"' in registry for key in ["standard", "volatile", "attrition", "abyssal"]) and '"description"' in registry,
-    "all difficulty modes define combat, rewards, healing, retention and score multiplier": all(f'"{field}"' in registry for field in ["enemy_attack_multiplier", "enemy_health_multiplier", "enemy_defense_multiplier", "reward_multiplier", "encounter_chance_delta", "danger_growth_multiplier", "event_damage_multiplier", "healing_multiplier", "defeat_keep_ratio", "starting_danger", "challenge_score_multiplier"]),
-    "difficulty registry validates bounds and required fields": 'difficulty:%s missing %s' in registry and 'has invalid risk/reward fields' in registry,
-    "selected difficulty is described in pre-expedition preview and refreshed on change": 'СЛОЖНОСТЬ: %s — %s' in ui and '_refresh_modifier_preview()' in ui[ui.index('func _on_difficulty_selected'):ui.index('func _on_modifier_selected')],
-    "difficulty cannot be swapped during an active or resumable run": 'if not GameState.has_saved_expedition():' in ui and 'if active:\n\t\treturn false' in manager[manager.index('func start_run'):manager.index('func get_run_modifier')],
-    "difficulty id persists in expedition snapshot and restore validates it": '"difficulty_id": difficulty_id' in manager and 'snapshot.get("difficulty_id", "standard")' in manager and 'ContentRegistry.DIFFICULTY_PRESETS.has(difficulty_id)' in manager,
-    "difficulty healing modifier applies to cycle, event, shrine, kill and tile healing": all(term in manager for term in ['func _scale_healing(amount: int)', '_scale_healing(int(ContentRegistry.BALANCE.get("loop_heal_base"', '_scale_healing(maxi(0, int(effects.get("heal"', '_scale_healing(4)', '_scale_healing(clampi(int(hero.get("equipped_kill_heal"', '_scale_healing(int(world_synergy.get("heal"']),
-    "defeat retention forecast and atomic settlement use chosen difficulty": 'active_difficulty.get("defeat_keep_ratio"' in manager and 'GameState.settle_expedition(' in manager and 'summary_metadata, record_key, challenge_score' in manager and 'defeat_keep_ratio_override: float = -1.0' in state,
-    "difficulty rewards affect both actual loop income and forecast": 'active_difficulty.get("reward_multiplier", 1.0)' in manager and 'var projected_scrap := int(round(float(projected_scrap_base) * float(active_difficulty.get("reward_multiplier", 1.0))' in manager,
-    "score uses real run counters and successful optional objectives": all(term in manager for term in ['run_ledger.get("victories"', 'run_ledger.get("bosses_defeated"', 'run_ledger.get("elites_defeated"', 'run_challenge.get("completed"', 'run_contract.get("completed"', '"challenge_score": challenge_score']),
-    "best score and difficulty records persist with safe old-save defaults": all(term in state for term in ['var difficulty_records: Dictionary = {}', 'saved.get("difficulty_records", {})', 'func record_difficulty_result(', '"difficulty_records": difficulty_records.duplicate(true)']),
-    "result screen reports selected difficulty score and personal record": all(term in ui for term in ['"Сложность: %s · счёт испытания: %d"', '"Рекорд сложности: %d очков']),
-    "supply objective and contract targets reflect observed run yields": '"target": 300, "scrap_reward": 30, "crystal_reward": 3' in registry and '"target": 300, "deadline_loops": 3' in registry,
-    "prototype version advances without changing stable app name": 'config/name="Abyss Loop"' in project and 'config/version="0.61.0"' in project,
+    "campaign has exactly eight ordered floor definitions": 'const FLOOR_COUNT: int = 8' in registry and 'const FLOOR_DEFS: Array[Dictionary] = [' in registry and 'FLOOR_DEFS.size() != FLOOR_COUNT' in registry,
+    "every floor config has its own registered guardian, biome, and enemy pool": all(field in registry for field in ['"biome"', '"boss_id"', '"enemy_pool"', '"starting_danger"', '"reward_multiplier"']) and 'floor:%d references unknown boss' in registry and 'floor:%d references unknown enemy' in registry,
+    "new expedition starts on an unlocked floor and does not accept a difficulty choice": 'requested_floor_number: int = 1' in manager and 'floor_number > int(GameState.highest_unlocked_floor)' in manager and 'difficulty_id = "standard"' in manager,
+    "each floor derives a reproducible independent world and RNG seed": 'func _get_floor_seed(base_seed: int, requested_floor: int)' in manager and 'route_system.create_route(floor_seed' in manager and 'run_rng.seed = floor_seed' in manager,
+    "floor enemy pools and guardian IDs feed production encounter generation": 'floor_config.get("enemy_pool", [])' in manager and 'preferred_boss_id' in manager and 'create_boss(loop_count, danger + strength_bonus, rng, preferred_boss_id)' in enemy,
+    "floor modifiers affect combat, healing, route danger, events, and rewards": all(text in manager for text in ['floor_config.get("enemy_attack_multiplier"', 'floor_config.get("enemy_health_multiplier"', 'floor_config.get("enemy_defense_multiplier"', 'floor_config.get("healing_multiplier"', 'floor_config.get("danger_growth_multiplier"', 'floor_config.get("event_damage_multiplier"', 'floor_config.get("reward_multiplier"']),
+    "defeating the configured guardian completes the floor only after the battle and perk flow": 'is_floor_guardian' in manager and 'run_ledger["floor_boss_defeated"] = true' in manager and 'func _maybe_finish_floor_after_boss()' in manager and 'pending_perk_count > 0 or not enemy.is_empty() or not pending_event.is_empty()' in manager,
+    "unlocking the next floor is part of the durable settlement transaction": 'var highest_unlocked_floor: int = 1' in state and 'saved.get("highest_unlocked_floor", 1)' in state and '"highest_unlocked_floor": highest_unlocked_floor' in state and 'summary_metadata.get("floor_cleared", false)' in state and 'highest_unlocked_floor = old_highest_unlocked_floor' in state,
+    "floor number and clear state survive save/restore and appear in the final summary": '"floor_number": floor_number' in manager and 'snapshot.get("floor_number", 1)' in manager and '"floor_cleared": bool(run_ledger.get("floor_cleared", false))' in manager,
+    "preparation UI exposes the eight-floor selector and no difficulty/mode selectors": 'floor_option = OptionButton.new()' in ui and 'ContentRegistry.FLOOR_DEFS' in ui and '_on_floor_selected' in ui and 'difficulty_option' not in ui and 'expedition_mode_option' not in ui and 'СЛОЖНОСТЬ:' not in ui,
+    "results report a floor clear and the next unlocked floor instead of a difficulty result": 'ЭТАЖ ПРОЙДЕН' in ui and 'Этаж %d/8' in ui and 'Сложность:' not in ui and 'Рекорд сложности' not in ui,
+    "prototype version and stable application name remain intact": 'config/name="Abyss Loop"' in project and 'config/version="0.61.0"' in project,
 }
 failed = [name for name, ok in checks.items() if not ok]
+for name, ok in checks.items():
+    print(f"[{'PASS' if ok else 'FAIL'}] {name}")
 if failed:
-    print("DIFFICULTY / CHALLENGE REGRESSION FAILED")
-    for item in failed: print("- " + item)
-    sys.exit(1)
-print(f"DIFFICULTY / CHALLENGE REGRESSION PASSED: {len(checks)} checks")
-for name in checks: print("- " + name)
-print("Source-level checks only; Godot runtime difficulty balance still requires matched campaigns in Godot 4.7.2.")
+    raise SystemExit("FLOOR / PROGRESSION REGRESSION FAILED: " + ", ".join(failed))
+print(f"FLOOR / PROGRESSION REGRESSION PASSED: {len(checks)}/{len(checks)} source guards")
+print("These source guards complement, but do not replace, the Godot floor progression runtime acceptance.")
