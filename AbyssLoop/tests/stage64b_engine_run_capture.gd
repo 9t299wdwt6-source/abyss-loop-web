@@ -70,7 +70,7 @@ func _run_capture() -> void:
 			"runs_completed": _runs.size(),
 			"route_scaled_delta": ROUTE_SCALED_DELTA,
 			"combat_scaled_delta": COMBAT_SCALED_DELTA,
-"policy": "The actual ExpeditionManager route, placement, encounter, combat, event, loot, perk, floor-guardian, equip_bag_item and settlement methods are executed with production hero/enemy/combat/reward formulas. A clean isolated profile exposes each test floor so the floor can be sampled independently. The scripted controller equips a bag item only when production item_power is strictly higher than the currently equipped item in that slot; all equipment changes use the production equip method. It never writes hero/enemy stats, loot, damage or rewards. Results are player-policy QA, not human playtests or a balance verdict."
+"policy": "The actual ExpeditionManager route, placement, encounter, combat, event, loot, perk, floor-guardian, equip_bag_item and settlement methods are executed with production hero/enemy/combat/reward formulas. A clean isolated profile exposes each test floor so the floor can be sampled independently. The scripted controller equips a bag item only when production item_power is strictly higher than the currently equipped item in that slot; all equipment changes use the production equip method. During safe route intervals it plays one legal card at a time, preferring healing, control and supply when health is low, and reserving danger tiles for healthier states or a nearly full hand. It never writes hero/enemy stats, loot, damage or rewards. Results are player-policy QA, not human playtests or a balance verdict."
 		},
 		"runs": _runs,
 		"failures": _failures
