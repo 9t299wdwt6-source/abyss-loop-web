@@ -39,7 +39,7 @@ func _run_capture() -> void:
 			])
 			break
 		_runs.append(row)
-		print("CAPTURED: group=%s floor=%d name=%s modifier=%s seed=%d outcome=%s cleared=%s loops=%d bosses=%d victories=%d events=%d autoequips=%d seconds=%d" % [
+		print("CAPTURED: group=%s floor=%d name=%s modifier=%s seed=%d outcome=%s cleared=%s loops=%d bosses=%d victories=%d events=%d autoequips=%d placements=%d seconds=%d" % [
 			str(row.get("capture_group", "unknown")),
 			int(row.get("floor_number", 0)),
 			str(row.get("floor_name", "")),
@@ -52,6 +52,7 @@ func _run_capture() -> void:
 			int(row.get("victories", 0)),
 			int(row.get("events_resolved", 0)),
 			int(row.get("capture_auto_equips", 0)),
+			int(row.get("capture_strategic_placements", 0)),
 			int(row.get("run_elapsed_seconds", 0))
 		])
 
@@ -141,6 +142,7 @@ func _capture_case(case_data: Dictionary) -> Dictionary:
 
 	var simulation_steps: int = 0
 	var auto_equips: int = 0
+	var strategic_placements: int = 0
 	var case_failed: bool = false
 	while bool(manager.active) and simulation_steps < MAX_SIMULATION_STEPS_PER_RUN:
 		simulation_steps += 1
@@ -176,6 +178,8 @@ func _capture_case(case_data: Dictionary) -> Dictionary:
 				manager._update_objective_progress()
 			continue
 		auto_equips += _equip_better_bag_items(manager)
+		if _place_best_legal_tile(manager):
+			strategic_placements += 1
 		var previous_steps: int = int(manager.processed_steps)
 		manager.distance = float(previous_steps)
 		manager._tick_route(ROUTE_SCALED_DELTA)
@@ -217,7 +221,125 @@ func _capture_case(case_data: Dictionary) -> Dictionary:
 	completed_summary["capture_modifier_id"] = modifier_id
 	completed_summary["capture_contract_id"] = contract_id
 	completed_summary["capture_auto_equips"] = auto_equips
+	completed_summary["capture_strategic_placements"] = strategic_placements
 	return completed_summary
+
+func _place_best_legal_tile(manager: Variant) -> bool:
+	# One actual card can be played during a safe route interval. The policy values
+	# healing/control/supply above extra danger when health is low; all legality,
+	# rewards and synergy outcomes remain the production game rules.
+	if not manager.enemy.is_empty() or not manager.pending_event.is_empty() or int(manager.pending_perk_count) > 0:
+		return false
+	if manager.tile_hand.is_empty():
+		return false
+	var best_score: float = -INF
+	var best_hand_index: int = -1
+	var best_route_index: int = -1
+	var best_world_cell: String = ""
+	var best_is_world: bool = false
+	var first_route_index: int = posmod(int(manager.processed_steps) + 1, manager.route.size())
+	for hand_index in range(manager.tile_hand.size()):
+		var tile_value: Variant = manager.tile_hand[hand_index]
+		if typeof(tile_value) != TYPE_DICTIONARY:
+			continue
+		var tile: Dictionary = tile_value
+		var tile_id: String = str(tile.get("id", ""))
+		var definition_value: Variant = ContentRegistry.TILE_DEFS.get(tile_id, {})
+		var definition: Dictionary = definition_value if typeof(definition_value) == TYPE_DICTIONARY else {}
+		var zone: String = str(tile.get("placement_zone", definition.get("placement_zone", "any")))
+		var utility: float = _tile_utility_score(tile, manager)
+		if zone in ["any", "road"]:
+			for offset in range(manager.route.size()):
+				var route_index: int = posmod(first_route_index + offset, manager.route.size())
+				var route_preview: Dictionary = manager.tile_system.can_place(manager.route, manager.placed_tiles, route_index, tile)
+				if not bool(route_preview.get("ok", false)):
+					continue
+				var score: float = utility + 1.5
+				if score > best_score:
+					best_score = score
+					best_hand_index = hand_index
+					best_route_index = route_index
+					best_world_cell = ""
+					best_is_world = false
+		if zone in ["any", "landscape", "roadside"]:
+			for y in range(TileSystemScript.MAP_ROWS):
+				for x in range(TileSystemScript.MAP_COLUMNS):
+					var cell_id: String = TileSystemScript.map_world_cell_id(x, y)
+					var world_preview: Dictionary = manager.tile_system.can_place_world(
+						manager.route, manager.world_tiles, cell_id, tile,
+						manager.get_route_shape_id(), manager.get_route_geometry_seed()
+					)
+					if not bool(world_preview.get("ok", false)):
+						continue
+					var world_score: float = utility + (0.5 if zone in ["landscape", "roadside"] else -1.5)
+					if world_score > best_score:
+						best_score = world_score
+						best_hand_index = hand_index
+					best_route_index = -1
+					best_world_cell = cell_id
+					best_is_world = true
+	if best_hand_index < 0:
+		return false
+	# Save dangerous cards for a better opportunity unless the hand is nearly full.
+	if best_score < 0.0 and manager.tile_hand.size() < maxi(1, int(ContentRegistry.BALANCE.get("max_tile_hand", 4)) - 1):
+		return false
+	var placement_result: Dictionary
+	if best_is_world:
+		placement_result = manager.place_world_tile(best_hand_index, best_world_cell)
+	else:
+		placement_result = manager.place_tile(best_hand_index, best_route_index)
+	if not bool(placement_result.get("ok", false)):
+		return false
+	manager._update_objective_progress()
+	return true
+
+func _tile_utility_score(tile: Dictionary, manager: Variant) -> float:
+	var tile_id: String = str(tile.get("id", ""))
+	var max_hp: float = maxf(1.0, float(manager.hero.get("max_hp", 1)))
+	var health_ratio: float = clampf(float(manager.hero.get("hp", 0)) / max_hp, 0.0, 1.0)
+	var missing_health: float = 1.0 - health_ratio
+	match tile_id:
+		"ward":
+			return 11.0 + missing_health * 3.0
+		"echo_spring":
+			return 10.0 + missing_health * 5.0
+		"snare":
+			return 8.0 + (3.0 if health_ratio < 0.7 else 0.0)
+		"cache":
+			return 8.0
+		"lost_convoy":
+			return 9.0
+		"archive":
+			return 8.0
+		"signal":
+			return 7.0
+		"spore_garden":
+			return 7.0 + missing_health * 4.0
+		"crystal_hive", "echo_obelisk":
+			return 5.5
+		"hunt", "rift", "fault_line", "hunter_marker":
+			return 5.0 if health_ratio >= 0.90 else -6.0
+		"nursery", "bone_orchard":
+			return 3.0 if health_ratio >= 0.90 else -5.0
+		_:
+			var definition_value: Variant = ContentRegistry.TILE_DEFS.get(tile_id, {})
+			var definition: Dictionary = definition_value if typeof(definition_value) == TYPE_DICTIONARY else {}
+			match str(definition.get("kind", "")):
+				"support":
+					return 9.0 + missing_health * 3.0
+				"control":
+					return 7.0
+				"economy":
+					return 7.0
+				"knowledge":
+					return 6.0
+				"rare":
+					return 5.0
+				"danger":
+					return 4.0 if health_ratio >= 0.90 else -4.0
+				_:
+					return 1.0
+
 
 func _equip_better_bag_items(manager: Variant) -> int:
 	# Automated QA emulates a basic player pausing between encounters to equip
