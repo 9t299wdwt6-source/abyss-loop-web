@@ -2,6 +2,7 @@ extends Node
 
 const ExpeditionManagerScript = preload("res://scripts/systems/expedition_manager.gd")
 const TileSystemScript = preload("res://scripts/systems/tile_system.gd")
+const InventorySystemScript = preload("res://scripts/systems/inventory_system.gd")
 const OUTPUT_PATH: String = "user://STAGE64B_AUTOMATED_ENGINE_RUNS.json"
 const MAX_SIMULATION_STEPS_PER_RUN: int = 20000
 const ROUTE_SCALED_DELTA: float = 1.24
@@ -38,7 +39,7 @@ func _run_capture() -> void:
 			])
 			break
 		_runs.append(row)
-		print("CAPTURED: group=%s floor=%d name=%s modifier=%s seed=%d outcome=%s cleared=%s loops=%d bosses=%d victories=%d events=%d seconds=%d" % [
+		print("CAPTURED: group=%s floor=%d name=%s modifier=%s seed=%d outcome=%s cleared=%s loops=%d bosses=%d victories=%d events=%d autoequips=%d seconds=%d" % [
 			str(row.get("capture_group", "unknown")),
 			int(row.get("floor_number", 0)),
 			str(row.get("floor_name", "")),
@@ -50,6 +51,7 @@ func _run_capture() -> void:
 			int(row.get("bosses_defeated", 0)),
 			int(row.get("victories", 0)),
 			int(row.get("events_resolved", 0)),
+			int(row.get("capture_auto_equips", 0)),
 			int(row.get("run_elapsed_seconds", 0))
 		])
 
