@@ -10,12 +10,15 @@ manager = (ROOT / "scripts/systems/expedition_manager.gd").read_text(encoding="u
 game_state = (ROOT / "scripts/core/game_state.gd").read_text(encoding="utf-8")
 
 checks = {
-    "capture exercises all eight ordered floors with three deterministic campaign seeds":
+    "capture exercises baseline and paired investment campaigns across all eight ordered floors":
         "FLOOR_NUMBERS: Array[int] = [1, 2, 3, 4, 5, 6, 7, 8]" in capture and
-        "CAMPAIGN_SEEDS: Array[int] = [8676203, 8676211, 8676221, 8676233, 8676241]" in capture,
+        "CAMPAIGN_SEEDS: Array[int] = [8676203, 8676211, 8676221, 8676233, 8676241]" in capture and
+        "META_CAMPAIGN_SEEDS: Array[int] = [8676203, 8676211, 8676221]" in capture and
+        '_capture_campaign(seed_value, "sequential_campaign")' in capture and
+        '_capture_campaign(seed_value, "sequential_campaign_meta")' in capture,
     "new profile reset occurs once per campaign, outside individual floor capture":
         capture.count("GameState.reset_progress()") == 1 and
-        "func _capture_campaign(seed_value: int)" in capture and "func _capture_floor(" in capture,
+        "func _capture_campaign(seed_value: int, capture_group: String)" in capture and "func _capture_floor(" in capture,
     "campaign can advance only when the production durable unlock frontier permits it":
         "if int(GameState.highest_unlocked_floor) < floor_number:" in capture and
         "var highest_unlocked_floor: int = 1" in game_state and
@@ -23,12 +26,31 @@ checks = {
     "persistent armory equipment uses production item-power comparison and equip transaction":
         "func _equip_better_armory_items() -> int:" in capture and
         "inventory.item_power(candidate)" in capture and "GameState.equip_item(item_id)" in capture,
+    "investment scenario uses production shelter, research, and equipped-item transactions":
+        "const BaseSystemScript = preload(\"res://scripts/systems/base_system.gd\")" in capture and
+        "func _invest_between_floors() -> Dictionary:" in capture and
+        "base.get_research_status(research_id)" in capture and
+        "base.try_research(research_id)" in capture and
+        "base.get_upgrade_cost(building_id)" in capture and
+        "base.try_upgrade(building_id)" in capture and
+        "GameState.upgrade_armory_item(item_id)" in capture,
+    "paired campaign keeps baseline distinct and never forces hero power":
+        'capture_group == "sequential_campaign_meta"' in capture and
+        '"capture_group": capture_group' in capture and
+        'summary["capture_buildings_before_floor"] = GameState.buildings.duplicate(true)' in capture and
+        all(token not in capture for token in [
+            'manager.hero["hp"] =', 'manager.hero["attack"] =',
+            'manager.enemy["hp"] =', 'fighter["hp"] ='
+        ]),
     "capture records campaign seed, start gear and armory progression":
-        '"capture_group"] = "sequential_campaign"' in capture and
+        '"capture_group"] = capture_group' in capture and
         '"capture_campaign_seed"] = campaign_seed' in capture and
         '"capture_start_loadout_items"] = starting_loadout_count' in capture and
         '"capture_start_armory_items"] = starting_armory_count' in capture and
-        '"capture_armory_equips_before_floor"] = armory_equips_before_floor' in capture,
+        '"capture_armory_equips_before_floor"] = armory_equips_before_floor' in capture and
+        '"capture_building_upgrades_before_floor"]' in capture and
+        '"capture_research_unlocks_before_floor"]' in capture and
+        '"capture_item_upgrades_before_floor"]' in capture,
     "capture runs production route, combat, event, perk, and legal placement":
         "manager._tick_route(ROUTE_SCALED_DELTA)" in capture and
         "manager._tick_combat(COMBAT_SCALED_DELTA)" in capture and

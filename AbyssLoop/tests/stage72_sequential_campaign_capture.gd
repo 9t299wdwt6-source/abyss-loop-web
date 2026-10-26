@@ -1,6 +1,7 @@
 extends Node
 
 const ExpeditionManagerScript = preload("res://scripts/systems/expedition_manager.gd")
+const BaseSystemScript = preload("res://scripts/systems/base_system.gd")
 const TileSystemScript = preload("res://scripts/systems/tile_system.gd")
 const InventorySystemScript = preload("res://scripts/systems/inventory_system.gd")
 const OUTPUT_PATH: String = "user://STAGE72_SEQUENTIAL_CAMPAIGNS.json"
@@ -9,6 +10,7 @@ const ROUTE_SCALED_DELTA: float = 1.24
 const COMBAT_SCALED_DELTA: float = 0.05
 const FLOOR_NUMBERS: Array[int] = [1, 2, 3, 4, 5, 6, 7, 8]
 const CAMPAIGN_SEEDS: Array[int] = [8676203, 8676211, 8676221, 8676233, 8676241]
+const META_CAMPAIGN_SEEDS: Array[int] = [8676203, 8676211, 8676221]
 
 var _runs: Array[Dictionary] = []
 var _failures: Array[String] = []
@@ -18,10 +20,12 @@ func _ready() -> void:
 	call_deferred("_run_capture")
 
 func _run_capture() -> void:
-	print("Stage72 sequential campaign capture: %d campaigns, each starting with a fresh profile and retaining progress between floors." % CAMPAIGN_SEEDS.size())
+	print("Stage72 capture: %d baseline campaigns and %d matched resource-investment campaigns." % [CAMPAIGN_SEEDS.size(), META_CAMPAIGN_SEEDS.size()])
 	print("Production combat, enemy stats, equipment, rewards, route and guardian conditions remain unchanged.")
 	for seed_value in CAMPAIGN_SEEDS:
-		await _capture_campaign(seed_value)
+		await _capture_campaign(seed_value, "sequential_campaign")
+	for seed_value in META_CAMPAIGN_SEEDS:
+		await _capture_campaign(seed_value, "sequential_campaign_meta")
 
 	var report := {
 		"metadata": {
@@ -31,16 +35,18 @@ func _run_capture() -> void:
 			"capture_kind": "automated_engine_run",
 			"not_human_playtest": true,
 			"not_a_balance_verdict": true,
-			"capture_group": "sequential_campaign",
-			"scenario": "sequential_campaign",
+			"capture_group": "paired_campaign_scenarios",
+			"scenario": "paired_campaign_scenarios",
 			"floor_numbers": FLOOR_NUMBERS,
 			"campaign_seeds": CAMPAIGN_SEEDS,
-			"runs_expected_maximum": CAMPAIGN_SEEDS.size() * ContentRegistry.FLOOR_COUNT,
+			"meta_campaign_seeds": META_CAMPAIGN_SEEDS,
+			"scenario_groups": ["sequential_campaign", "sequential_campaign_meta"],
+			"runs_expected_maximum": (CAMPAIGN_SEEDS.size() + META_CAMPAIGN_SEEDS.size()) * ContentRegistry.FLOOR_COUNT,
 			"runs_completed": _runs.size(),
 			"campaign_results": _campaign_results,
 			"route_scaled_delta": ROUTE_SCALED_DELTA,
 			"combat_scaled_delta": COMBAT_SCALED_DELTA,
-			"policy": "Each seed starts one new profile, then proceeds only through floors actually unlocked by the production guardian settlement. Persistent loadout, armory, shelter, research and resources are retained between cleared floors. Before each floor the scripted policy equips armory items only when production item_power is strictly higher than the currently equipped item in the same slot, using GameState.equip_item. During each run it uses actual production route, combat, event, perk, loot, placement and settlement handlers, places only legal tiles and chooses an available event option. It never forces hero/enemy stats, equipment values, rewards or unlocks. A defeat is a valid campaign outcome and prevents attempts to start locked floors. These are scripted player-policy observations, not human playtests or an automatic balance verdict."
+			"policy": "Every campaign starts a fresh profile and then proceeds only through floors actually unlocked by production guardian settlement. Baseline group sequential_campaign carries persistent loadout, armory, shelter, research and resources but makes no between-floor purchases. Paired group sequential_campaign_meta uses production BaseSystem.try_research, BaseSystem.try_upgrade and GameState.upgrade_armory_item to invest affordable resources into combat research, shelter attack/defence and equipped gear between floors; it does not assign hero stats directly. Both groups equip only items that improve production item_power, use real route/combat/event/perk/loot/placement/settlement handlers, place only legal tiles and choose available event options. No run forces hero/enemy stats, rewards or unlocks. Defeat is a valid outcome. These are scripted policy observations, not human playtests or an automatic balance verdict."
 		},
 		"runs": _runs,
 		"failures": _failures
@@ -62,10 +68,13 @@ func _run_capture() -> void:
 		printerr("STAGE72 SEQUENTIAL CAMPAIGN CAPTURE FAILED: %d observations; %s" % [_runs.size(), str(_failures)])
 		get_tree().quit(1)
 
-func _capture_campaign(seed_value: int) -> void:
+func _capture_campaign(seed_value: int, capture_group: String) -> void:
 	# Reset exactly once per campaign. Between floors all durable settlements remain intact.
 	GameState.reset_progress()
 	await get_tree().process_frame
+	var investment_for_floor: Dictionary = {}
+	if capture_group == "sequential_campaign_meta":
+		investment_for_floor = _invest_between_floors()
 	var rows_before: int = _runs.size()
 	var furthest_floor: int = 0
 	var final_floor_cleared: bool = false
@@ -75,43 +84,121 @@ func _capture_campaign(seed_value: int) -> void:
 		var armory_equips_before_floor: int = _equip_better_armory_items()
 		var starting_loadout_count: int = _count_equipped_items()
 		var starting_armory_count: int = GameState.armory.size()
-		var row: Dictionary = await _capture_floor(seed_value, floor_number, armory_equips_before_floor, starting_loadout_count, starting_armory_count)
+		var row: Dictionary = await _capture_floor(seed_value, floor_number, armory_equips_before_floor, starting_loadout_count, starting_armory_count, capture_group, investment_for_floor)
 		if row.is_empty():
-			_failures.append("Campaign seed %d floor %d failed to produce a valid settled run." % [seed_value, floor_number])
+			_failures.append("Campaign seed %d group %s floor %d failed to produce a valid settled run." % [seed_value, capture_group, floor_number])
 			break
 		_runs.append(row)
 		furthest_floor = floor_number
 		final_floor_cleared = bool(row.get("floor_cleared", false))
-		print("CAPTURED: group=sequential_campaign campaign_seed=%d floor=%d name=%s outcome=%s cleared=%s loops=%d bosses=%d victories=%d autoequips=%d armory_equips=%d placements=%d" % [
-			seed_value, floor_number, str(row.get("floor_name", "")), str(row.get("outcome", "unknown")),
+		print("CAPTURED: group=%s campaign_seed=%d floor=%d name=%s outcome=%s cleared=%s loops=%d bosses=%d victories=%d autoequips=%d armory_equips=%d placements=%d building_upgrades=%d researches=%d item_upgrades=%d" % [
+			capture_group, seed_value, floor_number, str(row.get("floor_name", "")), str(row.get("outcome", "unknown")),
 			str(row.get("floor_cleared", false)), int(row.get("loops", 0)),
 			int(row.get("bosses_defeated", 0)), int(row.get("victories", 0)),
 			int(row.get("capture_auto_equips", 0)), int(row.get("capture_armory_equips_before_floor", 0)),
-			int(row.get("capture_strategic_placements", 0))
+			int(row.get("capture_strategic_placements", 0)),
+			int(row.get("capture_building_upgrades_before_floor", 0)),
+			int(row.get("capture_research_unlocks_before_floor", 0)),
+			int(row.get("capture_item_upgrades_before_floor", 0))
 		])
 		if not final_floor_cleared:
 			break
 		if floor_number < ContentRegistry.FLOOR_COUNT and int(GameState.highest_unlocked_floor) < floor_number + 1:
-			_failures.append("Campaign seed %d cleared floor %d but durable progression did not unlock floor %d." % [seed_value, floor_number, floor_number + 1])
+			_failures.append("Campaign seed %d group %s cleared floor %d but durable progression did not unlock floor %d." % [seed_value, capture_group, floor_number, floor_number + 1])
 			break
+		if capture_group == "sequential_campaign_meta" and floor_number < ContentRegistry.FLOOR_COUNT:
+			investment_for_floor = _invest_between_floors()
 	var rows_completed: int = _runs.size() - rows_before
 	_campaign_results.append({
 		"campaign_seed": seed_value,
+		"capture_group": capture_group,
 		"floors_reached": rows_completed,
 		"furthest_floor": furthest_floor,
-		"last_floor_cleared": final_floor_cleared,
+		"last_floor_cleared": final_floor_cleared
 	})
 	if rows_completed == 0:
-		_failures.append("Campaign seed %d produced no floor observations." % seed_value)
+		_failures.append("Campaign seed %d group %s produced no floor observations." % [seed_value, capture_group])
 
-func _capture_floor(campaign_seed: int, floor_number: int, armory_equips_before_floor: int, starting_loadout_count: int, starting_armory_count: int) -> Dictionary:
+func _invest_between_floors() -> Dictionary:
+	# Invest only through live production transactions. This is a competent resource-spending
+	# policy, not free stats or an enemy-side handicap.
+	var base = BaseSystemScript.new()
+	var inventory = InventorySystemScript.new()
+	var result := {
+		"building_upgrades": [],
+		"research_unlocks": [],
+		"item_upgrades": 0,
+		"scrap_spent": 0,
+		"crystals_spent": 0
+	}
+	var research_priority: Array[String] = [
+		"field_training", "boss_analysis", "event_forecasting", "medical_relay",
+		"route_archive", "supply_contracts", "rare_survey", "advanced_salvage", "crystal_study"
+	]
+	for research_id in research_priority:
+		var status: Dictionary = base.get_research_status(research_id)
+		if not bool(status.get("available", false)):
+			continue
+		var research_result: Dictionary = base.try_research(research_id)
+		if bool(research_result.get("ok", false)):
+			result["research_unlocks"].append(research_id)
+			result["scrap_spent"] = int(result["scrap_spent"]) + int(status.get("scrap_cost", 0))
+			result["crystals_spent"] = int(result["crystals_spent"]) + int(status.get("crystal_cost", 0))
+	# Upgrade currently equipped gear one level at a time across slots when affordable.
+	var upgrade_round := 0
+	var more_gear_upgrades := true
+	while more_gear_upgrades and upgrade_round < 5:
+		upgrade_round += 1
+		more_gear_upgrades = false
+		for slot in ["armor", "shield", "helmet", "weapon", "core", "amulet"]:
+			var equipped_value: Variant = GameState.loadout.get(slot, {})
+			if typeof(equipped_value) != TYPE_DICTIONARY or equipped_value.is_empty():
+				continue
+			var item_id := str(equipped_value.get("id", ""))
+			if item_id.is_empty():
+				continue
+			var owned_item: Dictionary = GameState.get_armory_item(item_id)
+			if owned_item.is_empty():
+				continue
+			var upgrade_cost: Dictionary = inventory.get_upgrade_cost(owned_item)
+			if not bool(upgrade_cost.get("available", false)):
+				continue
+			if GameState.scrap < int(upgrade_cost.get("scrap", 0)) or GameState.crystals < int(upgrade_cost.get("crystals", 0)):
+				continue
+			var upgrade_result: Dictionary = GameState.upgrade_armory_item(item_id)
+			if bool(upgrade_result.get("ok", false)):
+				more_gear_upgrades = true
+				result["item_upgrades"] = int(result["item_upgrades"]) + 1
+				result["scrap_spent"] = int(result["scrap_spent"]) + int(upgrade_result.get("scrap_spent", 0))
+				result["crystals_spent"] = int(result["crystals_spent"]) + int(upgrade_result.get("crystals_spent", 0))
+	# Defence first, then attack. Repeat until neither can be afforded or both are capped.
+	var building_progress := true
+	var building_guard := 0
+	while building_progress and building_guard < 20:
+		building_guard += 1
+		building_progress = false
+		for building_id in ["infirmary", "forge"]:
+			var cost: Dictionary = base.get_upgrade_cost(building_id)
+			if int(cost.get("level", 0)) >= int(cost.get("max_level", 0)):
+				continue
+			if GameState.scrap < int(cost.get("scrap", 0)) or GameState.crystals < int(cost.get("crystals", 0)) or GameState.echo_dust < int(cost.get("echo_dust", 0)):
+				continue
+			var building_result: Dictionary = base.try_upgrade(building_id)
+			if bool(building_result.get("ok", false)):
+				building_progress = true
+				result["building_upgrades"].append({"id": building_id, "level": int(GameState.buildings.get(building_id, 0))})
+				result["scrap_spent"] = int(result["scrap_spent"]) + int(cost.get("scrap", 0))
+				result["crystals_spent"] = int(result["crystals_spent"]) + int(cost.get("crystals", 0))
+	return result
+
+func _capture_floor(campaign_seed: int, floor_number: int, armory_equips_before_floor: int, starting_loadout_count: int, starting_armory_count: int, capture_group: String, investment_summary: Dictionary) -> Dictionary:
 	var seed_value: int = campaign_seed + floor_number * 100003
 	var manager = ExpeditionManagerScript.new()
-	manager.name = "Stage72_Campaign%d_Floor%d" % [campaign_seed, floor_number]
+	manager.name = "Stage72_%s_Campaign%d_Floor%d" % [capture_group, campaign_seed, floor_number]
 	get_tree().root.add_child(manager)
 	await get_tree().process_frame
 	if not bool(manager.start_run("standard", seed_value, "standard", "none", "standard", floor_number)):
-		printerr("FAIL: sequential production start_run rejected campaign=%d floor=%d unlocked=%d" % [campaign_seed, floor_number, int(GameState.highest_unlocked_floor)])
+		printerr("FAIL: sequential production start_run rejected group=%s campaign=%d floor=%d unlocked=%d" % [capture_group, campaign_seed, floor_number, int(GameState.highest_unlocked_floor)])
 		manager.queue_free()
 		await get_tree().process_frame
 		return {}
@@ -206,7 +293,14 @@ func _capture_floor(campaign_seed: int, floor_number: int, armory_equips_before_
 	summary["source_run_id"] = source_run_id
 	summary["run_id"] = "qa-stage72-seed%d-floor%02d" % [campaign_seed, floor_number]
 	summary["capture_kind"] = "automated_engine_run"
-	summary["capture_group"] = "sequential_campaign"
+	summary["capture_group"] = capture_group
+	summary["capture_building_upgrades_before_floor"] = investment_summary.get("building_upgrades", []).size()
+	summary["capture_research_unlocks_before_floor"] = investment_summary.get("research_unlocks", []).size()
+	summary["capture_item_upgrades_before_floor"] = int(investment_summary.get("item_upgrades", 0))
+	summary["capture_investment_scrap_spent_before_floor"] = int(investment_summary.get("scrap_spent", 0))
+	summary["capture_investment_crystals_spent_before_floor"] = int(investment_summary.get("crystals_spent", 0))
+	summary["capture_buildings_before_floor"] = GameState.buildings.duplicate(true)
+	summary["capture_research_before_floor"] = GameState.unlocked_nodes.duplicate(true)
 	summary["capture_floor_number"] = floor_number
 	summary["capture_seed"] = seed_value
 	summary["capture_campaign_seed"] = campaign_seed
