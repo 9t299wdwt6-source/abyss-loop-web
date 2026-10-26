@@ -1,0 +1,127 @@
+name: Abyss Loop Engine QA (no web export)
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - '.github/workflows/abyssloop-engine-qa.yml'
+      - 'AbyssLoop/**/*.gd'
+      - 'AbyssLoop/**/*.tscn'
+      - 'AbyssLoop/**/*.tres'
+      - 'AbyssLoop/**/*.json'
+      - 'AbyssLoop/tests/**'
+      - 'AbyssLoop/tools/real_run_balance.py'
+      - 'AbyssLoop/project.godot'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: abyss-loop-engine-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Prepare QA output directory
+        shell: bash
+        run: mkdir -p "${RUNNER_TEMP}/abyss-loop-engine-qa"
+
+      - name: Install and verify Godot 4.7.2 (no export templates)
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="${RUNNER_TEMP}/godot-engine-qa"
+          mkdir -p "$work/bin"
+          curl --fail --location --silent --show-error --retry 3 \
+            'https://downloads.godotengine.org/?version=4.7.2&flavor=stable&slug=linux.x86_64.zip' \
+            -o "$work/godot.zip"
+          echo 'cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4  '"$work/godot.zip" | sha256sum --check --status
+          unzip -q "$work/godot.zip" -d "$work/bin"
+          GODOT_BIN="$(find "$work/bin" -type f -name 'Godot_v4.7.2-stable_linux.x86_64' -print -quit)"
+          test -n "$GODOT_BIN"
+          chmod +x "$GODOT_BIN"
+          echo "GODOT_BIN=$GODOT_BIN" >> "$GITHUB_ENV"
+          "$GODOT_BIN" --version
+
+      - name: Run static regression suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 AbyssLoop/tests/run_static_suite.py 2>&1 | tee "${RUNNER_TEMP}/abyss-loop-engine-qa/static-suite.log"
+
+      - name: Import and run core Godot acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_root="${RUNNER_TEMP}/AbyssLoopRuntimeAcceptance"
+          mkdir -p "$test_root"
+          cp -a AbyssLoop/. "$test_root/"
+          rm -rf "$test_root/.godot"
+          sed -i 's/^config\/name="Abyss Loop"$/config\/name="Abyss Loop CI Acceptance"/' "$test_root/project.godot"
+          grep -q '^config\/name="Abyss Loop CI Acceptance"$' "$test_root/project.godot"
+          "$GODOT_BIN" --headless --editor --path "$test_root" --import 2>&1 | tee "${RUNNER_TEMP}/abyss-loop-engine-qa/godot-import.log"
+          timeout 30s "$GODOT_BIN" --headless --path "$test_root" res://tests/smoke_test_runner.tscn 2>&1 | tee "${RUNNER_TEMP}/abyss-loop-engine-qa/smoke-test.log"
+          timeout 60s "$GODOT_BIN" --headless --path "$test_root" res://tests/save_system_regression_runner.tscn 2>&1 | tee "${RUNNER_TEMP}/abyss-loop-engine-qa/save-system.log"
+          rm -rf "$HOME/.local/share/godot/app_userdata/Abyss Loop CI Acceptance"
+          timeout 30s "$GODOT_BIN" --headless --path "$test_root" res://tests/expedition_runtime_acceptance_runner.tscn 2>&1 | tee "${RUNNER_TEMP}/abyss-loop-engine-qa/expedition-runtime.log"
+
+      - name: Run 12-loop long expedition acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_root="${RUNNER_TEMP}/AbyssLoopRuntimeAcceptance"
+          test -d "$test_root"
+          timeout 90s "$GODOT_BIN" --headless --path "$test_root" res://tests/long_expedition_runtime_acceptance_runner.tscn 2>&1 | tee "${RUNNER_TEMP}/abyss-loop-engine-qa/long-expedition.log"
+
+      - name: Capture Stage64B real-engine balance observations
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_root="${RUNNER_TEMP}/AbyssLoopRuntimeAcceptance"
+          qa_dir="${RUNNER_TEMP}/abyss-loop-engine-qa"
+          profile_data="$HOME/.local/share/godot/app_userdata/Abyss Loop CI Acceptance"
+          rm -f "$profile_data/STAGE64B_AUTOMATED_ENGINE_RUNS.json"
+          timeout 900s "$GODOT_BIN" --headless --path "$test_root" res://tests/stage64b_engine_run_capture_runner.tscn 2>&1 | tee "$qa_dir/stage64b-capture.log"
+          capture="$profile_data/STAGE64B_AUTOMATED_ENGINE_RUNS.json"
+          test -s "$capture"
+          cp "$capture" "$qa_dir/STAGE64B_AUTOMATED_ENGINE_RUNS.json"
+          python3 AbyssLoop/tools/real_run_balance.py \
+            --input "$qa_dir/STAGE64B_AUTOMATED_ENGINE_RUNS.json" \
+            --output "$qa_dir/STAGE64B_AUTOMATED_ENGINE_RUNS_ANALYSIS.md" \
+            --label "Stage64B scripted engine QA (not human playtest)" \
+            --godot-version "4.7.2.stable" --minimum-repeats 5
+
+      - name: Capture Stage71 real-engine balance matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_root="${RUNNER_TEMP}/AbyssLoopRuntimeAcceptance"
+          qa_dir="${RUNNER_TEMP}/abyss-loop-engine-qa"
+          profile_data="$HOME/.local/share/godot/app_userdata/Abyss Loop CI Acceptance"
+          rm -f "$profile_data/STAGE71_BALANCE_MATRIX.json"
+          timeout 900s "$GODOT_BIN" --headless --path "$test_root" res://tests/stage71_balance_matrix_runner.tscn 2>&1 | tee "$qa_dir/stage71-capture.log"
+          capture="$profile_data/STAGE71_BALANCE_MATRIX.json"
+          test -s "$capture"
+          cp "$capture" "$qa_dir/STAGE71_BALANCE_MATRIX.json"
+          python3 AbyssLoop/tools/real_run_balance.py \
+            --input "$qa_dir/STAGE71_BALANCE_MATRIX.json" \
+            --output "$qa_dir/STAGE71_BALANCE_MATRIX_REPORT.md" \
+            --label "Stage71 scripted engine QA (not human playtest)" \
+            --godot-version "4.7.2.stable" --minimum-repeats 3
+
+      - name: Preserve engine QA logs and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: abyss-loop-engine-qa-${{ github.sha }}
+          path: ${{ runner.temp }}/abyss-loop-engine-qa/
+          if-no-files-found: warn
+          retention-days: 14
