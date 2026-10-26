@@ -69,7 +69,7 @@ func _run_capture() -> void:
 			"runs_completed": _runs.size(),
 			"route_scaled_delta": ROUTE_SCALED_DELTA,
 			"combat_scaled_delta": COMBAT_SCALED_DELTA,
-			"policy": "The actual ExpeditionManager route, placement, encounter, combat, event, loot, perk, floor-guardian and settlement methods are executed with production hero/enemy/combat/reward formulas. A clean isolated profile exposes the test floor only so all eight floors can be sampled independently; no combat stats, loot, damage, or rewards are forced. Outcomes are scripted engine QA, not human playtests or a balance verdict."
+"policy": "The actual ExpeditionManager route, placement, encounter, combat, event, loot, perk, floor-guardian, equip_bag_item and settlement methods are executed with production hero/enemy/combat/reward formulas. A clean isolated profile exposes each test floor so the floor can be sampled independently. The scripted controller equips a bag item only when production item_power is strictly higher than the currently equipped item in that slot; all equipment changes use the production equip method. It never writes hero/enemy stats, loot, damage or rewards. Results are player-policy QA, not human playtests or a balance verdict."
 		},
 		"runs": _runs,
 		"failures": _failures
@@ -150,6 +150,7 @@ func _capture_case(case_data: Dictionary) -> Dictionary:
 	manager.set_pause(false)
 
 	var simulation_steps: int = 0
+	var auto_equips: int = 0
 	var case_failed: bool = false
 	while bool(manager.active) and simulation_steps < MAX_SIMULATION_STEPS_PER_RUN:
 		simulation_steps += 1
@@ -184,6 +185,7 @@ func _capture_case(case_data: Dictionary) -> Dictionary:
 			if manager.active:
 				manager._update_objective_progress()
 			continue
+		auto_equips += _equip_better_bag_items(manager)
 		var previous_steps: int = int(manager.processed_steps)
 		manager.distance = float(previous_steps)
 		manager._tick_route(ROUTE_SCALED_DELTA)
@@ -224,7 +226,37 @@ func _capture_case(case_data: Dictionary) -> Dictionary:
 	completed_summary["capture_seed"] = seed_value
 	completed_summary["capture_modifier_id"] = modifier_id
 	completed_summary["capture_contract_id"] = contract_id
+	completed_summary["capture_auto_equips"] = auto_equips
 	return completed_summary
+
+func _equip_better_bag_items(manager: Variant) -> int:
+	# Automated QA emulates a basic player pausing between encounters to equip
+	# an actual loot drop only when it improves the item-power score in that slot.
+	# It never edits hero stats directly; all changes go through production equip logic.
+	if not manager.enemy.is_empty() or not manager.pending_event.is_empty() or int(manager.pending_perk_count) > 0:
+		return 0
+	var equip_count: int = 0
+	var bag_snapshot: Array = manager.bag.duplicate(true)
+	for bag_value in bag_snapshot:
+		if typeof(bag_value) != TYPE_DICTIONARY:
+			continue
+		var candidate: Dictionary = bag_value
+		var slot: String = str(candidate.get("slot", ""))
+		if not InventorySystemScript.EQUIPMENT_SLOTS.has(slot):
+			continue
+		var item_id: String = str(candidate.get("id", ""))
+		if item_id.is_empty():
+			continue
+		var current_value: Variant = manager.equipment.get(slot, {})
+		var current_item: Dictionary = current_value if typeof(current_value) == TYPE_DICTIONARY else {}
+		var candidate_power: float = manager.inventory_system.item_power(candidate)
+		var current_power: float = manager.inventory_system.item_power(current_item) if not current_item.is_empty() else -1.0
+		if not current_item.is_empty() and candidate_power <= current_power + 0.01:
+			continue
+		var result: Dictionary = manager.equip_bag_item(item_id)
+		if bool(result.get("ok", false)):
+			equip_count += 1
+	return equip_count
 
 func _place_one_legal_road_tile(manager: Variant) -> bool:
 	for hand_index in range(manager.tile_hand.size()):
