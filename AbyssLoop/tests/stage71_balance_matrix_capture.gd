@@ -276,9 +276,9 @@ func _place_landscape_tiles(manager: Variant, target_count: int) -> int:
 			continue
 		if supplemental_draws >= 12:
 			break
-		var unlock_rare := manager.loop_count >= 3 or GameState.get_unlock_effect("unlock_rare_tiles") > 0.0
+		var unlock_rare: bool = manager.loop_count >= 3 or GameState.get_unlock_effect("unlock_rare_tiles") > 0.0
 		var supplemental_tile: Dictionary = manager.tile_system.draw_tile(manager._rng_for_draw(), unlock_rare)
-		var supplemental_index := manager.tile_hand.size()
+		var supplemental_index: int = manager.tile_hand.size()
 		manager.tile_hand.append(supplemental_tile)
 		supplemental_draws += 1
 		print("Stage71 QA placement draw %d: %s (%s)." % [supplemental_draws, str(supplemental_tile.get("id", "")), str(supplemental_tile.get("placement_zone", "any"))])
