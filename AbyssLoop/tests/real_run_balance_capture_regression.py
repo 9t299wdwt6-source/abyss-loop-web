@@ -17,11 +17,12 @@ spec.loader.exec_module(real_run_balance)
 
 def sample(run_id: str = "r1", *, outcome: str = "return", seed: int = 42,
            version: str = "0.61.0", loops: int = 2, mode: str = "standard",
-           modifier: str = "standard", schema: int = 1,
+           modifier: str = "standard", schema: int = 1, floor_number: int = 1,
            capture_kind: str | None = None, contract_id: str = "none",
            challenge_id: str = "none") -> dict:
     row = {
         "run_id": run_id, "outcome": outcome, "seed": seed, "game_version": version,
+        "floor_number": floor_number, "floor_name": f"Этаж {floor_number}",
         "difficulty_id": "standard", "modifier_id": modifier, "expedition_mode_id": mode,
         "loops": loops, "hero_level": 2, "victories": 4, "bosses_defeated": 1,
         "elites_defeated": 0, "events_resolved": 1, "earned_scrap": 20,
@@ -73,16 +74,16 @@ checks["negative metric and non-object rows are rejected"] = invalid_count == 3
 checks["float danger remains valid while integer metrics are strict"] = any(row["run_id"] == "a" and row["danger"] == 2.2 for row in runs)
 
 mixed, mixed_warnings, _, _ = real_run_balance.normalize_runs([
-    sample("a", version="0.61.0", mode="standard"),
-    sample("b", version="0.61.0", mode="long_expedition", seed=43),
-    sample("c", version="0.62.0", modifier="glass_cannon", seed=44),
-    sample("auto", capture_kind="automated_engine_run", seed=45),
+    sample("a", version="0.61.0", mode="standard", floor_number=1),
+    sample("b", version="0.61.0", seed=43, floor_number=2),
+    sample("c", version="0.62.0", modifier="glass_cannon", seed=44, floor_number=3),
+    sample("auto", capture_kind="automated_engine_run", seed=45, floor_number=1),
 ])
 report = real_run_balance.build_report({}, mixed, mixed_warnings, 0, 0, "exported runs", "test label", "4.7.2.stable", "", 5)
 checks["comparison groups separate build, floor, modifier, contract, challenge, and capture source"] = (
     report.count("| 0.61.0 | 1/8 | Этаж 1 | standard | none | none | profile_history | 1 |") == 1
     and report.count("| 0.61.0 | 1/8 | Этаж 1 | standard | none | none | automated_engine_run | 1 |") == 1
-    and "2/8" in report and "glass_cannon" in report
+    and "2/8 | Этаж 2" in report and "3/8 | Этаж 3" in report and "glass_cannon" in report
 )
 
 contract_rows, contract_warnings, contract_invalid, contract_duplicates = real_run_balance.normalize_runs([
