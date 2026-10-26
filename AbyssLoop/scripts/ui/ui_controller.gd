@@ -30,12 +30,10 @@ const TUTORIAL_STEPS := [
 	{"title_key": "tutorial.5.title", "body_key": "tutorial.5.body", "tip_key": "tutorial.5.tip"}
 ]
 var manager
-var selected_difficulty_id: String = "standard"
+var selected_floor_number: int = 1
 var selected_modifier_id: String = "standard"
 var selected_contract_id: String = "none"
-var selected_expedition_mode_id: String = "standard"
-var expedition_mode_option: OptionButton
-var difficulty_option: OptionButton
+var floor_option: OptionButton
 var modifier_option: OptionButton
 var contract_option: OptionButton
 var modifier_preview_label: Label
@@ -511,37 +509,32 @@ func _render_base() -> void:
 		feature_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		feature_panel.add_child(feature_label)
 	if not GameState.has_saved_expedition():
-		var mode_row: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()
-		mode_row.add_theme_constant_override("separation", 8)
-		launch_box.add_child(mode_row)
-		mode_row.add_child(_label(_t("base.mode.label"), 12, C_ACCENT, true))
-		expedition_mode_option = OptionButton.new()
-		_apply_keyboard_focus_outline(expedition_mode_option)
-		expedition_mode_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		expedition_mode_option.tooltip_text = "Обычная экспедиция свободная. Длинная: цель — 12 циклов и четыре босса; контрольные точки на циклах 3/6/9/12. Можно вернуться раньше."
-		for mode_key in ContentRegistry.EXPEDITION_MODES.keys():
-			var mode_definition: Dictionary = ContentRegistry.EXPEDITION_MODES[mode_key]
-			expedition_mode_option.add_item(str(mode_definition.get("name", mode_key)))
-			expedition_mode_option.set_item_metadata(expedition_mode_option.item_count - 1, str(mode_key))
-			if str(mode_key) == selected_expedition_mode_id:
-				expedition_mode_option.select(expedition_mode_option.item_count - 1)
-		expedition_mode_option.item_selected.connect(_on_expedition_mode_selected)
-		mode_row.add_child(expedition_mode_option)
+		selected_floor_number = clampi(GameState.highest_unlocked_floor, 1, ContentRegistry.FLOOR_COUNT)
+		var floor_row: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()
+		floor_row.add_theme_constant_override("separation", 8)
+		launch_box.add_child(floor_row)
+		floor_row.add_child(_label("ЭТАЖ ПОДЗЕМЕЛЬЯ", 12, C_ACCENT, true))
+		floor_option = OptionButton.new()
+		_apply_keyboard_focus_outline(floor_option)
+		floor_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		floor_option.tooltip_text = "В подземелье восемь этажей. Открывается следующий этаж после победы над его хранителем; закрытые этажи недоступны."
+		for floor_index in range(ContentRegistry.FLOOR_DEFS.size()):
+			var floor_definition: Dictionary = ContentRegistry.FLOOR_DEFS[floor_index]
+			var floor_number: int = int(floor_definition.get("floor", floor_index + 1))
+			var is_unlocked: bool = floor_number <= int(GameState.highest_unlocked_floor)
+			var floor_label: String = "Этаж %d — %s" % [floor_number, str(floor_definition.get("name", "Неизвестный этаж"))] if is_unlocked else "Этаж %d — ЗАКРЫТ" % floor_number
+			floor_option.add_item(floor_label)
+			var option_index: int = floor_option.item_count - 1
+			floor_option.set_item_metadata(option_index, floor_number)
+			floor_option.set_item_disabled(option_index, not is_unlocked)
+			if floor_number == selected_floor_number:
+				floor_option.select(option_index)
+		floor_option.item_selected.connect(_on_floor_selected)
+		floor_row.add_child(floor_option)
+
 		var preparation_row: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()
 		preparation_row.add_theme_constant_override("separation", 8)
 		launch_box.add_child(preparation_row)
-		difficulty_option = OptionButton.new()
-		_apply_keyboard_focus_outline(difficulty_option)
-		difficulty_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		difficulty_option.tooltip_text = "Сложность фиксируется на весь забег. Нельзя изменить её до возвращения на базу или поражения. Подробные коэффициенты показаны ниже."
-		for difficulty_key in ContentRegistry.DIFFICULTY_PRESETS.keys():
-			var difficulty_definition: Dictionary = ContentRegistry.DIFFICULTY_PRESETS[difficulty_key]
-			difficulty_option.add_item(str(difficulty_definition.get("name", difficulty_key)))
-			difficulty_option.set_item_metadata(difficulty_option.item_count - 1, str(difficulty_key))
-			if str(difficulty_key) == selected_difficulty_id:
-				difficulty_option.select(difficulty_option.item_count - 1)
-		difficulty_option.item_selected.connect(_on_difficulty_selected)
-		preparation_row.add_child(difficulty_option)
 		modifier_option = OptionButton.new()
 		_apply_keyboard_focus_outline(modifier_option)
 		modifier_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -552,14 +545,14 @@ func _render_base() -> void:
 			modifier_option.set_item_metadata(modifier_option.item_count - 1, str(modifier_key))
 			if str(modifier_key) == selected_modifier_id:
 				modifier_option.select(modifier_option.item_count - 1)
-		modifier_option.tooltip_text = "Модификатор экспедиции задаёт форму замкнутого маршрута, ограничения и дополнительное испытание."
+		modifier_option.tooltip_text = "Опциональный облик маршрута. Этаж определяет биом, состав врагов и хранителя."
 		modifier_option.item_selected.connect(_on_modifier_selected)
 		preparation_row.add_child(modifier_option)
 		seed_input = LineEdit.new()
 		_apply_keyboard_focus_outline(seed_input)
 		pending_preview_seed = _make_preview_seed()
 		seed_input.placeholder_text = "Seed (0 = случайный)"
-		seed_input.tooltip_text = "Введите целое число, чтобы воспроизвести генерацию и последовательность случайных решений."
+		seed_input.tooltip_text = "Введите целое число, чтобы повторить генерацию выбранного этажа."
 		seed_input.custom_minimum_size.x = 180 if not compact_layout else 0
 		seed_input.text = "0"
 		seed_input.text_changed.connect(_on_seed_input_changed)
@@ -678,8 +671,8 @@ func _render_base() -> void:
 	bottom_box.add_child(history_button)
 	_refresh_header()
 	var base_focus_target: Control = _base_primary_action
-	if expedition_mode_option != null:
-		base_focus_target = expedition_mode_option
+	if floor_option != null:
+		base_focus_target = floor_option
 	if base_focus_target != null:
 		call_deferred("_focus_control_if_valid", base_focus_target)
 	if bool(GameState.settings.get("high_contrast", false)):
@@ -749,12 +742,12 @@ func _open_expedition_history(filter_id: String = "all") -> void:
 		var card_box := VBoxContainer.new()
 		card_box.add_theme_constant_override("separation", 4)
 		card.add_child(card_box)
-		var title_text := "%s · %s · цикл %d · ур. %d" % ["ВОЗВРАЩЕНИЕ" if is_return else "ПОРАЖЕНИЕ", str(entry.get("difficulty_name", "Стандарт")), int(entry.get("loops", 0)), int(entry.get("hero_level", 1))]
+		var title_text := "%s · этаж %d/8 · %s · цикл %d · ур. %d" % ["ВОЗВРАЩЕНИЕ" if is_return else "ПОРАЖЕНИЕ", int(entry.get("floor_number", 1)), str(entry.get("floor_name", entry.get("difficulty_name", "Этаж"))), int(entry.get("loops", 0)), int(entry.get("hero_level", 1))]
 		card_box.add_child(_label(title_text, 13, C_ACCENT if is_return else C_RED, true))
 		card_box.add_child(_label("%s · seed %d · v%s · счёт %d" % [str(entry.get("date", "Дата неизвестна")), int(entry.get("seed", 0)), str(entry.get("game_version", "unknown")), int(entry.get("challenge_score", 0))], 10, C_MUTED))
 		var endgame_completed := bool(entry.get("endgame_completed", false))
 		var history_mode_name := str(entry.get("expedition_mode_name", "Обычная экспедиция"))
-		card_box.add_child(_label("Режим: %s%s" % [history_mode_name, " · ФИНАЛ ЭНДГЕЙМА" if endgame_completed else ""], 10, C_GOLD if endgame_completed else C_MUTED, endgame_completed))
+		card_box.add_child(_label("Этаж: %s%s" % [str(entry.get("floor_name", history_mode_name)), " · ФИНАЛ КАМПАНИИ" if endgame_completed else (" · ХРАНИТЕЛЬ ПОВЕРЖЕН" if bool(entry.get("floor_cleared", false)) else "")], 10, C_GOLD if endgame_completed or bool(entry.get("floor_cleared", false)) else C_MUTED, endgame_completed or bool(entry.get("floor_cleared", false))))
 		card_box.add_child(_label("Победы %d · боссы %d · элиты %d · события %d" % [int(entry.get("victories", 0)), int(entry.get("bosses_defeated", 0)), int(entry.get("elites_defeated", 0)), int(entry.get("events_resolved", 0))], 11, C_TEXT))
 		card_box.add_child(_label("Добыча: заработано %d мат. / %d ред. · сохранено %d мат. / %d ред. · потеряно %d мат. / %d ред." % [int(entry.get("earned_scrap", 0)), int(entry.get("earned_crystals", 0)), int(entry.get("kept_scrap", 0)), int(entry.get("kept_crystals", 0)), int(entry.get("lost_scrap", 0)), int(entry.get("lost_crystals", 0))], 10, C_TEXT))
 		var detail_parts: Array[String] = []
@@ -1155,18 +1148,11 @@ func _on_upgrade_pressed(building_id: String) -> void:
 	else:
 		_open_message("Улучшение недоступно", str(result.message))
 
-func _on_expedition_mode_selected(index: int) -> void:
-	if expedition_mode_option == null or index < 0 or index >= expedition_mode_option.item_count:
-		selected_expedition_mode_id = "standard"
+func _on_floor_selected(index: int) -> void:
+	if floor_option == null or index < 0 or index >= floor_option.item_count:
+		selected_floor_number = clampi(GameState.highest_unlocked_floor, 1, ContentRegistry.FLOOR_COUNT)
 	else:
-		selected_expedition_mode_id = str(expedition_mode_option.get_item_metadata(index))
-	_refresh_modifier_preview()
-
-func _on_difficulty_selected(index: int) -> void:
-	if difficulty_option == null or index < 0 or index >= difficulty_option.item_count:
-		selected_difficulty_id = "standard"
-		return
-	selected_difficulty_id = str(difficulty_option.get_item_metadata(index))
+		selected_floor_number = clampi(int(floor_option.get_item_metadata(index)), 1, int(GameState.highest_unlocked_floor))
 	_refresh_modifier_preview()
 
 func _on_modifier_selected(index: int) -> void:
@@ -1205,15 +1191,15 @@ func _refresh_modifier_preview() -> void:
 	if modifier_preview_label == null or not is_instance_valid(modifier_preview_label):
 		return
 	var modifier: Dictionary = ContentRegistry.RUN_MODIFIERS.get(selected_modifier_id, ContentRegistry.RUN_MODIFIERS["standard"])
-	var difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(selected_difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
-	var mode: Dictionary = ContentRegistry.EXPEDITION_MODES.get(selected_expedition_mode_id, ContentRegistry.EXPEDITION_MODES["standard"])
-	var preview := "РЕЖИМ: %s — %s" % [str(mode.get("name", "Обычная экспедиция")), str(mode.get("description", ""))]
-	if selected_expedition_mode_id == "long_expedition":
-		preview += " Цель: 12 циклов и победа над боссом цикла 12. Максимальная опасность ×%.1f; награда за цикл ограничена множителем ×%.2f. Контрольные точки 3/6/9/12." % [float(mode.get("max_danger", 6.0)), float(mode.get("reward_multiplier_cap", 1.8))]
-	preview += "\nСЛОЖНОСТЬ: %s — %s" % [str(difficulty.get("name", "Стандарт")), str(difficulty.get("description", ""))]
-	preview += "\nВраги: атака ×%.2f, здоровье ×%.2f, защита ×%.2f; награда ×%.2f; лечение ×%.0f%%; при поражении сохраняется %d%% добычи." % [float(difficulty.get("enemy_attack_multiplier", 1.0)), float(difficulty.get("enemy_health_multiplier", 1.0)), float(difficulty.get("enemy_defense_multiplier", 1.0)), float(difficulty.get("reward_multiplier", 1.0)), float(difficulty.get("healing_multiplier", 1.0)) * 100.0, int(round(float(difficulty.get("defeat_keep_ratio", 0.4)) * 100.0))]
-	preview += " Рейтинг испытания ×%.2f." % float(difficulty.get("challenge_score_multiplier", 1.0))
-	preview += "\n%s — %s" % [str(modifier.get("name", "Обычная экспедиция")), str(modifier.get("description", ""))]
+	var safe_floor: int = clampi(selected_floor_number, 1, ContentRegistry.FLOOR_COUNT)
+	var floor_definition: Dictionary = ContentRegistry.FLOOR_DEFS[safe_floor - 1]
+	var boss_id: String = str(floor_definition.get("boss_id", ""))
+	var boss_definition: Dictionary = ContentRegistry.BOSSES.get(boss_id, {})
+	var preview := "ЭТАЖ %d/8: %s" % [safe_floor, str(floor_definition.get("name", "Этаж"))]
+	preview += "\n%s" % str(floor_definition.get("description", ""))
+	preview += "\nБиом: %s · хранитель: %s · цикл босса: %d." % [str(floor_definition.get("biome", "Неизвестно")), str(boss_definition.get("name", boss_id)), int(floor_definition.get("boss_loop", 3))]
+	preview += "\nПосле победы над хранителем добыча сохраняется, а следующий этаж открывается. На восьмом этаже находится финальный хранитель."
+	preview += "\nОблик маршрута: %s — %s" % [str(modifier.get("name", "Обычный")), str(modifier.get("description", ""))]
 	var challenge_value: Variant = modifier.get("challenge", {})
 	if typeof(challenge_value) == TYPE_DICTIONARY and not challenge_value.is_empty():
 		preview += " Испытание: %s; награда +%d материалов и +%d редких ресурсов." % [str(challenge_value.get("name", "Испытание")), int(challenge_value.get("scrap_reward", 0)), int(challenge_value.get("crystal_reward", 0))]
@@ -1244,7 +1230,7 @@ func _start_expedition() -> void:
 	if not bool(acceptance.get("ok", false)):
 		_open_message("Контракт недоступен", str(acceptance.get("reason", "Недостаточно ресурсов.")))
 		return
-	if not manager.start_run(selected_difficulty_id, requested_seed, selected_modifier_id, selected_contract_id, selected_expedition_mode_id):
+	if not manager.start_run("standard", requested_seed, selected_modifier_id, selected_contract_id, "standard", selected_floor_number):
 		_open_message("Не удалось начать экспедицию", "Начальное состояние и плата не сохранены. Проверьте свободное место для сохранения и повторите попытку.")
 		return
 	_render_expedition()
@@ -1313,7 +1299,7 @@ func _render_expedition() -> void:
 	map_title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	map_header.add_child(map_title_box)
 	map_title_box.add_child(_label(_t("expedition.map.title"), 13, C_ACCENT, true))
-	map_title_box.add_child(_label("Seed: %d · %s · %s · %s · замкнутый маршрут." % [int(manager.run_seed), str(ContentRegistry.EXPEDITION_MODES.get(manager.expedition_mode_id, {}).get("name", "Обычная экспедиция")), str(ContentRegistry.DIFFICULTY_PRESETS.get(manager.difficulty_id, {}).get("name", "Стандарт")), str(manager.get_run_modifier().get("name", "Обычная экспедиция"))], 11, C_MUTED))
+	map_title_box.add_child(_label("Этаж %d/8 · %s · %s · seed %d · замкнутый маршрут." % [int(manager.floor_number), manager.get_floor_name(), str(manager.get_floor_config().get("biome", "")), int(manager.run_seed)], 11, C_MUTED))
 	fight_status_label = _label(_t("expedition.hero_moving"), 13, C_TEXT, true)
 	fight_status_label.visible = not compact_layout
 	map_header.add_child(fight_status_label)
@@ -1512,7 +1498,7 @@ func _sync_expedition_view(rebuild_tiles: bool) -> void:
 	if exp_metrics.has("hp"):
 		var hp_text := "%d / %d" % [int(manager.hero.get("hp", 0)), int(manager.hero.get("max_hp", 0))]
 		var level_text := "Ур. %d · %d/%d XP" % [int(manager.hero.get("level", 1)), int(manager.hero.get("xp", 0)), int(manager.hero.get("xp_next", 16))]
-		var loop_text := "%d · узел %d/%d" % [int(manager.loop_count), int(manager.current_cell()) + 1, manager.route.size()]
+		var loop_text := "Этаж %d/8 · цикл %d · узел %d/%d" % [int(manager.floor_number), int(manager.loop_count), int(manager.current_cell()) + 1, manager.route.size()]
 		var risk_text := "x%.1f · %d мат." % [float(manager.danger), int(manager.run_ledger.get("scrap", 0))]
 		if exp_metrics.hp.text != hp_text: exp_metrics.hp.text = hp_text
 		if exp_metrics.level.text != level_text: exp_metrics.level.text = level_text
@@ -1934,18 +1920,19 @@ func _render_summary(summary: Dictionary) -> void:
 	header_box.add_child(_label("ЭКСПЕДИЦИЯ ЗАВЕРШЕНА", 11, C_ACCENT if returned else C_RED, true))
 	header_box.add_child(_label("Добыча возвращена в убежище." if returned else "Герой потерпел поражение.", 24, C_TEXT, true))
 	header_box.add_child(_label("Маршрут seed %s · пройдено циклов: %d · уровень героя: %d" % [str(summary.get("seed", "—")), int(summary.get("loops", 0)), int(summary.get("hero_level", 1))], 12, C_MUTED))
-	header_box.add_child(_label("Сложность: %s · счёт испытания: %d" % [str(summary.get("difficulty_name", "Стандарт")), int(summary.get("challenge_score", 0))], 12, C_GOLD, true))
+	header_box.add_child(_label("Этаж %d/8: %s · счёт: %d" % [int(summary.get("floor_number", 1)), str(summary.get("floor_name", "Этаж")), int(summary.get("challenge_score", 0))], 12, C_GOLD, true))
 	var record_value: Variant = summary.get("difficulty_record", {})
 	if typeof(record_value) == TYPE_DICTIONARY:
 		var record: Dictionary = record_value
 		if not record.is_empty():
-			header_box.add_child(_label("Рекорд сложности: %d очков · лучший цикл: %d · возвращений: %d/%d" % [int(record.get("best_score", 0)), int(record.get("best_loops", 0)), int(record.get("returns", 0)), int(record.get("runs", 0))], 11, C_MUTED))
-	header_box.add_child(_label("Режим: %s" % str(summary.get("expedition_mode_name", "Обычная экспедиция")), 11, C_ACCENT, true))
+			header_box.add_child(_label("Рекорд этажа: %d очков · лучший цикл: %d · возвращений: %d/%d" % [int(record.get("best_score", 0)), int(record.get("best_loops", 0)), int(record.get("returns", 0)), int(record.get("runs", 0))], 11, C_MUTED))
+	header_box.add_child(_label("Модификатор: %s" % str(summary.get("modifier_name", "Обычная экспедиция")), 11, C_ACCENT, true))
 	header_box.add_child(_label("Модификатор маршрута: %s" % str(summary.get("modifier_name", "Обычная экспедиция")), 11, C_MUTED, true))
-	if bool(summary.get("endgame_completed", false)):
-		header_box.add_child(_label("ФИНАЛ ДЛИННОЙ ЭКСПЕДИЦИИ: цель выполнена; вся добыча сохранена; бонус +250 к счёту.", 12, C_GOLD, true))
-	elif int(summary.get("endgame_target_loops", 0)) > 0:
-		header_box.add_child(_label("Цель эндгейма: %d/%d циклов · боссы %d/%d" % [int(summary.get("loops", 0)), int(summary.get("endgame_target_loops", 12)), int(summary.get("bosses_defeated", 0)), int(summary.get("endgame_target_bosses", 4))], 11, C_MUTED, true))
+	if bool(summary.get("floor_cleared", false)):
+		if int(summary.get("floor_number", 1)) >= ContentRegistry.FLOOR_COUNT:
+			header_box.add_child(_label("КАМПАНИЯ ЗАВЕРШЕНА: все 8 этажей пройдены, финальный хранитель побеждён.", 12, C_GOLD, true))
+		else:
+			header_box.add_child(_label("ЭТАЖ ПРОЙДЕН: следующий этаж %d теперь открыт. Добыча сохранена." % mini(ContentRegistry.FLOOR_COUNT, int(summary.get("floor_number", 1)) + 1), 12, C_GOLD, true))
 	var details_scroll := ScrollContainer.new()
 	details_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	details_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
