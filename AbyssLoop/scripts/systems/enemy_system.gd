@@ -46,13 +46,13 @@ func create_enemy(loop_count: int, danger: float, rng: RandomNumberGenerator, st
 		"status_effects": []
 	}
 
-func create_boss(loop_count: int, danger: float, rng: RandomNumberGenerator) -> Dictionary:
+func create_boss(loop_count: int, danger: float, rng: RandomNumberGenerator, preferred_boss_id: String = "") -> Dictionary:
 	var cycle_index := maxi(1, int(floor(float(loop_count) / float(ContentRegistry.BALANCE.boss_loop_interval))))
 	var boss_ids: Array = ContentRegistry.BOSSES.keys()
 	if boss_ids.is_empty():
 		push_error("ContentRegistry.BOSSES is empty; cannot create boss encounter")
 		return {}
-	var boss_id: String = str(boss_ids[posmod(cycle_index - 1, boss_ids.size())])
+	var boss_id: String = preferred_boss_id if ContentRegistry.BOSSES.has(preferred_boss_id) else str(boss_ids[posmod(cycle_index - 1, boss_ids.size())])
 	var def: Dictionary = ContentRegistry.BOSSES[boss_id]
 	var cycles_after_first := maxi(0, cycle_index - 1)
 	var scaling := 1.0 + float(cycles_after_first) * float(ContentRegistry.BALANCE.get("boss_cycle_scaling", 0.28)) + maxf(0.0, danger - 1.0) * float(ContentRegistry.BALANCE.get("boss_danger_scaling", 0.22))
@@ -132,9 +132,9 @@ func promote_encounter_to_elite(encounter: Array, loop_count: int) -> Dictionary
 
 # Returns a whole encounter. All members attack independently; the hero focuses
 # the first living member. High-threat expeditions guarantee at least a pair.
-func create_encounter(loop_count: int, danger: float, rng: RandomNumberGenerator, strength_bonus: float = 0.0, boss_encounter: bool = false, extra_group_members: int = 0, preferred_pool: Array = []) -> Array:
+func create_encounter(loop_count: int, danger: float, rng: RandomNumberGenerator, strength_bonus: float = 0.0, boss_encounter: bool = false, extra_group_members: int = 0, preferred_pool: Array = [], preferred_boss_id: String = "") -> Array:
 	if boss_encounter:
-		return [create_boss(loop_count, danger + strength_bonus, rng)]
+		return [create_boss(loop_count, danger + strength_bonus, rng, preferred_boss_id)]
 	var members: Array = []
 	members.append(create_enemy(loop_count, danger, rng, strength_bonus, preferred_pool))
 	var pack_size := 1

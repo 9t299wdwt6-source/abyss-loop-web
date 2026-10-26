@@ -39,6 +39,7 @@ var route_geometry_seed: int = 0
 # Bounded local measurements for reproducible balance capture; no network telemetry.
 var run_elapsed_seconds: float = 0.0
 var run_baseline: Dictionary = {}
+var floor_number: int = 1
 var difficulty_id: String = "standard"
 var run_modifier_id: String = "standard"
 var expedition_mode_id: String = "standard"
@@ -123,17 +124,20 @@ func can_accept_contract(contract_id: String) -> Dictionary:
 		return {"ok": false, "reason": "Условия контракта некорректны."}
 	return {"ok": true, "reason": "Контракт доступен.", "scrap_cost": scrap_cost, "crystal_cost": crystal_cost}
 
-func start_run(requested_difficulty_id: String = "standard", requested_seed: int = 0, requested_modifier_id: String = "standard", requested_contract_id: String = "none", requested_mode_id: String = "standard") -> bool:
+func start_run(requested_difficulty_id: String = "standard", requested_seed: int = 0, requested_modifier_id: String = "standard", requested_contract_id: String = "none", requested_mode_id: String = "standard", requested_floor_number: int = 1) -> bool:
 	if active:
+		return false
+	floor_number = clampi(requested_floor_number, 1, ContentRegistry.FLOOR_COUNT)
+	if floor_number > int(GameState.highest_unlocked_floor):
 		return false
 	pending_end_outcome = ""
 	_snapshot_save_failure_notified = false
 	var contract_acceptance := can_accept_contract(requested_contract_id)
 	if not bool(contract_acceptance.get("ok", false)):
 		return false
-	difficulty_id = requested_difficulty_id if ContentRegistry.DIFFICULTY_PRESETS.has(requested_difficulty_id) else "standard"
+	difficulty_id = "standard" # Legacy save field retained; floors govern campaign pressure.
 	run_modifier_id = requested_modifier_id if ContentRegistry.RUN_MODIFIERS.has(requested_modifier_id) else "standard"
-	expedition_mode_id = requested_mode_id if ContentRegistry.EXPEDITION_MODES.has(requested_mode_id) else "standard"
+	expedition_mode_id = "standard" # The eight-floor campaign replaces the old free/12-loop selector.
 	var modifier_definition: Dictionary = ContentRegistry.RUN_MODIFIERS.get(run_modifier_id, ContentRegistry.RUN_MODIFIERS["standard"])
 	var challenge_value: Variant = modifier_definition.get("challenge", {})
 	run_challenge = challenge_value.duplicate(true) if typeof(challenge_value) == TYPE_DICTIONARY else {}
@@ -152,23 +156,24 @@ func start_run(requested_difficulty_id: String = "standard", requested_seed: int
 		run_contract["failure_reason"] = ""
 		run_contract["cost_paid"] = true # committed atomically with the first snapshot below
 	run_seed = ProceduralGenerationScript.create_seed() if requested_seed <= 0 else requested_seed
-	# New runs get a seed-driven map contour. Legacy snapshots without this field
-	# deliberately keep route_geometry_seed=0 and therefore their historic geometry.
-	route_geometry_seed = maxi(1, run_seed)
+	# Each floor derives its own deterministic map and RNG stream from the chosen seed.
+	# The saved base seed remains unchanged so a floor can be reproduced exactly.
+	var floor_seed: int = _get_floor_seed(run_seed, floor_number)
+	route_geometry_seed = floor_seed
 	run_elapsed_seconds = 0.0
 	run_baseline.clear()
 	run_rng = RandomNumberGenerator.new()
-	run_rng.seed = run_seed
-	route = route_system.create_route(run_seed, int(ContentRegistry.BALANCE.route_cells))
-	run_objective = _choose_objective_for_seed(run_seed, run_modifier_id)
+	run_rng.seed = floor_seed
+	route = route_system.create_route(floor_seed, int(ContentRegistry.BALANCE.route_cells))
+	run_objective = _choose_objective_for_seed(floor_seed, run_modifier_id)
 	distance = 0.0
 	processed_steps = 0
 	loop_count = 0
-	var difficulty_config: Dictionary = ContentRegistry.DIFFICULTY_PRESETS[difficulty_id]
-	danger = maxf(1.0, float(difficulty_config.get("starting_danger", 1.0)))
+	var floor_config: Dictionary = get_floor_config()
+	danger = maxf(1.0, float(floor_config.get("starting_danger", 1.0)))
 	paused = false
 	speed = 1.0
-	run_ledger = {"scrap": 0, "crystals": 0, "victories": 0, "bosses_defeated": 0, "elites_defeated": 0, "events_resolved": 0, "event_history": [], "event_flags": {}, "trophy_drops": _empty_trophy_counts(), "echo_item_charges": 0, "pending_item_rarity_bonus": 0.0, "pending_item_drop_bonus": 0.0, "inventory_ejections": [], "inventory_ejections_count": 0, "inventory_ejections_dust": 0, "last_tile_exchange_loop": -1}
+	run_ledger = {"scrap": 0, "crystals": 0, "victories": 0, "bosses_defeated": 0, "elites_defeated": 0, "events_resolved": 0, "event_history": [], "event_flags": {}, "trophy_drops": _empty_trophy_counts(), "echo_item_charges": 0, "pending_item_rarity_bonus": 0.0, "pending_item_drop_bonus": 0.0, "inventory_ejections": [], "inventory_ejections_count": 0, "inventory_ejections_dust": 0, "last_tile_exchange_loop": -1, "floor_number": floor_number, "floor_boss_defeated": false, "floor_cleared": false}
 	placed_tiles.clear()
 	world_tiles.clear()
 	discovered_world_cells.clear()
@@ -216,8 +221,7 @@ func start_run(requested_difficulty_id: String = "standard", requested_seed: int
 		tile_hand.append(tile_system.draw_tile(_rng_for_draw(), false))
 	run_baseline = _build_run_baseline()
 	active = true
-	_log("Экспедиция началась. Маршрут сгенерирован по seed %d." % run_seed)
-	_log("Режим: %s." % str(get_expedition_mode().get("name", "Обычная экспедиция")))
+	_log("Начат этаж %d/8: %s — %s. Seed %d." % [floor_number, get_floor_name(), str(floor_config.get("biome", "Бездонье")), run_seed])
 	_log("Условия маршрута: %s." % str(modifier_definition.get("name", "Обычная экспедиция")))
 	if expedition_mode_id == "long_expedition":
 		_log("Цель длинной экспедиции: 12 циклов и четыре победы над боссами, включая финального босса цикла 12. Риск и награды ограничены мягким пределом.")
@@ -239,6 +243,18 @@ func start_run(requested_difficulty_id: String = "standard", requested_seed: int
 func get_tile_hand_limit() -> int:
 	var modifier: Dictionary = ContentRegistry.RUN_MODIFIERS.get(run_modifier_id, ContentRegistry.RUN_MODIFIERS["standard"])
 	return maxi(1, int(ContentRegistry.BALANCE.max_tile_hand) + int(modifier.get("starting_tile_delta", 0)) + int(GameState.get_unlock_effect("starting_tiles")))
+
+func get_floor_config() -> Dictionary:
+	var safe_floor: int = clampi(floor_number, 1, ContentRegistry.FLOOR_COUNT)
+	return ContentRegistry.FLOOR_DEFS[safe_floor - 1].duplicate(true)
+
+func get_floor_name() -> String:
+	return str(get_floor_config().get("name", "Этаж %d" % floor_number))
+
+func _get_floor_seed(base_seed: int, requested_floor: int) -> int:
+	var safe_floor: int = clampi(requested_floor, 1, ContentRegistry.FLOOR_COUNT)
+	var value: int = posmod(base_seed + safe_floor * 104729, 2147483647)
+	return maxi(1, value)
 
 func get_run_modifier() -> Dictionary:
 	return ContentRegistry.RUN_MODIFIERS.get(run_modifier_id, ContentRegistry.RUN_MODIFIERS["standard"]).duplicate(true)
@@ -465,12 +481,13 @@ func get_return_forecast() -> Dictionary:
 	var active_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
 	var modifier: Dictionary = get_run_modifier()
 	var next_loop := loop_count + 1
-	var projected_danger := minf(float(ContentRegistry.BALANCE.get("max_danger", 6.0)), danger + float(ContentRegistry.BALANCE.get("loop_danger_growth", 0.18)) * float(active_difficulty.get("danger_growth_multiplier", 1.0)) * float(modifier.get("danger_growth_multiplier", 1.0)))
+	var floor_config: Dictionary = get_floor_config()
+	var projected_danger := minf(float(ContentRegistry.BALANCE.get("max_danger", 6.0)), danger + float(ContentRegistry.BALANCE.get("loop_danger_growth", 0.18)) * float(floor_config.get("danger_growth_multiplier", 1.0)) * float(active_difficulty.get("danger_growth_multiplier", 1.0)) * float(modifier.get("danger_growth_multiplier", 1.0)))
 	var projected_scrap_base := int(ContentRegistry.BALANCE.get("route_reward_scrap", 4)) + GameState.get_effective_loop_scrap_bonus()
-	var projected_scrap := int(round(float(projected_scrap_base) * float(active_difficulty.get("reward_multiplier", 1.0)) * float(modifier.get("reward_multiplier", 1.0))))
+	var projected_scrap := int(round(float(projected_scrap_base) * float(floor_config.get("reward_multiplier", 1.0)) * float(active_difficulty.get("reward_multiplier", 1.0)) * float(modifier.get("reward_multiplier", 1.0))))
 	var crystal_interval := maxi(1, int(ContentRegistry.BALANCE.get("loop_crystal_interval", 2)))
 	var projected_crystals := 1 if next_loop % crystal_interval == 0 else 0
-	var chance := clampf(float(ContentRegistry.BALANCE.get("encounter_chance_base", 0.22)) + float(next_loop) * float(ContentRegistry.BALANCE.get("encounter_chance_per_loop", 0.04)) + float(active_difficulty.get("encounter_chance_delta", 0.0)) + _get_modifier_chance_delta(), float(ContentRegistry.BALANCE.get("encounter_chance_min", 0.08)), float(ContentRegistry.BALANCE.get("encounter_chance_max", 0.96)))
+	var chance := clampf(float(ContentRegistry.BALANCE.get("encounter_chance_base", 0.22)) + float(next_loop) * float(ContentRegistry.BALANCE.get("encounter_chance_per_loop", 0.04)) + float(floor_config.get("encounter_chance_delta", 0.0)) + float(active_difficulty.get("encounter_chance_delta", 0.0)) + _get_modifier_chance_delta(), float(ContentRegistry.BALANCE.get("encounter_chance_min", 0.08)), float(ContentRegistry.BALANCE.get("encounter_chance_max", 0.96)))
 	var boss_interval := maxi(1, int(ContentRegistry.BALANCE.get("boss_loop_interval", 3)))
 	return {
 		"scrap": int(run_ledger.get("scrap", 0)),
@@ -484,7 +501,9 @@ func get_return_forecast() -> Dictionary:
 		"danger_next": projected_danger,
 		"encounter_chance": chance,
 		"boss_next": next_loop % boss_interval == 0,
-		"difficulty_name": str(active_difficulty.get("name", "Стандарт"))
+		"floor_number": floor_number,
+		"floor_name": get_floor_name(),
+		"difficulty_name": get_floor_name()
 	}
 
 func _empty_trophy_counts() -> Dictionary:
@@ -514,6 +533,7 @@ func export_run_state() -> Dictionary:
 		"active": true,
 		"run_seed": run_seed,
 		"route_geometry_seed": route_geometry_seed,
+		"floor_number": floor_number,
 		"difficulty_id": difficulty_id,
 		"run_modifier_id": run_modifier_id,
 		"expedition_mode_id": expedition_mode_id,
@@ -585,13 +605,12 @@ func restore_saved_run() -> bool:
 		if typeof(route_cell_value) != TYPE_DICTIONARY:
 			return false
 	run_seed = int(snapshot.get("run_seed", ProceduralGenerationScript.create_seed()))
+	floor_number = clampi(int(snapshot.get("floor_number", 1)), 1, ContentRegistry.FLOOR_COUNT)
 	route_geometry_seed = maxi(0, int(snapshot.get("route_geometry_seed", 0)))
 	run_elapsed_seconds = maxf(0.0, float(snapshot.get("run_elapsed_seconds", 0.0)))
 	var baseline_value: Variant = snapshot.get("run_baseline", {})
 	run_baseline = baseline_value.duplicate(true) if typeof(baseline_value) == TYPE_DICTIONARY else {}
-	difficulty_id = str(snapshot.get("difficulty_id", "standard"))
-	if not ContentRegistry.DIFFICULTY_PRESETS.has(difficulty_id):
-		difficulty_id = "standard"
+	difficulty_id = "standard" # Legacy snapshots migrate to the single floor-progression rules.
 	run_modifier_id = str(snapshot.get("run_modifier_id", "standard"))
 	if not ContentRegistry.RUN_MODIFIERS.has(run_modifier_id):
 		run_modifier_id = "standard"
@@ -2090,6 +2109,11 @@ func _finish_run(outcome: String) -> void:
 		"bosses_defeated": int(run_ledger.get("bosses_defeated", 0)),
 		"elites_defeated": int(run_ledger.get("elites_defeated", 0)),
 		"seed": run_seed,
+		"floor_number": floor_number,
+		"floor_name": get_floor_name(),
+		"floor_biome": str(get_floor_config().get("biome", "")),
+		"floor_boss_id": str(get_floor_config().get("boss_id", "")),
+		"floor_cleared": bool(run_ledger.get("floor_cleared", false)),
 		"difficulty_id": difficulty_id,
 		"modifier_id": run_modifier_id,
 		"difficulty_name": str(ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, {}).get("name", "Стандарт")),
