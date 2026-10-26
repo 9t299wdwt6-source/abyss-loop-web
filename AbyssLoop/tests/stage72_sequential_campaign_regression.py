@@ -18,7 +18,7 @@ checks = {
         "func _capture_campaign(seed_value: int)" in capture and "func _capture_floor(" in capture,
     "campaign can advance only when the production durable unlock frontier permits it":
         "if int(GameState.highest_unlocked_floor) < floor_number:" in capture and
-        "GameState.highest_unlocked_floor" in game_state and
+        "var highest_unlocked_floor: int = 1" in game_state and
         "manager.start_run(\"standard\", seed_value, \"standard\", \"none\", \"standard\", floor_number)" in capture,
     "persistent armory equipment uses production item-power comparison and equip transaction":
         "func _equip_better_armory_items() -> int:" in capture and
