@@ -488,7 +488,7 @@ func get_return_forecast() -> Dictionary:
 	var crystal_interval := maxi(1, int(ContentRegistry.BALANCE.get("loop_crystal_interval", 2)))
 	var projected_crystals := 1 if next_loop % crystal_interval == 0 else 0
 	var chance := clampf(float(ContentRegistry.BALANCE.get("encounter_chance_base", 0.22)) + float(next_loop) * float(ContentRegistry.BALANCE.get("encounter_chance_per_loop", 0.04)) + float(floor_config.get("encounter_chance_delta", 0.0)) + float(active_difficulty.get("encounter_chance_delta", 0.0)) + _get_modifier_chance_delta(), float(ContentRegistry.BALANCE.get("encounter_chance_min", 0.08)), float(ContentRegistry.BALANCE.get("encounter_chance_max", 0.96)))
-	var boss_interval := maxi(1, int(ContentRegistry.BALANCE.get("boss_loop_interval", 3)))
+	var boss_interval := maxi(1, int(get_floor_config().get("boss_loop", ContentRegistry.BALANCE.get("boss_loop_interval", 3))))
 	return {
 		"scrap": int(run_ledger.get("scrap", 0)),
 		"crystals": int(run_ledger.get("crystals", 0)),
@@ -850,10 +850,11 @@ func _tick_route(delta: float) -> void:
 		if cell_index == 0:
 			loop_count += 1
 			var active_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
-			danger += float(ContentRegistry.BALANCE.get("loop_danger_growth", 0.18)) * float(active_difficulty.get("danger_growth_multiplier", 1.0)) * float(get_run_modifier().get("danger_growth_multiplier", 1.0)) * float(get_expedition_mode().get("danger_growth_multiplier", 1.0))
+			var floor_config: Dictionary = get_floor_config()
+			danger += float(ContentRegistry.BALANCE.get("loop_danger_growth", 0.18)) * float(floor_config.get("danger_growth_multiplier", 1.0)) * float(active_difficulty.get("danger_growth_multiplier", 1.0)) * float(get_run_modifier().get("danger_growth_multiplier", 1.0)) * float(get_expedition_mode().get("danger_growth_multiplier", 1.0))
 			danger = _clamp_long_mode_danger(danger)
 			var loop_reward_base := int(ContentRegistry.BALANCE.route_reward_scrap) + GameState.get_effective_loop_scrap_bonus()
-			var combined_reward_multiplier := float(active_difficulty.get("reward_multiplier", 1.0)) * float(get_run_modifier().get("reward_multiplier", 1.0))
+			var combined_reward_multiplier := float(floor_config.get("reward_multiplier", 1.0)) * float(active_difficulty.get("reward_multiplier", 1.0)) * float(get_run_modifier().get("reward_multiplier", 1.0))
 			if expedition_mode_id == "long_expedition":
 				combined_reward_multiplier = minf(combined_reward_multiplier, float(get_expedition_mode().get("reward_multiplier_cap", 1.8)))
 			var loop_reward := int(round(float(loop_reward_base) * combined_reward_multiplier))
@@ -1058,8 +1059,9 @@ func _visit_cell(index: int) -> void:
 		_begin_expedition_event(index, spawn_bonus, strength_bonus, reward_bonus, encounter_pool)
 		return
 	var active_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
-	var base_chance := clampf(float(ContentRegistry.BALANCE.get("encounter_chance_base", 0.22)) + float(loop_count) * float(ContentRegistry.BALANCE.get("encounter_chance_per_loop", 0.04)) + spawn_bonus + float(active_difficulty.get("encounter_chance_delta", 0.0)) + _get_modifier_chance_delta(), float(ContentRegistry.BALANCE.get("encounter_chance_min", 0.08)), float(ContentRegistry.BALANCE.get("encounter_chance_max", 0.96)))
-	var boss_interval := maxi(1, int(ContentRegistry.BALANCE.get("boss_loop_interval", 3)))
+	var floor_config: Dictionary = get_floor_config()
+	var base_chance := clampf(float(ContentRegistry.BALANCE.get("encounter_chance_base", 0.22)) + float(loop_count) * float(ContentRegistry.BALANCE.get("encounter_chance_per_loop", 0.04)) + spawn_bonus + float(floor_config.get("encounter_chance_delta", 0.0)) + float(active_difficulty.get("encounter_chance_delta", 0.0)) + _get_modifier_chance_delta(), float(ContentRegistry.BALANCE.get("encounter_chance_min", 0.08)), float(ContentRegistry.BALANCE.get("encounter_chance_max", 0.96)))
+	var boss_interval := maxi(1, int(floor_config.get("boss_loop", ContentRegistry.BALANCE.get("boss_loop_interval", 3))))
 	var is_boss_node := index == 0 and loop_count > 0 and loop_count % boss_interval == 0
 	if is_boss_node:
 		_start_encounter(index, strength_bonus, reward_bonus, true)
@@ -1209,7 +1211,8 @@ func resolve_event_choice(choice_id: String) -> Dictionary:
 	resource_system.add(run_ledger, "scrap", maxi(0, int(effects.get("scrap", 0))))
 	resource_system.add(run_ledger, "crystals", maxi(0, int(effects.get("crystals", 0))))
 	var event_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
-	var event_damage_value: float = float(effects.get("damage", 0)) * float(event_difficulty.get("event_damage_multiplier", 1.0)) * float(get_run_modifier().get("event_damage_multiplier", 1.0))
+	var floor_config: Dictionary = get_floor_config()
+	var event_damage_value: float = float(effects.get("damage", 0)) * float(floor_config.get("event_damage_multiplier", 1.0)) * float(event_difficulty.get("event_damage_multiplier", 1.0)) * float(get_run_modifier().get("event_damage_multiplier", 1.0))
 	var research_damage_reduction: float = clampf(GameState.get_unlock_effect("event_damage_reduction"), 0.0, 0.75)
 	var damage: int = maxi(0, int(ceil(event_damage_value * (1.0 - research_damage_reduction))))
 	var healing: int = _scale_healing(maxi(0, int(effects.get("heal", 0))))
@@ -1301,14 +1304,17 @@ func _grant_secret_event_item(relic_id: String) -> Dictionary:
 
 func _start_encounter(index: int, strength_bonus: float, reward_bonus: float, boss_encounter: bool, enemy_pool: Array = []) -> void:
 	var active_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
+	var floor_config: Dictionary = get_floor_config()
 	var modifier: Dictionary = get_run_modifier()
 	var encounter_scaling_loop := _effective_scaling_loop(loop_count)
-	encounter_enemies = enemy_system.create_encounter(encounter_scaling_loop, danger, _rng_for_event(), strength_bonus, boss_encounter, int(active_difficulty.get("extra_group_members", 0)) + int(modifier.get("extra_group_members", 0)), enemy_pool)
+	var effective_enemy_pool: Array = enemy_pool if not enemy_pool.is_empty() else floor_config.get("enemy_pool", [])
+	var preferred_boss_id: String = str(floor_config.get("boss_id", "")) if boss_encounter else ""
+	encounter_enemies = enemy_system.create_encounter(encounter_scaling_loop, danger, _rng_for_event(), strength_bonus, boss_encounter, int(floor_config.get("extra_group_members", 0)) + int(active_difficulty.get("extra_group_members", 0)) + int(modifier.get("extra_group_members", 0)), effective_enemy_pool, preferred_boss_id)
 	if encounter_enemies.is_empty():
 		return
 	var elite_interval := maxi(1, int(ContentRegistry.BALANCE.get("elite_loop_interval", 4)))
 	var elite_min_loop := maxi(1, int(ContentRegistry.BALANCE.get("elite_min_loop", 2)))
-	var boss_interval := maxi(1, int(ContentRegistry.BALANCE.get("boss_loop_interval", 3)))
+	var boss_interval := maxi(1, int(floor_config.get("boss_loop", ContentRegistry.BALANCE.get("boss_loop_interval", 3))))
 	var elite_due := not boss_encounter and loop_count >= elite_min_loop and posmod(loop_count, elite_interval) == 0 and posmod(loop_count, boss_interval) != 0
 	if elite_due:
 		var promoted_elite: Dictionary = enemy_system.promote_encounter_to_elite(encounter_enemies, loop_count)
@@ -1319,9 +1325,9 @@ func _start_encounter(index: int, strength_bonus: float, reward_bonus: float, bo
 		if typeof(enemy_value) != TYPE_DICTIONARY:
 			continue
 		var enemy_data: Dictionary = enemy_value
-		var attack_multiplier := float(active_difficulty.get("enemy_attack_multiplier", 1.0)) * float(modifier.get("enemy_attack_multiplier", 1.0))
-		var health_multiplier := float(active_difficulty.get("enemy_health_multiplier", 1.0)) * float(modifier.get("enemy_health_multiplier", 1.0))
-		var defense_multiplier := float(active_difficulty.get("enemy_defense_multiplier", 1.0)) * float(modifier.get("enemy_defense_multiplier", 1.0))
+		var attack_multiplier := float(floor_config.get("enemy_attack_multiplier", 1.0)) * float(active_difficulty.get("enemy_attack_multiplier", 1.0)) * float(modifier.get("enemy_attack_multiplier", 1.0))
+		var health_multiplier := float(floor_config.get("enemy_health_multiplier", 1.0)) * float(active_difficulty.get("enemy_health_multiplier", 1.0)) * float(modifier.get("enemy_health_multiplier", 1.0))
+		var defense_multiplier := float(floor_config.get("enemy_defense_multiplier", 1.0)) * float(active_difficulty.get("enemy_defense_multiplier", 1.0)) * float(modifier.get("enemy_defense_multiplier", 1.0))
 		if enemy_data.has("base_attack"):
 			enemy_data["base_attack"] = maxf(1.0, float(enemy_data.get("base_attack", enemy_data.get("attack", 1.0))) * attack_multiplier)
 			enemy_data["attack"] = maxf(1.0, float(enemy_data.get("attack", 1.0)) * attack_multiplier)
@@ -1357,6 +1363,7 @@ func _start_encounter(index: int, strength_bonus: float, reward_bonus: float, bo
 	combat_cell = index
 	combat_timers = {"hero": 0.0, "enemy": 0.0}
 	combat_reward_bonus = reward_bonus + clampf(float(hero.get("equipped_reward_bonus", 0.0)) + float(hero.get("perk_reward_bonus", 0.0)), 0.0, 1.5)
+	combat_reward_bonus += maxf(0.0, float(floor_config.get("reward_multiplier", 1.0)) - 1.0)
 	combat_reward_bonus += maxf(0.0, float(active_difficulty.get("reward_multiplier", 1.0)) - 1.0)
 	combat_reward_bonus += maxf(0.0, float(get_run_modifier().get("reward_multiplier", 1.0)) - 1.0)
 	var event_flags_value: Variant = run_ledger.get("event_flags", {})
@@ -2068,7 +2075,8 @@ func _finish_run(outcome: String) -> void:
 	active = false
 	paused = false
 	var active_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
-	var defeat_keep_ratio := clampf(float(active_difficulty.get("defeat_keep_ratio", ContentRegistry.BALANCE.get("defeat_keep_ratio", 0.4))), 0.0, 1.0)
+	var floor_config: Dictionary = get_floor_config()
+	var defeat_keep_ratio := clampf(float(floor_config.get("defeat_keep_ratio", active_difficulty.get("defeat_keep_ratio", ContentRegistry.BALANCE.get("defeat_keep_ratio", 0.4))), 0.0, 1.0)
 	# Build every durable result field before the settlement transaction. Rewards,
 	# checkpoint deletion, campaign journal and difficulty record must become durable
 	# together, so a crash cannot consume rewards but lose the replay summary.
@@ -2100,7 +2108,7 @@ func _finish_run(outcome: String) -> void:
 		if recent_decisions.size() >= 5:
 			break
 	var contract_status := "completed" if bool(run_contract.get("completed", false)) and not bool(run_contract.get("failed", false)) else ("failed" if bool(run_contract.get("failed", false)) else ("active" if not run_contract.is_empty() else "none"))
-	var record_key := difficulty_id if expedition_mode_id == "standard" else "%s:%s" % [difficulty_id, expedition_mode_id]
+	var record_key := "floor_%02d" % floor_number
 	var inventory_ejections_value: Variant = run_ledger.get("inventory_ejections", [])
 	var inventory_ejection_count: int = inventory_ejections_value.size() if typeof(inventory_ejections_value) == TYPE_ARRAY else 0
 	var summary_metadata: Dictionary = {
@@ -2130,7 +2138,7 @@ func _finish_run(outcome: String) -> void:
 		"best_hp": int(hero.get("hp", 0)),
 		"danger": snappedf(danger, 0.1),
 		"challenge_score": challenge_score,
-		"run_id": "%d-%d-%s" % [GameState.runs_started, run_seed, difficulty_id],
+		"run_id": "%d-%d-floor%d" % [GameState.runs_started, run_seed, floor_number],
 		"timestamp_unix": int(Time.get_unix_time_from_system()),
 		"date": Time.get_datetime_string_from_system(false, true),
 		"game_version": str(ProjectSettings.get_setting("application/config/version", "0.61.0")),
@@ -2223,7 +2231,8 @@ func _scale_healing(amount: int) -> int:
 	if amount <= 0:
 		return 0
 	var difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
-	var multiplier := clampf(float(difficulty.get("healing_multiplier", 1.0)), 0.1, 2.0)
+	var floor_config: Dictionary = get_floor_config()
+	var multiplier := clampf(float(floor_config.get("healing_multiplier", 1.0)) * float(difficulty.get("healing_multiplier", 1.0)), 0.1, 2.0)
 	return maxi(1, int(floor(float(amount) * multiplier)))
 
 func current_cell() -> int:
