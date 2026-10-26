@@ -272,7 +272,7 @@ def write_fixture(root: Path) -> None:
         elif name == "tests/reports/STAGE68B_PREFLIGHT_REPORT_RU.txt":
             content = "Stage68B; Runtime: NOT RUN\n"
         elif name == "tests/stage64b_engine_run_capture_regression.py":
-            content = "STAGE64B ENGINE CAPTURE REGRESSION PASSED; never forces player/enemy health\n"
+            content = "STAGE64B FLOOR BASELINE CAPTURE REGRESSION PASSED; capture never forces player/enemy stats, loot, damage, or rewards\n"
         elif name == "tests/reports/STAGE64B_AUTOMATED_ENGINE_RUN_CAPTURE_GUIDE_RU.md":
             content = "automated_engine_run is not human playtest evidence\n"
         elif name == "ROADMAP_STATUS_STAGE68C_RU.md":

@@ -277,7 +277,7 @@ def audit_project(root: Path, expected_version: str = DEFAULT_VERSION, *, requir
         "tools/real_run_balance.py": ("never edits a save", "Баланс не оценён автоматически"),
         "tests/reports/REAL_RUN_BALANCE_CAPTURE_AUDIT_STAGE68B_RU.md": ("17/17 PASS", "Реальных профилей"),
         "tests/reports/STAGE68B_PREFLIGHT_REPORT_RU.txt": ("Stage68B", "Runtime: NOT RUN"),
-        "tests/stage64b_engine_run_capture_regression.py": ("STAGE64B ENGINE CAPTURE REGRESSION PASSED", "never forces player/enemy health"),
+        "tests/stage64b_engine_run_capture_regression.py": ("STAGE64B FLOOR BASELINE CAPTURE REGRESSION PASSED", "capture never forces player/enemy stats, loot, damage, or rewards"),
         "tests/reports/STAGE64B_AUTOMATED_ENGINE_RUN_CAPTURE_GUIDE_RU.md": ("automated_engine_run", "not human playtest"),
         "ROADMAP_STATUS_STAGE68C_RU.md": ("Stage68C", "Web"),
         "STAGE68C_BUILD_REPORT_RU.md": ("Web export", "runtime не подтверждён"),
