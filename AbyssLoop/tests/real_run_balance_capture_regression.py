@@ -81,8 +81,8 @@ mixed, mixed_warnings, _, _ = real_run_balance.normalize_runs([
 ])
 report = real_run_balance.build_report({}, mixed, mixed_warnings, 0, 0, "exported runs", "test label", "4.7.2.stable", "", 5)
 checks["comparison groups separate build, floor, modifier, contract, challenge, and capture source"] = (
-    report.count("| 0.61.0 | 1/8 | Этаж 1 | standard | none | none | profile_history | 1 |") == 1
-    and report.count("| 0.61.0 | 1/8 | Этаж 1 | standard | none | none | automated_engine_run | 1 |") == 1
+    report.count("| 0.61.0 | 1/8 | Этаж 1 | general | standard | none | none | profile_history | 1 |") == 1
+    and report.count("| 0.61.0 | 1/8 | Этаж 1 | general | standard | none | none | automated_engine_run | 1 |") == 1
     and "2/8 | Этаж 2" in report and "3/8 | Этаж 3" in report and "glass_cannon" in report
 )
 

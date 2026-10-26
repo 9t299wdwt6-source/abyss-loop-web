@@ -117,6 +117,24 @@ jobs:
             --label "Stage71 scripted engine QA (not human playtest)" \
             --godot-version "4.7.2.stable" --minimum-repeats 3
 
+      - name: Capture sequential eight-floor campaign with persistent gear
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_root="${RUNNER_TEMP}/AbyssLoopRuntimeAcceptance"
+          qa_dir="${RUNNER_TEMP}/abyss-loop-engine-qa"
+          profile_data="$HOME/.local/share/godot/app_userdata/Abyss Loop CI Acceptance"
+          rm -f "$profile_data/STAGE72_SEQUENTIAL_CAMPAIGNS.json"
+          timeout 900s "$GODOT_BIN" --headless --path "$test_root" res://tests/stage72_sequential_campaign_runner.tscn 2>&1 | tee "$qa_dir/stage72-sequential-campaign.log"
+          capture="$profile_data/STAGE72_SEQUENTIAL_CAMPAIGNS.json"
+          test -s "$capture"
+          cp "$capture" "$qa_dir/STAGE72_SEQUENTIAL_CAMPAIGNS.json"
+          python3 AbyssLoop/tools/real_run_balance.py \
+            --input "$qa_dir/STAGE72_SEQUENTIAL_CAMPAIGNS.json" \
+            --output "$qa_dir/STAGE72_SEQUENTIAL_CAMPAIGN_REPORT.md" \
+            --label "Stage72 sequential eight-floor campaign with persistent gear (scripted player-policy QA)" \
+            --godot-version "4.7.2.stable" --minimum-repeats 3
+
       - name: Preserve engine QA logs and reports
         if: always()
         uses: actions/upload-artifact@v4

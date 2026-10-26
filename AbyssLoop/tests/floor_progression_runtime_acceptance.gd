@@ -35,17 +35,17 @@ func _run_acceptance() -> void:
 	locked_manager.queue_free()
 	await get_tree().process_frame
 
-	var floor_one: Dictionary = await _complete_floor(1, 881101)
-	_check(bool(floor_one.get("floor_cleared", false)), "the first guardian victory durably completes floor one")
-	_check(int(floor_one.get("floor_number", 0)) == 1, "the first durable result identifies floor one")
-	_check(int(GameState.highest_unlocked_floor) == 2, "settling floor one unlocks floor two")
-	_check(not GameState.has_saved_expedition(), "successful floor settlement removes the active checkpoint")
-
-	var floor_two: Dictionary = await _complete_floor(2, 881201)
-	_check(bool(floor_two.get("floor_cleared", false)), "the second guardian victory durably completes floor two")
-	_check(int(floor_two.get("floor_number", 0)) == 2, "the second durable result identifies floor two")
-	_check(int(GameState.highest_unlocked_floor) == 3, "settling floor two unlocks floor three")
-	_check(int(GameState.runs_completed) == 2, "two completed floors create two separate durable settlements")
+	var last_floor_summary: Dictionary = {}
+	for floor_number in range(1, ContentRegistry.FLOOR_COUNT + 1):
+		var floor_summary: Dictionary = await _complete_floor(floor_number, 881000 + floor_number * 100)
+		last_floor_summary = floor_summary
+		_check(bool(floor_summary.get("floor_cleared", false)), "the real guardian victory durably completes floor %d" % floor_number)
+		_check(int(floor_summary.get("floor_number", 0)) == floor_number, "the durable result identifies floor %d" % floor_number)
+		var expected_unlocked: int = mini(ContentRegistry.FLOOR_COUNT, floor_number + 1)
+		_check(int(GameState.highest_unlocked_floor) == expected_unlocked, "clearing floor %d updates the durable unlock frontier to %d" % [floor_number, expected_unlocked])
+		_check(not GameState.has_saved_expedition(), "successful settlement on floor %d removes the active checkpoint" % floor_number)
+	_check(int(GameState.runs_completed) == ContentRegistry.FLOOR_COUNT, "eight completed floors create eight distinct durable settlements")
+	_check(bool(last_floor_summary.get("endgame_completed", false)), "the eighth guardian victory commits the final campaign flag")
 
 	GameState.reset_progress()
 	await get_tree().process_frame
