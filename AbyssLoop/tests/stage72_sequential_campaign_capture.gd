@@ -8,7 +8,7 @@ const MAX_SIMULATION_STEPS_PER_FLOOR: int = 20000
 const ROUTE_SCALED_DELTA: float = 1.24
 const COMBAT_SCALED_DELTA: float = 0.05
 const FLOOR_NUMBERS: Array[int] = [1, 2, 3, 4, 5, 6, 7, 8]
-const CAMPAIGN_SEEDS: Array[int] = [8676203, 8676211, 8676221]
+const CAMPAIGN_SEEDS: Array[int] = [8676203, 8676211, 8676221, 8676233, 8676241]
 
 var _runs: Array[Dictionary] = []
 var _failures: Array[String] = []

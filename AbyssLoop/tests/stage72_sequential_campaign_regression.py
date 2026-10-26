@@ -12,7 +12,7 @@ game_state = (ROOT / "scripts/core/game_state.gd").read_text(encoding="utf-8")
 checks = {
     "capture exercises all eight ordered floors with three deterministic campaign seeds":
         "FLOOR_NUMBERS: Array[int] = [1, 2, 3, 4, 5, 6, 7, 8]" in capture and
-        "CAMPAIGN_SEEDS: Array[int] = [8676203, 8676211, 8676221]" in capture,
+        "CAMPAIGN_SEEDS: Array[int] = [8676203, 8676211, 8676221, 8676233, 8676241]" in capture,
     "new profile reset occurs once per campaign, outside individual floor capture":
         capture.count("GameState.reset_progress()") == 1 and
         "func _capture_campaign(seed_value: int)" in capture and "func _capture_floor(" in capture,
