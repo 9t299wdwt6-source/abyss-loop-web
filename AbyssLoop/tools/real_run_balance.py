@@ -92,7 +92,8 @@ def normalize_runs(raw_rows: list[Any]) -> tuple[list[dict[str, Any]], list[str]
         outcome = str(row.get("outcome", "")).strip().lower()
         version = str(row.get("game_version", "unknown")).strip() or "unknown"
         floor_number_value = row.get("floor_number", row.get("capture_floor_number", 1))
-        floor_name = str(row.get("floor_name", f"Этаж {floor_number_value}")).strip() or f"Этаж {floor_number_value}"
+        floor_number = int(floor_number_value) if _is_int(floor_number_value) and 1 <= floor_number_value <= 8 else 1
+        floor_name = str(row.get("floor_name", f"Этаж {floor_number}")).strip() or f"Этаж {floor_number}"
         difficulty = str(row.get("difficulty_id", "standard")).strip() or "standard"
         mode = str(row.get("expedition_mode_id", "standard")).strip() or "standard"
         modifier = str(row.get("modifier_id", row.get("modifier_name", "unknown"))).strip() or "unknown"
@@ -143,6 +144,7 @@ def normalize_runs(raw_rows: list[Any]) -> tuple[list[dict[str, Any]], list[str]
         row["run_id"] = run_id
         row["outcome"] = outcome
         row["game_version"] = version
+        row["floor_number"] = floor_number
         row["floor_name"] = floor_name
         row["difficulty_id"] = difficulty
         row["expedition_mode_id"] = mode

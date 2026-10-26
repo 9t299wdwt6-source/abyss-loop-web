@@ -24,7 +24,7 @@ source_checks = {
     "all procedural modes account for exactly 34 road cells via bounded detours": 'bump_depths = [1, 1]' in tile and 'bump_depths = [2]' in tile and 'bump_depths = [1]' in tile and 'bump_depths = [1, 1, 1]' in tile and 'const ROAD_CELL_COUNT := 34' in tile,
     "detours remove their midpoint to avoid a side-connected shortcut": 'skipped_midpoints[(bump_edge + 1) % base.size()] = true' in tile and 'if skipped_midpoints.has(edge_index):' in tile,
     "generated contours validate bounds, uniqueness, adjacency and accidental chords": 'static func is_valid_procedural_road_grid_coordinates(cells: Array[Vector2i]) -> bool:' in tile and 'if other_index == index + 1 or (index == 0 and other_index == cells.size() - 1):' in tile,
-    "new runs persist a dedicated geometry seed": 'route_geometry_seed = maxi(1, run_seed)' in manager and '"route_geometry_seed": route_geometry_seed' in manager,
+    "new runs persist a dedicated geometry seed": 'route_geometry_seed = floor_seed' in manager and '"route_geometry_seed": route_geometry_seed' in manager,
     "legacy saved runs without the geometry seed preserve fixed contours": 'snapshot.get("route_geometry_seed", 0)' in manager,
     "map drawing and hit testing query the shared TileSystem contour": 'TileSystemScript.get_road_grid_coordinates_for_seed(route_shape_id, route_geometry_seed)' in view,
     "map cache key changes when geometry seed changes": 'var signature_parts: Array[String] = [route_shape_id, str(route_geometry_seed)]' in view,

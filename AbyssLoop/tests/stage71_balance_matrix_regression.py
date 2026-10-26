@@ -1,36 +1,35 @@
-"""Source regression guards for the Stage71 real-engine balance matrix."""
+"""Source guards for the eight-floor real-engine balance matrix."""
 from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 capture = (ROOT / "tests/stage71_balance_matrix_capture.gd").read_text(encoding="utf-8")
 scene = (ROOT / "tests/stage71_balance_matrix_runner.tscn").read_text(encoding="utf-8")
-workflow = (ROOT / ".github/workflows/abyssloop-web.yml").read_text(encoding="utf-8")
+workflow = (ROOT.parent / ".github/workflows/abyssloop-engine-qa.yml").read_text(encoding="utf-8")
 analyzer = (ROOT / "tools/real_run_balance.py").read_text(encoding="utf-8")
 manager = (ROOT / "scripts/systems/expedition_manager.gd").read_text(encoding="utf-8")
 
 checks = {
-    "matrix covers all four registered difficulty presets": all(f'"{difficulty}"' in capture for difficulty in ["standard", "volatile", "attrition", "abyssal"]),
-    "matrix includes three same-seed-count repeats per difficulty in the ordinary mode": 'BASE_SEEDS: Array[int] = [8675309, 8675311, 8675313]' in capture and '"difficulty_standard_one_loop"' in capture,
-    "matrix includes the long mode at three loops across all difficulties": '"difficulty_long_mode_three_loops"' in capture and '"long_expedition", 3, 1, LONG_MODE_SEEDS' in capture,
-    "matrix has repeat groups for the three non-standard modifiers": all(f'"modifier_{modifier}"' in capture for modifier in ["resonance", "scarce", "unstable"]),
-    "matrix has repeat groups for three separately identified contracts": all(f'"contract_{contract}"' in capture for contract in ["bounty_hunter", "event_archive", "landscape_survey"]),
-    "landscape survey really attempts three legal landscape placements": '"landscape_survey", "standard", 3, 3, LANDSCAPE_SEEDS' in capture and "func _place_landscape_tiles(manager: Variant, target_count: int) -> int:" in capture,
-    "placement capture passes each real candidate tile into road and modern-grid previews": "can_place(manager.route, manager.placed_tiles, route_index, tile)" in capture and "manager.route, manager.world_tiles, cell_id, tile," in capture and "TileSystemScript.map_world_cell_id(x, y)" in capture and "for hand_index in range(manager.tile_hand.size()):" in capture,
-    "placement coverage uses bounded production draws rather than bypassing placement rules": "manager.tile_system.draw_tile(manager._rng_for_draw(), unlock_rare)" in capture and "supplemental_draws >= 12" in capture and "_try_place_landscape_from_hand_slot(manager, supplemental_index)" in capture and "manager.tile_hand.remove_at(supplemental_index)" in capture,
-    "each case uses the actual ExpeditionManager with a deterministic seed": 'manager.start_run(difficulty_id, seed_value, modifier_id, contract_id, mode_id)' in capture and 'GameState.reset_progress()' in capture,
-    "test leaves game combat and reward formulas unmodified": 'manager.hero["hp"] =' not in capture and 'fighter["hp"] =' not in capture and 'manager.enemy["hp"]' not in capture,
-    "matrix captures contract and modifier challenge IDs separately": '"capture_contract_id"' in capture and '"capture_challenge_id"' in capture,
-    "scene runs the Stage71 capture node": 'path="res://tests/stage71_balance_matrix_capture.gd"' in scene,
-    "CI executes the matrix with a bounded timeout and preserves output": 'Capture Stage71 real-engine balance matrix' in workflow and 'timeout 900s' in workflow and 'STAGE71_BALANCE_MATRIX.json' in workflow and 'STAGE71_BALANCE_MATRIX_REPORT.md' in workflow,
-    "analysis separates contracts and challenges into comparison groups": 'row["contract_id"]' in analyzer and 'row["challenge_id"]' in analyzer and '"contract_id"]' in analyzer and '"challenge_id"]' in analyzer,
-    "road placement rolls back hand, board, and log if snapshot persistence fails": "var previous_placed_tiles: Dictionary = placed_tiles.duplicate(true)" in manager and "if not save_run_snapshot():" in manager and 'return {"ok": false, "reason": "Не удалось сохранить размещение. Карта возвращена в руку, поле восстановлено."}' in manager,
-    "landscape placement also rolls back discovery state when snapshot persistence fails": "var previous_world_tiles: Dictionary = world_tiles.duplicate(true)" in manager and "var previous_discovered_cells: Dictionary = discovered_world_cells.duplicate(true)" in manager and 'return {"ok": false, "reason": "Не удалось сохранить размещение. Карта возвращена в руку, ландшафт восстановлен."}' in manager,
+    "matrix covers every floor from one through eight": 'FLOOR_NUMBERS: Array[int] = [1, 2, 3, 4, 5, 6, 7, 8]' in capture and 'ContentRegistry.FLOOR_COUNT' in manager,
+    "base observations repeat three fixed seeds on every floor": 'BASE_SEEDS: Array[int] = [8675309, 8675311, 8675313]' in capture and 'for floor_number in FLOOR_NUMBERS:' in capture and 'for seed_value in BASE_SEEDS:' in capture,
+    "route modifier comparisons use repeatable floors one, four, and eight": 'MODIFIER_FLOORS: Array[int] = [1, 4, 8]' in capture and all(f'"{modifier}"' in capture for modifier in ['resonance', 'scarce', 'unstable']),
+    "case creation builds baseline runs for all floors and modifier cross-samples": '"capture_group": "floor_baseline"' in capture and '"modifier_id": modifier_id' in capture and '"capture_group": "modifier_%s" % modifier_id' in capture,
+    "every case uses the production manager with selected floor and deterministic seed": 'manager.start_run("standard", seed_value, modifier_id, contract_id, "standard", floor_number)' in capture and 'GameState.reset_progress()' in capture and 'GameState.highest_unlocked_floor = floor_number' in capture,
+    "route and combat are stepped through production handlers": 'manager._tick_route(ROUTE_SCALED_DELTA)' in capture and 'manager._tick_combat(COMBAT_SCALED_DELTA)' in capture and 'const ROUTE_SCALED_DELTA: float = 1.24' in capture and 'const COMBAT_SCALED_DELTA: float = 0.05' in capture,
+    "test uses production stats without forcing hero/enemy health or reward values": all(token not in capture for token in ['manager.hero["hp"] =', 'manager.hero["attack"] =', 'fighter["hp"] =', 'manager.enemy["hp"] =', 'manager.run_ledger["scrap"] =']),
+    "placement test searches candidate tiles and enforces production road/landscape rules": 'manager.tile_system.can_place(manager.route, manager.placed_tiles, route_index, tile)' in capture and 'manager.tile_system.can_place_world(manager.route, manager.world_tiles, cell_id, tile' in capture and 'TileSystemScript.map_world_cell_id(x, y)' in capture,
+    "tile draw fallback is bounded and uses explicit local types": capture.count('supplemental_draws < 12') >= 2 and capture.count('var unlock_rare: bool =') >= 2 and capture.count('var supplemental_index: int =') >= 2 and 'manager.tile_system.draw_tile(manager._rng_for_draw(), unlock_rare)' in capture,
+    "summary records floor, modifier, seed, durable identity and placement telemetry": all(token in capture for token in ['"capture_kind"] = "automated_engine_run"', '"capture_floor_number"] = floor_number', '"capture_modifier_id"] = modifier_id', '"floor_number", 0', '"run_id"] = "qa-stage71-', '"road_placements"', '"world_placements"']),
+    "scene runs the Stage71 floor capture": 'path="res://tests/stage71_balance_matrix_capture.gd"' in scene,
+    "Godot-only CI captures and stores the floor matrix and report without web export": 'res://tests/stage71_balance_matrix_runner.tscn' in workflow and 'timeout 900s' in workflow and 'STAGE71_BALANCE_MATRIX.json' in workflow and 'STAGE71_BALANCE_MATRIX_REPORT.md' in workflow and 'Export Godot Web build' not in workflow,
+    "analyzer groups comparisons by floor and does not use selectable difficulty/mode columns": 'int(row.get("floor_number", 1))' in analyzer and '"floor_number": floor_number' in analyzer and 'key[1], key[2], key[3]' in analyzer,
+    "road placement failure rolls back the hand, board, and log": 'var previous_placed_tiles: Dictionary = placed_tiles.duplicate(true)' in manager and 'if not save_run_snapshot():' in manager and 'Карта возвращена в руку, поле восстановлено.' in manager,
+    "landscape rollback restores discovery as well as tile hand": 'var previous_world_tiles: Dictionary = world_tiles.duplicate(true)' in manager and 'var previous_discovered_cells: Dictionary = discovered_world_cells.duplicate(true)' in manager and 'Карта возвращена в руку, ландшафт восстановлен.' in manager,
 }
-failed = [name for name, passed in checks.items() if not passed]
-for name, passed in checks.items():
-    print(("PASS" if passed else "FAIL") + ": " + name)
+failed = [name for name, ok in checks.items() if not ok]
+for name, ok in checks.items():
+    print(f"[{'PASS' if ok else 'FAIL'}] {name}")
 if failed:
-    raise SystemExit("STAGE71 BALANCE MATRIX REGRESSION FAILED: " + ", ".join(failed))
-print(f"STAGE71 BALANCE MATRIX REGRESSION PASSED: {len(checks)}/{len(checks)} checks")
-print("These are source guards; Stage71 result data still requires the actual Godot runtime capture.")
+    raise SystemExit("STAGE71 FLOOR BALANCE MATRIX REGRESSION FAILED: " + ", ".join(failed))
+print(f"STAGE71 FLOOR BALANCE MATRIX REGRESSION PASSED: {len(checks)}/{len(checks)} checks")
+print("Static guards only; the captured JSON and Godot runtime results must be inspected before tuning balance.")

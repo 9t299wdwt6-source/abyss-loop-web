@@ -2100,7 +2100,7 @@ func _finish_run(outcome: String) -> void:
 	paused = false
 	var active_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
 	var floor_config: Dictionary = get_floor_config()
-	var defeat_keep_ratio := clampf(float(floor_config.get("defeat_keep_ratio", active_difficulty.get("defeat_keep_ratio", ContentRegistry.BALANCE.get("defeat_keep_ratio", 0.4))), 0.0, 1.0)
+	var defeat_keep_ratio := clampf(float(floor_config.get("defeat_keep_ratio", active_difficulty.get("defeat_keep_ratio", ContentRegistry.BALANCE.get("defeat_keep_ratio", 0.4)))), 0.0, 1.0)
 	# Build every durable result field before the settlement transaction. Rewards,
 	# checkpoint deletion, campaign journal and difficulty record must become durable
 	# together, so a crash cannot consume rewards but lose the replay summary.
