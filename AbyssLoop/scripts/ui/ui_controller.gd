@@ -513,7 +513,7 @@ func _render_base() -> void:
 		var floor_row: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()
 		floor_row.add_theme_constant_override("separation", 8)
 		launch_box.add_child(floor_row)
-		floor_row.add_child(_label("ЭТАЖ ПОДЗЕМЕЛЬЯ", 12, C_ACCENT, true))
+		floor_row.add_child(_label(_t("base.floor.label"), 12, C_ACCENT, true))
 		floor_option = OptionButton.new()
 		_apply_keyboard_focus_outline(floor_option)
 		floor_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
