@@ -301,9 +301,9 @@ func _place_one_legal_road_tile(manager) -> bool:
 			return true
 	var supplemental_draws := 0
 	while supplemental_draws < 12:
-		var unlock_rare := manager.loop_count >= 3 or GameState.get_unlock_effect("unlock_rare_tiles") > 0.0
+		var unlock_rare: bool = manager.loop_count >= 3 or GameState.get_unlock_effect("unlock_rare_tiles") > 0.0
 		var supplemental_tile: Dictionary = manager.tile_system.draw_tile(manager._rng_for_draw(), unlock_rare)
-		var supplemental_index := manager.tile_hand.size()
+		var supplemental_index: int = manager.tile_hand.size()
 		manager.tile_hand.append(supplemental_tile)
 		supplemental_draws += 1
 		if _try_place_road_from_hand_slot(manager, supplemental_index, supplemental_tile):
@@ -332,9 +332,9 @@ func _place_one_legal_landscape_tile(manager) -> bool:
 			return true
 	var supplemental_draws := 0
 	while supplemental_draws < 12:
-		var unlock_rare := manager.loop_count >= 3 or GameState.get_unlock_effect("unlock_rare_tiles") > 0.0
+		var unlock_rare: bool = manager.loop_count >= 3 or GameState.get_unlock_effect("unlock_rare_tiles") > 0.0
 		var supplemental_tile: Dictionary = manager.tile_system.draw_tile(manager._rng_for_draw(), unlock_rare)
-		var supplemental_index := manager.tile_hand.size()
+		var supplemental_index: int = manager.tile_hand.size()
 		manager.tile_hand.append(supplemental_tile)
 		supplemental_draws += 1
 		if _try_place_landscape_from_hand_slot(manager, supplemental_index):
