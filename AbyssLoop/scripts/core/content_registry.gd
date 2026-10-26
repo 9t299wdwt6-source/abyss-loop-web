@@ -86,6 +86,20 @@ const DIFFICULTY_PRESETS := {
 	"abyssal": {"name": "Бездна", "description": "Для подготовленных героев: сильные группы, мало лечения и лишь четверть добычи при поражении. Максимальный счёт испытания.", "enemy_attack_multiplier": 1.30, "enemy_health_multiplier": 1.22, "enemy_defense_multiplier": 1.18, "reward_multiplier": 1.65, "encounter_chance_delta": 0.08, "danger_growth_multiplier": 1.30, "event_damage_multiplier": 1.30, "healing_multiplier": 0.55, "defeat_keep_ratio": 0.25, "starting_danger": 1.15, "challenge_score_multiplier": 1.75, "extra_group_members": 1}
 }
 
+# Main campaign progression: each floor has its own enemy pool and guardian.
+# These are progression stages, not selectable difficulty modes.
+const FLOOR_COUNT: int = 8
+const FLOOR_DEFS: Array[Dictionary] = [
+	{"floor": 1, "name": "Порог бездны", "biome": "Мшистый край", "description": "Первые следы жизни в глубине. Освой маршрут и подготовься к Стражу древнего узла.", "boss_id": "warden", "boss_loop": 3, "enemy_pool": ["scout", "brute", "hexer", "medic", "hunter"], "enemy_attack_multiplier": 1.00, "enemy_health_multiplier": 1.00, "enemy_defense_multiplier": 1.00, "reward_multiplier": 1.00, "encounter_chance_delta": 0.00, "danger_growth_multiplier": 1.00, "event_damage_multiplier": 1.00, "healing_multiplier": 1.00, "defeat_keep_ratio": 0.40, "starting_danger": 1.00, "extra_group_members": 0},
+	{"floor": 2, "name": "Споровая низина", "biome": "Споровые заросли", "description": "Токсичные заросли лечат и истощают. Матриарх мшистой гнили охраняет выход.", "boss_id": "matriarch", "boss_loop": 3, "enemy_pool": ["scout", "medic", "hunter", "sporeling"], "enemy_attack_multiplier": 1.02, "enemy_health_multiplier": 1.03, "enemy_defense_multiplier": 1.00, "reward_multiplier": 1.04, "encounter_chance_delta": 0.005, "danger_growth_multiplier": 1.00, "event_damage_multiplier": 1.02, "healing_multiplier": 1.00, "defeat_keep_ratio": 0.40, "starting_danger": 1.02, "extra_group_members": 0},
+	{"floor": 3, "name": "Кристальный карьер", "biome": "Призматические жилы", "description": "Частые атаки призматических клещей карают за слабую защиту. Впереди — Сборщик импульсов.", "boss_id": "harvester", "boss_loop": 3, "enemy_pool": ["scout", "hexer", "prism_mite", "hunter"], "enemy_attack_multiplier": 1.04, "enemy_health_multiplier": 1.06, "enemy_defense_multiplier": 1.02, "reward_multiplier": 1.08, "encounter_chance_delta": 0.01, "danger_growth_multiplier": 1.02, "event_damage_multiplier": 1.04, "healing_multiplier": 0.98, "defeat_keep_ratio": 0.40, "starting_danger": 1.04, "extra_group_members": 0},
+	{"floor": 4, "name": "Костяная чаща", "biome": "Погребённые останки", "description": "Бронированные дозорные держат проход. Глашатай пустого колокола завершает этот рубеж.", "boss_id": "bellkeeper", "boss_loop": 3, "enemy_pool": ["brute", "hunter", "bone_warden", "medic"], "enemy_attack_multiplier": 1.06, "enemy_health_multiplier": 1.09, "enemy_defense_multiplier": 1.04, "reward_multiplier": 1.12, "encounter_chance_delta": 0.015, "danger_growth_multiplier": 1.03, "event_damage_multiplier": 1.06, "healing_multiplier": 0.96, "defeat_keep_ratio": 0.40, "starting_danger": 1.06, "extra_group_members": 0},
+	{"floor": 5, "name": "Затонувший архив", "biome": "Архивное эхо", "description": "Искажения и спектральные враги проверят сборку героя. Страж возвращается усиленным глубиной.", "boss_id": "warden", "boss_loop": 3, "enemy_pool": ["hexer", "echo_wisp", "medic", "hunter"], "enemy_attack_multiplier": 1.08, "enemy_health_multiplier": 1.12, "enemy_defense_multiplier": 1.06, "reward_multiplier": 1.17, "encounter_chance_delta": 0.02, "danger_growth_multiplier": 1.04, "event_damage_multiplier": 1.08, "healing_multiplier": 0.94, "defeat_keep_ratio": 0.40, "starting_danger": 1.08, "extra_group_members": 0},
+	{"floor": 6, "name": "Корневая гробница", "biome": "Смешанные споры и кости", "description": "Враги поддерживают и прикрывают друг друга. Матриарх усилила споровую корону.", "boss_id": "matriarch", "boss_loop": 3, "enemy_pool": ["bone_warden", "brute", "sporeling", "hunter"], "enemy_attack_multiplier": 1.11, "enemy_health_multiplier": 1.16, "enemy_defense_multiplier": 1.08, "reward_multiplier": 1.22, "encounter_chance_delta": 0.025, "danger_growth_multiplier": 1.06, "event_damage_multiplier": 1.10, "healing_multiplier": 0.92, "defeat_keep_ratio": 0.40, "starting_danger": 1.10, "extra_group_members": 0},
+	{"floor": 7, "name": "Разлом забытых", "biome": "Искажённое эхо", "description": "Встречи опаснее и чаще. Сборщик импульсов защищает путь к сердцу бездны.", "boss_id": "harvester", "boss_loop": 3, "enemy_pool": ["echo_wisp", "bone_warden", "prism_mite", "hexer"], "enemy_attack_multiplier": 1.14, "enemy_health_multiplier": 1.20, "enemy_defense_multiplier": 1.10, "reward_multiplier": 1.28, "encounter_chance_delta": 0.03, "danger_growth_multiplier": 1.08, "event_damage_multiplier": 1.12, "healing_multiplier": 0.90, "defeat_keep_ratio": 0.40, "starting_danger": 1.12, "extra_group_members": 1},
+	{"floor": 8, "name": "Сердце бездны", "biome": "Первозданная бездна", "description": "Последний рубеж объединяет все угрозы глубины. Победи Глашатая и заверши спуск.", "boss_id": "bellkeeper", "boss_loop": 3, "enemy_pool": ["brute", "hunter", "bone_warden", "echo_wisp", "hexer"], "enemy_attack_multiplier": 1.18, "enemy_health_multiplier": 1.25, "enemy_defense_multiplier": 1.12, "reward_multiplier": 1.35, "encounter_chance_delta": 0.04, "danger_growth_multiplier": 1.10, "event_damage_multiplier": 1.15, "healing_multiplier": 0.88, "defeat_keep_ratio": 0.40, "starting_danger": 1.15, "extra_group_members": 1}
+]
+
 # Expedition mode controls the overall contract of a run. It remains separate from difficulty
 # (enemy pressure) and route modifiers (shape/tactical twist).
 const EXPEDITION_MODES := {
@@ -733,6 +747,40 @@ func validate_content_registry() -> Array[String]:
 						issues.append("boss:%s phase thresholds must descend" % boss_id)
 				previous_threshold = threshold
 				phase_index += 1
+	if FLOOR_DEFS.size() != FLOOR_COUNT:
+		issues.append("campaign must define exactly %d floors" % FLOOR_COUNT)
+	var seen_floor_numbers: Dictionary = {}
+	for floor_index in range(FLOOR_DEFS.size()):
+		var floor_value: Variant = FLOOR_DEFS[floor_index]
+		if typeof(floor_value) != TYPE_DICTIONARY:
+			issues.append("floor %d definition is malformed" % (floor_index + 1))
+			continue
+		var floor_definition: Dictionary = floor_value
+		var floor_number := int(floor_definition.get("floor", 0))
+		if floor_number != floor_index + 1 or seen_floor_numbers.has(floor_number):
+			issues.append("floor IDs must be unique and ordered from 1 to %d" % FLOOR_COUNT)
+		seen_floor_numbers[floor_number] = true
+		for field in ["name", "biome", "description", "boss_id"]:
+			if str(floor_definition.get(field, "")).strip_edges().is_empty():
+				issues.append("floor:%d missing %s" % [floor_number, field])
+		if not BOSSES.has(str(floor_definition.get("boss_id", ""))):
+			issues.append("floor:%d references unknown boss %s" % [floor_number, str(floor_definition.get("boss_id", ""))])
+		if int(floor_definition.get("boss_loop", 0)) < 1:
+			issues.append("floor:%d requires a positive boss loop" % floor_number)
+		var floor_enemies_value: Variant = floor_definition.get("enemy_pool", [])
+		if typeof(floor_enemies_value) != TYPE_ARRAY or floor_enemies_value.is_empty():
+			issues.append("floor:%d requires a non-empty enemy pool" % floor_number)
+		elif typeof(floor_enemies_value) == TYPE_ARRAY:
+			for floor_enemy_value in floor_enemies_value:
+				if not ENEMIES.has(str(floor_enemy_value)):
+					issues.append("floor:%d references unknown enemy %s" % [floor_number, str(floor_enemy_value)])
+		for multiplier_field in ["enemy_attack_multiplier", "enemy_health_multiplier", "enemy_defense_multiplier", "reward_multiplier", "danger_growth_multiplier", "event_damage_multiplier", "healing_multiplier", "starting_danger"]:
+			var multiplier := float(floor_definition.get(multiplier_field, 0.0))
+			if not is_finite(multiplier) or multiplier <= 0.0 or multiplier > 3.0:
+				issues.append("floor:%d has invalid %s" % [floor_number, multiplier_field])
+		var keep_ratio := float(floor_definition.get("defeat_keep_ratio", -1.0))
+		if keep_ratio < 0.0 or keep_ratio > 1.0:
+			issues.append("floor:%d has invalid defeat retention ratio" % floor_number)
 	var seen_synergy_ids: Dictionary = {}
 	var supported_tile_effects: Array[String] = ["scrap", "heal", "reward_bonus", "spawn_bonus", "enemy_bonus"]
 	for synergy_value in TILE_SYNERGIES:

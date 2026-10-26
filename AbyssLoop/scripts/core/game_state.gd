@@ -21,6 +21,7 @@ var loadout: Dictionary = {"weapon": {}, "helmet": {}, "armor": {}, "shield": {}
 var armory: Array = []
 var runs_started: int = 0
 var runs_completed: int = 0
+var highest_unlocked_floor: int = 1
 var best_loop: int = 0
 var total_victories: int = 0
 var total_bosses_defeated: int = 0
@@ -117,6 +118,7 @@ func _ready() -> void:
 					armory.append(armory_item_data.duplicate(true))
 		runs_started = maxi(0, int(saved.get("runs_started", 0)))
 		runs_completed = maxi(0, int(saved.get("runs_completed", 0)))
+		highest_unlocked_floor = clampi(int(saved.get("highest_unlocked_floor", 1)), 1, ContentRegistry.FLOOR_COUNT)
 		best_loop = maxi(0, int(saved.get("best_loop", 0)))
 		total_victories = maxi(0, int(saved.get("total_victories", 0)))
 		total_bosses_defeated = maxi(0, int(saved.get("total_bosses_defeated", 0)))
@@ -588,6 +590,7 @@ func settle_expedition(earned: Dictionary, outcome: String, loops: int, hero_lev
 	var old_bestiary_trophies := bestiary_trophies.duplicate(true)
 	var old_runs_completed := runs_completed
 	var old_best_loop := best_loop
+	var old_highest_unlocked_floor := highest_unlocked_floor
 	var old_total_events_resolved := total_events_resolved
 	var old_saved_expedition: Dictionary = saved_expedition.duplicate(true)
 	var old_last_summary: Dictionary = last_summary.duplicate(true)
@@ -671,6 +674,10 @@ func settle_expedition(earned: Dictionary, outcome: String, loops: int, hero_lev
 		"retention": ratio
 	}
 	summary.merge(summary_metadata, true)
+	# Unlock the next floor in the same durable transaction as the boss reward and summary.
+	if bool(summary_metadata.get("floor_cleared", false)):
+		var cleared_floor := clampi(int(summary_metadata.get("floor_number", 1)), 1, ContentRegistry.FLOOR_COUNT)
+		highest_unlocked_floor = maxi(highest_unlocked_floor, mini(ContentRegistry.FLOOR_COUNT, cleared_floor + 1))
 	# Core transaction fields are authoritative and cannot be overwritten by metadata.
 	summary["outcome"] = outcome
 	summary["loops"] = maxi(0, loops)
@@ -756,6 +763,7 @@ func settle_expedition(earned: Dictionary, outcome: String, loops: int, hero_lev
 		bestiary_trophies = old_bestiary_trophies
 		runs_completed = old_runs_completed
 		best_loop = old_best_loop
+		highest_unlocked_floor = old_highest_unlocked_floor
 		total_events_resolved = old_total_events_resolved
 		saved_expedition = old_saved_expedition
 		last_summary = old_last_summary
@@ -926,6 +934,7 @@ func export_save_data() -> Dictionary:
 		"armory": armory.duplicate(true),
 		"runs_started": runs_started,
 		"runs_completed": runs_completed,
+		"highest_unlocked_floor": highest_unlocked_floor,
 		"best_loop": best_loop,
 		"total_victories": total_victories,
 		"total_bosses_defeated": total_bosses_defeated,
@@ -956,6 +965,7 @@ func reset_progress() -> void:
 	armory.clear()
 	runs_started = 0
 	runs_completed = 0
+	highest_unlocked_floor = 1
 	best_loop = 0
 	total_victories = 0
 	total_bosses_defeated = 0
