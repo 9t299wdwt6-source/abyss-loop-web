@@ -28,6 +28,8 @@ var route_geometry_seed: int = 0
 var placement_enabled: bool = false
 var placement_action_allowed: bool = true
 var selected_tile_id: String = ""
+var selected_tile_display_name: String = ""
+var selected_tile_zone: String = "any"
 var hovered_cell_index: int = -1
 var hovered_world_cell_id: String = ""
 var feedback_text: String = ""
@@ -93,11 +95,13 @@ func _on_mouse_exited() -> void:
 	if changed_state:
 		queue_redraw()
 
-func configure(cells: Array, progress: float, tiles: Dictionary, fighting_cell: int, allow_placement: bool, tile_id: String, is_boss: bool = false, next_route_shape_id: String = "classic_ring", landscape_tiles: Dictionary = {}, is_elite: bool = false, placement_allowed: bool = true, next_route_geometry_seed: int = 0, discovered_cells: Dictionary = {}) -> void:
+func configure(cells: Array, progress: float, tiles: Dictionary, fighting_cell: int, allow_placement: bool, tile_id: String, is_boss: bool = false, next_route_shape_id: String = "classic_ring", landscape_tiles: Dictionary = {}, is_elite: bool = false, placement_allowed: bool = true, next_route_geometry_seed: int = 0, discovered_cells: Dictionary = {}, tile_display_name: String = "", tile_zone: String = "any") -> void:
 	var next_progress := maxf(0.0, progress)
 	var safe_shape := next_route_shape_id if ["classic_ring", "deep_descent", "narrow_ring", "fractured_loop"].has(next_route_shape_id) else "classic_ring"
 	var safe_geometry_seed := maxi(0, next_route_geometry_seed)
-	var static_signature := str(cells.size()) + "|" + str(tiles.keys()) + "|" + str(landscape_tiles) + "|" + str(discovered_cells.keys()) + "|" + str(fighting_cell) + "|" + str(is_boss) + "|" + str(is_elite) + "|" + str(allow_placement) + "|" + str(placement_allowed) + "|" + tile_id + "|" + safe_shape + "|" + str(safe_geometry_seed)
+	var safe_tile_zone := tile_zone if tile_zone in ["any", "road", "roadside", "landscape"] else "any"
+	var safe_tile_name := tile_display_name if not tile_display_name.is_empty() else tile_id
+	var static_signature := str(cells.size()) + "|" + str(tiles.keys()) + "|" + str(landscape_tiles) + "|" + str(discovered_cells.keys()) + "|" + str(fighting_cell) + "|" + str(is_boss) + "|" + str(is_elite) + "|" + str(allow_placement) + "|" + str(placement_allowed) + "|" + tile_id + "|" + safe_tile_name + "|" + safe_tile_zone + "|" + safe_shape + "|" + str(safe_geometry_seed)
 	var needs_redraw := static_signature != _last_static_signature or not is_equal_approx(next_progress, hero_progress)
 	route_cells = cells
 	hero_progress = next_progress
@@ -109,7 +113,9 @@ func configure(cells: Array, progress: float, tiles: Dictionary, fighting_cell: 
 	elite_encounter = is_elite
 	placement_enabled = allow_placement
 	placement_action_allowed = placement_allowed
-	selected_tile_id = tile_id
+	selected_tile_id = tile_id if allow_placement else ""
+	selected_tile_display_name = safe_tile_name if allow_placement else ""
+	selected_tile_zone = safe_tile_zone
 	route_shape_id = safe_shape
 	route_geometry_seed = safe_geometry_seed
 	_last_static_signature = static_signature
@@ -163,11 +169,16 @@ func _draw() -> void:
 		_draw_pixel_symbol(point + Vector2(0, -marker_size * 0.18), symbol_id)
 		var route_target_is_valid := false
 		if placement_enabled:
-			var route_check: Dictionary = _placement_rules.can_place(route_cells, placed_tiles, i)
+			var route_probe: Dictionary = {"id": selected_tile_id, "placement_zone": selected_tile_zone}
+			var route_check: Dictionary = _placement_rules.can_place(route_cells, placed_tiles, i, route_probe)
 			route_target_is_valid = bool(route_check.get("ok", false)) and placement_action_allowed
+			if route_target_is_valid:
+				var placement_color := _placement_target_color()
+				placement_color.a = 0.72
+				draw_rect(marker_rect.grow(2.0), placement_color, false, 1.5)
 		var outline_growth := 2.0 if count >= 30 else 4.0
 		if i == hovered_cell_index:
-			var hover_color := Color("#b4eb8b")
+			var hover_color := Color("#a5b2a7")
 			if placement_enabled:
 				hover_color = Color("#8fe3a5") if route_target_is_valid else Color("#ec8a7d")
 			draw_rect(marker_rect.grow(outline_growth), Color("#f7fff3") if high_contrast else hover_color, false, 2.0)
@@ -186,16 +197,19 @@ func _draw() -> void:
 			draw_rect(Rect2(badge_position, Vector2(badge_size, badge_size)), combat_color, true)
 			var badge_text := "Б" if boss_encounter else ("Э" if elite_encounter else "!")
 			draw_string(ThemeDB.fallback_font, badge_position + Vector2(1, badge_size - 1), badge_text, HORIZONTAL_ALIGNMENT_CENTER, badge_size - 1, 8, Color("#172329"))
-		var label := str(placed.get("short", i + 1)) if not placed.is_empty() else str(i + 1)
-		var label_width := minf(marker_size - 3.0, 24.0 if count >= 30 else 30.0)
-		var label_font_size := 5 if _map_cell_size() < 18.0 else (6 if _map_cell_size() < 26.0 else (7 if count >= 30 else (8 if not placed.is_empty() else 9)))
-		var label_height := clampf(_map_cell_size() * 0.34, 5.0, 10.0)
-		var label_rect := Rect2(Vector2(point.x - label_width * 0.5, point.y + _map_cell_size() * 0.05), Vector2(label_width, label_height))
-		draw_rect(label_rect, Color("#f4f8ee") if high_contrast else Color("#09191d", 0.86), true)
-		if high_contrast:
-			draw_rect(label_rect, Color("#081319"), false, 1.0)
-		var label_color := Color("#10191c") if high_contrast else Color("#f5f4e6")
-		draw_string(ThemeDB.fallback_font, Vector2(label_rect.position.x, label_rect.position.y + minf(label_height - 1.0, float(label_font_size))), label, HORIZONTAL_ALIGNMENT_CENTER, label_width, label_font_size, label_color)
+		# Route indices and tile names are secondary; show them on focus, or
+		# persistently only when high-contrast accessibility is enabled.
+		if i == hovered_cell_index or high_contrast:
+			var label := str(placed.get("short", i + 1)) if not placed.is_empty() else str(i + 1)
+			var label_width := minf(marker_size - 3.0, 24.0 if count >= 30 else 30.0)
+			var label_font_size := 5 if _map_cell_size() < 18.0 else (6 if _map_cell_size() < 26.0 else (7 if count >= 30 else (8 if not placed.is_empty() else 9)))
+			var label_height := clampf(_map_cell_size() * 0.34, 5.0, 10.0)
+			var label_rect := Rect2(Vector2(point.x - label_width * 0.5, point.y + _map_cell_size() * 0.05), Vector2(label_width, label_height))
+			draw_rect(label_rect, Color("#f4f8ee") if high_contrast else Color("#09191d", 0.86), true)
+			if high_contrast:
+				draw_rect(label_rect, Color("#081319"), false, 1.0)
+			var label_color := Color("#10191c") if high_contrast else Color("#f5f4e6")
+			draw_string(ThemeDB.fallback_font, Vector2(label_rect.position.x, label_rect.position.y + minf(label_height - 1.0, float(label_font_size))), label, HORIZONTAL_ALIGNMENT_CENTER, label_width, label_font_size, label_color)
 	# Hero interpolation still follows the same route indices that drive combat.
 	var hero_point: Vector2 = _get_hero_grid_position(hero_progress, route_geometry)
 	var hero_scale := clampf(_map_cell_size() / 30.0, 0.62, 1.15)
@@ -214,7 +228,7 @@ func _draw() -> void:
 	if high_contrast:
 		draw_string(ThemeDB.fallback_font, header_position + Vector2(1, 1), header_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#071217"))
 	draw_string(ThemeDB.fallback_font, header_position, header_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, header_color)
-	var selected_text := Localization.text("route.placement") % selected_tile_id if placement_enabled else Localization.text("route.no_tiles")
+	var selected_text := Localization.text("route.placement") % selected_tile_display_name if placement_enabled else Localization.text("route.no_tiles")
 	var footer_position := Vector2(14, size.y - 14)
 	var footer_color := Color("#ffffff") if high_contrast else Color("#a8bd9e")
 	if high_contrast:
@@ -275,7 +289,8 @@ func _draw_map_grid(route_geometry: Dictionary) -> void:
 			if roadside_lookup.has(coord_id):
 				_draw_roadside_edge(cell_rect, coord, road_lookup, cell_size)
 			var tone := 0.0 if (col + row) % 2 == 0 else 0.025
-			draw_rect(cell_rect, Color("#9bb59a", 0.10 + tone) if not high_contrast else Color("#e3f1dc", 0.36), false, 1.0)
+			var grid_alpha := 0.20 if placement_enabled else 0.035
+			draw_rect(cell_rect, Color("#9bb59a", grid_alpha + (tone if placement_enabled else tone * 0.15)) if not high_contrast else Color("#e3f1dc", 0.36), false, 1.25 if placement_enabled else 0.8)
 
 func _visual_biome_for_cell(col: int, row: int) -> int:
 	# Cosmetic biome regions only: gameplay placement and combat continue to use tile definitions.
@@ -602,17 +617,19 @@ func _draw_world_field(route_geometry: Dictionary) -> void:
 		if tile.is_empty():
 			var map_cell_id := TileSystemScript.map_world_cell_id(coord.x, coord.y)
 			var is_discovered := discovered_world_cells.has(map_cell_id)
-			var placement_probe: Dictionary = {"id": selected_tile_id} if not selected_tile_id.is_empty() else {}
+			var placement_probe: Dictionary = {"id": selected_tile_id, "placement_zone": selected_tile_zone} if not selected_tile_id.is_empty() else {}
 			var world_check: Dictionary = _placement_rules.can_place_world(route_cells, world_tiles, cell_id, placement_probe, route_shape_id, route_geometry_seed) if placement_enabled else {"ok": true}
 			var world_target_is_valid := placement_enabled and placement_action_allowed and bool(world_check.get("ok", false))
 			var base := Color("#253c32", 0.30)
 			var outline := Color("#b6d2a0", 0.18)
 			if placement_enabled and world_target_is_valid:
-				base = Color("#82b96e", 0.36)
-				outline = Color("#c1e89b", 0.98)
+				var target_color := _placement_target_color()
+				base = Color(target_color.r, target_color.g, target_color.b, 0.22)
+				outline = Color(target_color.r, target_color.g, target_color.b, 0.78)
 			elif placement_enabled:
-				base = Color("#c96562", 0.18)
-				outline = Color("#ed9d91", 0.82)
+				# Ineligible cells remain quiet; the hovered cell carries the explicit rejection.
+				base = Color("#253c32", 0.22)
+				outline = Color("#82938a", 0.28)
 			if not is_discovered:
 				if placement_enabled:
 					# Preserve readable valid/invalid preview while strongly muting the unknown biome.
@@ -626,17 +643,26 @@ func _draw_world_field(route_geometry: Dictionary) -> void:
 				if placement_enabled and not world_target_is_valid:
 					base = Color("#c96562", 0.42)
 					outline = Color("#ed9d91", 1.0)
+				elif placement_enabled:
+					var hover_color := _placement_target_color()
+					base = Color(hover_color.r, hover_color.g, hover_color.b, 0.46)
+					outline = Color(hover_color.r, hover_color.g, hover_color.b, 1.0)
 				else:
-					base = Color("#a5d98b", 0.48)
-					outline = Color("#e3f4b6", 1.0)
+					base = base.lerp(Color("#b9c8b4"), 0.08)
+					outline = Color("#aebeb3", 0.70)
 			draw_rect(tile_rect, base, true)
 			if not is_discovered:
 				_draw_unknown_cell_fog(tile_rect, coord, cell_size, cell_id == hovered_world_cell_id)
-			draw_rect(tile_rect, Color("#f4f8ee") if high_contrast else outline, false, 2.0 if placement_enabled else 1.0)
+			var outline_width := 1.0
+			if placement_enabled and world_target_is_valid:
+				outline_width = 1.35
+			if cell_id == hovered_world_cell_id:
+				outline_width = 2.0
+			draw_rect(tile_rect, Color("#f4f8ee") if high_contrast else outline, false, outline_width)
 			var center := tile_rect.get_center()
 			if cell_id == hovered_world_cell_id and placement_enabled:
 				_draw_placement_preview_corners(tile_rect.grow(-1.0), Color("#f4f8ee") if high_contrast else outline)
-			if placement_enabled:
+			if placement_enabled and cell_id == hovered_world_cell_id:
 				var status_text := Localization.text("tile.route.status.valid") if world_target_is_valid else Localization.text("tile.route.status.invalid")
 				var status_color := Color("#173c27") if world_target_is_valid else Color("#701f26")
 				var status_size := clampf(cell_size * 0.48, 8.0, 12.0)
@@ -656,12 +682,25 @@ func _draw_world_field(route_geometry: Dictionary) -> void:
 			else:
 				draw_rect(tile_rect, Color("#172a25"), false, 2.0)
 			_draw_pixel_symbol(tile_rect.get_center() + Vector2(0, -cell_size * 0.10), str(tile.get("id", "")))
-			var label_height := clampf(cell_size * 0.22, 6.0, 10.0)
-			var world_label_rect := Rect2(tile_rect.position + Vector2(1.0, tile_rect.size.y - label_height), Vector2(maxf(1.0, tile_rect.size.x - 2.0), label_height))
-			draw_rect(world_label_rect, Color("#f4f8ee") if high_contrast else Color("#071619", 0.88), true)
-			draw_string(ThemeDB.fallback_font, Vector2(world_label_rect.position.x, world_label_rect.end.y - 1.0), str(tile.get("short", Localization.text("route.tile.short"))), HORIZONTAL_ALIGNMENT_CENTER, world_label_rect.size.x, 6 if cell_size < 24.0 else 7, Color("#10191c") if high_contrast else Color("#f5f4e6"))
+			# Keep landscape labels available on focus and in high-contrast mode only.
+			if cell_id == hovered_world_cell_id or high_contrast:
+				var label_height := clampf(cell_size * 0.22, 6.0, 10.0)
+				var world_label_rect := Rect2(tile_rect.position + Vector2(1.0, tile_rect.size.y - label_height), Vector2(maxf(1.0, tile_rect.size.x - 2.0), label_height))
+				draw_rect(world_label_rect, Color("#f4f8ee") if high_contrast else Color("#071619", 0.88), true)
+				draw_string(ThemeDB.fallback_font, Vector2(world_label_rect.position.x, world_label_rect.end.y - 1.0), str(tile.get("short", Localization.text("route.tile.short"))), HORIZONTAL_ALIGNMENT_CENTER, world_label_rect.size.x, 6 if cell_size < 24.0 else 7, Color("#10191c") if high_contrast else Color("#f5f4e6"))
 			if cell_id == hovered_world_cell_id and placement_enabled:
-				draw_rect(tile_rect.grow(2.0), Color("#ec8a7d"), false, 2.0)
+				draw_rect(tile_rect.grow(2.0), Color("#ec8a7d") if not world_target_is_valid else _placement_target_color(), false, 2.0)
+
+func _placement_target_color() -> Color:
+	match selected_tile_zone:
+		"roadside":
+			return Color("#b4a56f") # restrained amber: cells directly beside the road
+		"landscape":
+			return Color("#79aa97") # muted teal: deeper landscape cells
+		"road":
+			return Color("#98b97d")
+		_:
+			return Color("#8eb883")
 
 func _draw_discovery_status_hud(route_geometry: Dictionary) -> void:
 	# A compact map status is kept outside the tile board so that it never covers
