@@ -248,12 +248,14 @@ func _place_best_legal_tile(manager: Variant) -> bool:
 		var definition: Dictionary = definition_value if typeof(definition_value) == TYPE_DICTIONARY else {}
 		var zone: String = str(tile.get("placement_zone", definition.get("placement_zone", "any")))
 		var utility: float = _tile_utility_score(tile, manager)
+		var road_candidate_found: bool = false
 		if zone in ["any", "road"]:
 			for offset in range(manager.route.size()):
 				var route_index: int = posmod(first_route_index + offset, manager.route.size())
 				var route_preview: Dictionary = manager.tile_system.can_place(manager.route, manager.placed_tiles, route_index, tile)
 				if not bool(route_preview.get("ok", false)):
 					continue
+				road_candidate_found = true
 				var score: float = utility + 1.5
 				if score > best_score:
 					best_score = score
@@ -261,7 +263,8 @@ func _place_best_legal_tile(manager: Variant) -> bool:
 					best_route_index = route_index
 					best_world_cell = ""
 					best_is_world = false
-		if zone in ["any", "landscape", "roadside"]:
+		if zone in ["landscape", "roadside"] or (zone == "any" and not road_candidate_found):
+			var world_target_found: bool = false
 			for y in range(TileSystemScript.MAP_ROWS):
 				for x in range(TileSystemScript.MAP_COLUMNS):
 					var cell_id: String = TileSystemScript.map_world_cell_id(x, y)
@@ -271,13 +274,17 @@ func _place_best_legal_tile(manager: Variant) -> bool:
 					)
 					if not bool(world_preview.get("ok", false)):
 						continue
+					world_target_found = true
 					var world_score: float = utility + (0.5 if zone in ["landscape", "roadside"] else -1.5)
 					if world_score > best_score:
 						best_score = world_score
 						best_hand_index = hand_index
-					best_route_index = -1
-					best_world_cell = cell_id
-					best_is_world = true
+						best_route_index = -1
+						best_world_cell = cell_id
+						best_is_world = true
+					break
+				if world_target_found:
+					break
 	if best_hand_index < 0:
 		return false
 	# Save dangerous cards for a better opportunity unless the hand is nearly full.
