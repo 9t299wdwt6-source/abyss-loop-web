@@ -97,6 +97,20 @@ func _run_acceptance() -> void:
 	_check(expanded_mask_valid, "the expanded discovery mask remains canonical and excludes all road cells")
 	manager.set_pause(true)
 
+	# The equipment/backpack panel should appear only during actual combat.
+	var gear_panel := ui.get("expedition_gear_panel") as PanelContainer
+	_check(gear_panel != null, "the expedition UI exposes a dedicated battle equipment panel")
+	manager.enemy.clear()
+	ui.call("_sync_expedition_view", false)
+	_check(gear_panel != null and not gear_panel.visible, "equipment panel stays hidden during route exploration")
+	var empty_enemy_state: Dictionary = manager.enemy.duplicate(true)
+	manager.enemy = {"id": "ui_visibility_probe", "name": "Проверка интерфейса", "hp": 1, "max_hp": 1, "is_boss": false, "is_elite": false}
+	ui.call("_sync_expedition_view", false)
+	_check(gear_panel != null and gear_panel.visible, "equipment and backpack appear during combat")
+	manager.enemy = empty_enemy_state
+	ui.call("_sync_expedition_view", false)
+	_check(gear_panel != null and not gear_panel.visible, "equipment panel hides again when combat ends")
+
 	var hand_before: int = manager.tile_hand.size()
 	var invalid_road: Dictionary = manager.place_tile(0, 0)
 	_check(not bool(invalid_road.get("ok", false)), "placing a tile on the protected start node is rejected")

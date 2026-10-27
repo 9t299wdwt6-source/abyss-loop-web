@@ -71,6 +71,7 @@ var pause_button: Button
 var return_button: Button
 var speed_label: Label
 var equipment_label: Label
+var expedition_gear_panel: PanelContainer
 var backpack_button: Button
 var armory_page_index: int = 0
 var log_label: Label
@@ -426,6 +427,7 @@ func _clear_screen() -> void:
 	return_button = null
 	speed_label = null
 	equipment_label = null
+	expedition_gear_panel = null
 	log_label = null
 	log_scroll = null
 	tile_hand_grid = null
@@ -1401,10 +1403,11 @@ func _render_expedition() -> void:
 	tile_preview_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tile_preview_label.custom_minimum_size.x = 285 if not compact_layout else 0
 	tile_box.add_child(tile_preview_label)
-	var gear_panel := _make_panel(right_column, C_PANEL, 12)
+	expedition_gear_panel = _make_panel(right_column, C_PANEL, 12)
+	expedition_gear_panel.visible = false
 	var gear_box := VBoxContainer.new()
 	gear_box.add_theme_constant_override("separation", 5)
-	gear_panel.add_child(gear_box)
+	expedition_gear_panel.add_child(gear_box)
 	gear_box.add_child(_label(_t("expedition.equipment.title"), 12, C_MUTED, true))
 	equipment_label = _label("", 12, C_TEXT)
 	equipment_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1466,6 +1469,9 @@ func _sync_expedition_view(rebuild_tiles: bool) -> void:
 	var current_is_boss: bool = not manager.enemy.is_empty() and bool(manager.enemy.get("is_boss", false))
 	var current_is_elite: bool = not manager.enemy.is_empty() and bool(manager.enemy.get("is_elite", false))
 	route_view.configure(manager.route, manager.hero_progress_for_draw(), manager.placed_tiles, int(manager.combat_cell), selected_tile_hand_index >= 0, selected_tile_id, current_is_boss, manager.get_route_shape_id(), manager.world_tiles, current_is_elite, _get_tile_placement_block_reason().is_empty(), manager.get_route_geometry_seed(), manager.discovered_world_cells)
+	# Equipment and backpack controls are contextual battle tools, not permanent map clutter.
+	if is_instance_valid(expedition_gear_panel):
+		expedition_gear_panel.visible = not manager.enemy.is_empty()
 	if objective_label != null:
 		var objective: Dictionary = manager.run_objective
 		if not objective.is_empty():
