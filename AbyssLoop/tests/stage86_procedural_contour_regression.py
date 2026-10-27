@@ -31,7 +31,7 @@ source_checks = {
         'placement_enabled = allow_placement and not tile_id.is_empty()' in view and
         'placement_overlay_enabled = placement_enabled and placement_action_allowed' in view and
         'if placement_overlay_enabled and roadside_lookup.has(coord_id):' in view and
-        'if placement_overlay_enabled:\\n\\t\\t\\t\\tdraw_rect(cell_rect, Color("#9bb59a", 0.10 + tone) if not high_contrast else Color("#e3f1dc", 0.36), false, 1.0)' in view and
+        'if placement_overlay_enabled:\n\t\t\t\tdraw_rect(cell_rect, Color("#9bb59a", 0.10 + tone) if not high_contrast else Color("#e3f1dc", 0.36), false, 1.0)' in view and
         'var variation_strength := 0.018 if not placement_overlay_enabled else 0.055' in view and
         'var inset := maxf(2.0, cell_size * 0.08) if placement_overlay_enabled else 0.0' in view and
         'if cell_id == hovered_world_cell_id and placement_overlay_enabled:' in view,

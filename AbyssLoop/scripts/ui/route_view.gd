@@ -607,8 +607,8 @@ func _draw_world_field(route_geometry: Dictionary) -> void:
 			var map_cell_id := TileSystemScript.map_world_cell_id(coord.x, coord.y)
 			var is_discovered := discovered_world_cells.has(map_cell_id)
 			var placement_probe: Dictionary = {"id": selected_tile_id} if not selected_tile_id.is_empty() else {}
-			var world_check: Dictionary = _placement_rules.can_place_world(route_cells, world_tiles, cell_id, placement_probe, route_shape_id, route_geometry_seed) if placement_overlay_enabled else {"ok": true}
-			var world_target_is_valid := placement_overlay_enabled and placement_action_allowed and bool(world_check.get("ok", false))
+			var world_check: Dictionary = _placement_rules.can_place_world(route_cells, world_tiles, cell_id, placement_probe, route_shape_id, route_geometry_seed) if placement_enabled else {"ok": true}
+			var world_target_is_valid := placement_enabled and placement_action_allowed and bool(world_check.get("ok", false))
 			var base := Color("#253c32", 0.30)
 			var outline := Color("#b6d2a0", 0.18)
 			if placement_overlay_enabled and world_target_is_valid:
@@ -705,7 +705,7 @@ func _draw_unknown_cell_fog(tile_rect: Rect2, coord: Vector2i, cell_size: float,
 		draw_line(origin + Vector2(cell_size * 0.22, cell_size * 0.24), origin + Vector2(cell_size * 0.39, cell_size * 0.41), color, pixel, true)
 	if mark % 3 == 1:
 		draw_rect(Rect2(origin + Vector2(cell_size * 0.62, cell_size * 0.65), Vector2(pixel * 1.8, pixel)), color, true)
-	if not placement_overlay_enabled and cell_size >= 13.0:
+	if not placement_enabled and cell_size >= 13.0:
 		var font_size := 6 if cell_size < 16.0 else (7 if cell_size < 24.0 else 10)
 		var glyph_color := Color("#eef7eb") if high_contrast else Color("#a3b6ac")
 		if emphasized:
