@@ -29,6 +29,7 @@ checks = {
     "investment scenario uses production shelter, research, and equipped-item transactions":
         "const BaseSystemScript = preload(\"res://scripts/systems/base_system.gd\")" in capture and
         "func _invest_between_floors() -> Dictionary:" in capture and
+        "before floor 1 and after each cleared floor" in capture and
         "base.get_research_status(research_id)" in capture and
         "base.try_research(research_id)" in capture and
         "base.get_upgrade_cost(building_id)" in capture and

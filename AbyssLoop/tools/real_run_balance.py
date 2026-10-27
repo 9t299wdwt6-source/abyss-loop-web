@@ -230,7 +230,7 @@ def build_report(metadata: dict[str, Any], rows: list[dict[str, Any]], warnings:
     legacy = sum(1 for row in rows if int(row.get("telemetry_schema", 0)) < 1)
     seeds = {row["seed"] for row in rows if row["seed"] > 0}
     lines = [
-        "# Abyss Loop — анализ игровых наблюдений (Stage71 / Stage64B)", "",
+        "# Abyss Loop — анализ игровых наблюдений", "",
         "## Паспорт данных", "",
         f"- Источник: {input_shape} (локальный/offline анализ).",
         f"- Метка сборки: {label or str(metadata.get('build_label', 'не указана'))}.",

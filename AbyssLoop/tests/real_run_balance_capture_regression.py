@@ -85,6 +85,10 @@ checks["comparison groups separate build, floor, modifier, contract, challenge, 
     and report.count("| 0.61.0 | 1/8 | Этаж 1 | general | standard | none | none | automated_engine_run | 1 |") == 1
     and "2/8 | Этаж 2" in report and "3/8 | Этаж 3" in report and "glass_cannon" in report
 )
+checks["report heading is source-agnostic for Stage64B, Stage71, and Stage72"] = (
+    report.startswith("# Abyss Loop — анализ игровых наблюдений\n")
+    and "Stage71 / Stage64B" not in report
+)
 
 contract_rows, contract_warnings, contract_invalid, contract_duplicates = real_run_balance.normalize_runs([
     sample("bounty", seed=51, contract_id="bounty_hunter"),

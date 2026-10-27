@@ -27,6 +27,7 @@ var route_shape_id: String = "classic_ring"
 var route_geometry_seed: int = 0
 var placement_enabled: bool = false
 var placement_action_allowed: bool = true
+var placement_overlay_enabled: bool = false
 var selected_tile_id: String = ""
 var hovered_cell_index: int = -1
 var hovered_world_cell_id: String = ""
@@ -107,8 +108,9 @@ func configure(cells: Array, progress: float, tiles: Dictionary, fighting_cell: 
 	combat_cell = fighting_cell
 	boss_encounter = is_boss
 	elite_encounter = is_elite
-	placement_enabled = allow_placement
+	placement_enabled = allow_placement and not tile_id.is_empty()
 	placement_action_allowed = placement_allowed
+	placement_overlay_enabled = placement_enabled and placement_action_allowed
 	selected_tile_id = tile_id
 	route_shape_id = safe_shape
 	route_geometry_seed = safe_geometry_seed
@@ -162,16 +164,16 @@ func _draw() -> void:
 		var symbol_id := str(placed.get("id", base_kind))
 		_draw_pixel_symbol(point + Vector2(0, -marker_size * 0.18), symbol_id)
 		var route_target_is_valid := false
-		if placement_enabled:
+		if placement_overlay_enabled:
 			var route_check: Dictionary = _placement_rules.can_place(route_cells, placed_tiles, i)
 			route_target_is_valid = bool(route_check.get("ok", false)) and placement_action_allowed
 		var outline_growth := 2.0 if count >= 30 else 4.0
 		if i == hovered_cell_index:
 			var hover_color := Color("#b4eb8b")
-			if placement_enabled:
+			if placement_overlay_enabled:
 				hover_color = Color("#8fe3a5") if route_target_is_valid else Color("#ec8a7d")
 			draw_rect(marker_rect.grow(outline_growth), Color("#f7fff3") if high_contrast else hover_color, false, 2.0)
-			if placement_enabled:
+			if placement_overlay_enabled:
 				var status_text := Localization.text("tile.route.status.valid") if route_target_is_valid else Localization.text("tile.route.status.invalid")
 				var status_color := Color("#173c27") if route_target_is_valid else Color("#701f26")
 				var status_rect := Rect2(marker_rect.position + Vector2(1, 1), Vector2(11, 11))
@@ -266,16 +268,18 @@ func _draw_map_grid(route_geometry: Dictionary) -> void:
 			var base := _terrain_color_for_biome(biome_index)
 			# Subtle deterministic value variation breaks uniform blocks without introducing noisy flicker.
 			var noise_value := float(posmod(col * 7 + row * 11 + posmod(route_geometry_seed, 31), 7) - 3) / 3.0
-			base = base.lerp(Color("#10191b") if noise_value < 0.0 else Color("#d7dfbf"), absf(noise_value) * 0.055)
-			if roadside_lookup.has(coord_id):
+			var variation_strength := 0.018 if not placement_overlay_enabled else 0.055
+			base = base.lerp(Color("#10191b") if noise_value < 0.0 else Color("#d7dfbf"), absf(noise_value) * variation_strength)
+			if placement_overlay_enabled and roadside_lookup.has(coord_id):
 				base = base.lerp(Color("#c5b98c"), 0.08)
 			base.a = 0.94
 			draw_rect(cell_rect, base, true)
 			_draw_terrain_cell_details(cell_rect, biome_index, col, row)
-			if roadside_lookup.has(coord_id):
+			if placement_overlay_enabled and roadside_lookup.has(coord_id):
 				_draw_roadside_edge(cell_rect, coord, road_lookup, cell_size)
 			var tone := 0.0 if (col + row) % 2 == 0 else 0.025
-			draw_rect(cell_rect, Color("#9bb59a", 0.10 + tone) if not high_contrast else Color("#e3f1dc", 0.36), false, 1.0)
+			if placement_overlay_enabled:
+				draw_rect(cell_rect, Color("#9bb59a", 0.10 + tone) if not high_contrast else Color("#e3f1dc", 0.36), false, 1.0)
 
 func _visual_biome_for_cell(col: int, row: int) -> int:
 	# Cosmetic biome regions only: gameplay placement and combat continue to use tile definitions.
@@ -596,25 +600,25 @@ func _draw_world_field(route_geometry: Dictionary) -> void:
 		var cell_id := str(cell_id_value)
 		var coord: Vector2i = display_map[cell_id]
 		var cell_rect := Rect2(map_rect.position + Vector2(coord) * cell_size, Vector2.ONE * cell_size)
-		var inset := maxf(2.0, cell_size * 0.08)
+		var inset := maxf(2.0, cell_size * 0.08) if placement_overlay_enabled else 0.0
 		var tile_rect := cell_rect.grow(-inset)
 		var tile: Dictionary = world_tiles.get(cell_id, {})
 		if tile.is_empty():
 			var map_cell_id := TileSystemScript.map_world_cell_id(coord.x, coord.y)
 			var is_discovered := discovered_world_cells.has(map_cell_id)
 			var placement_probe: Dictionary = {"id": selected_tile_id} if not selected_tile_id.is_empty() else {}
-			var world_check: Dictionary = _placement_rules.can_place_world(route_cells, world_tiles, cell_id, placement_probe, route_shape_id, route_geometry_seed) if placement_enabled else {"ok": true}
-			var world_target_is_valid := placement_enabled and placement_action_allowed and bool(world_check.get("ok", false))
+			var world_check: Dictionary = _placement_rules.can_place_world(route_cells, world_tiles, cell_id, placement_probe, route_shape_id, route_geometry_seed) if placement_overlay_enabled else {"ok": true}
+			var world_target_is_valid := placement_overlay_enabled and placement_action_allowed and bool(world_check.get("ok", false))
 			var base := Color("#253c32", 0.30)
 			var outline := Color("#b6d2a0", 0.18)
-			if placement_enabled and world_target_is_valid:
+			if placement_overlay_enabled and world_target_is_valid:
 				base = Color("#82b96e", 0.36)
 				outline = Color("#c1e89b", 0.98)
-			elif placement_enabled:
+			elif placement_overlay_enabled:
 				base = Color("#c96562", 0.18)
 				outline = Color("#ed9d91", 0.82)
 			if not is_discovered:
-				if placement_enabled:
+				if placement_overlay_enabled:
 					# Preserve readable valid/invalid preview while strongly muting the unknown biome.
 					base = base.lerp(Color("#101b20"), 0.58)
 					outline = Color("#b3c6b6", 0.72) if not high_contrast else Color("#f4f8ee", 0.92)
@@ -622,8 +626,8 @@ func _draw_world_field(route_geometry: Dictionary) -> void:
 					# The fog is nearly opaque so hidden terrain details cannot leak through.
 					base = Color("#09161b", 0.98)
 					outline = Color("#71847e", 0.92) if not high_contrast else Color("#f4f8ee", 0.96)
-			if cell_id == hovered_world_cell_id:
-				if placement_enabled and not world_target_is_valid:
+			if cell_id == hovered_world_cell_id and placement_overlay_enabled:
+				if not world_target_is_valid:
 					base = Color("#c96562", 0.42)
 					outline = Color("#ed9d91", 1.0)
 				else:
@@ -632,11 +636,12 @@ func _draw_world_field(route_geometry: Dictionary) -> void:
 			draw_rect(tile_rect, base, true)
 			if not is_discovered:
 				_draw_unknown_cell_fog(tile_rect, coord, cell_size, cell_id == hovered_world_cell_id)
-			draw_rect(tile_rect, Color("#f4f8ee") if high_contrast else outline, false, 2.0 if placement_enabled else 1.0)
+			if placement_overlay_enabled:
+				draw_rect(tile_rect, Color("#f4f8ee") if high_contrast else outline, false, 2.0)
 			var center := tile_rect.get_center()
-			if cell_id == hovered_world_cell_id and placement_enabled:
+			if cell_id == hovered_world_cell_id and placement_overlay_enabled:
 				_draw_placement_preview_corners(tile_rect.grow(-1.0), Color("#f4f8ee") if high_contrast else outline)
-			if placement_enabled:
+			if placement_overlay_enabled:
 				var status_text := Localization.text("tile.route.status.valid") if world_target_is_valid else Localization.text("tile.route.status.invalid")
 				var status_color := Color("#173c27") if world_target_is_valid else Color("#701f26")
 				var status_size := clampf(cell_size * 0.48, 8.0, 12.0)
@@ -660,7 +665,7 @@ func _draw_world_field(route_geometry: Dictionary) -> void:
 			var world_label_rect := Rect2(tile_rect.position + Vector2(1.0, tile_rect.size.y - label_height), Vector2(maxf(1.0, tile_rect.size.x - 2.0), label_height))
 			draw_rect(world_label_rect, Color("#f4f8ee") if high_contrast else Color("#071619", 0.88), true)
 			draw_string(ThemeDB.fallback_font, Vector2(world_label_rect.position.x, world_label_rect.end.y - 1.0), str(tile.get("short", Localization.text("route.tile.short"))), HORIZONTAL_ALIGNMENT_CENTER, world_label_rect.size.x, 6 if cell_size < 24.0 else 7, Color("#10191c") if high_contrast else Color("#f5f4e6"))
-			if cell_id == hovered_world_cell_id and placement_enabled:
+			if cell_id == hovered_world_cell_id and placement_overlay_enabled:
 				draw_rect(tile_rect.grow(2.0), Color("#ec8a7d"), false, 2.0)
 
 func _draw_discovery_status_hud(route_geometry: Dictionary) -> void:
@@ -700,14 +705,14 @@ func _draw_unknown_cell_fog(tile_rect: Rect2, coord: Vector2i, cell_size: float,
 		draw_line(origin + Vector2(cell_size * 0.22, cell_size * 0.24), origin + Vector2(cell_size * 0.39, cell_size * 0.41), color, pixel, true)
 	if mark % 3 == 1:
 		draw_rect(Rect2(origin + Vector2(cell_size * 0.62, cell_size * 0.65), Vector2(pixel * 1.8, pixel)), color, true)
-	if not placement_enabled and cell_size >= 13.0:
+	if not placement_overlay_enabled and cell_size >= 13.0:
 		var font_size := 6 if cell_size < 16.0 else (7 if cell_size < 24.0 else 10)
 		var glyph_color := Color("#eef7eb") if high_contrast else Color("#a3b6ac")
 		if emphasized:
 			glyph_color = Color("#ffffff") if high_contrast else Color("#d5e5da")
 		var center := tile_rect.get_center()
 		draw_string(ThemeDB.fallback_font, center + Vector2(-3.0, font_size * 0.36), "?", HORIZONTAL_ALIGNMENT_CENTER, 7.0, font_size, glyph_color)
-	elif placement_enabled and cell_size >= 20.0:
+	elif placement_overlay_enabled and cell_size >= 20.0:
 		draw_string(ThemeDB.fallback_font, origin + Vector2(2.0, 8.0), "?", HORIZONTAL_ALIGNMENT_LEFT, 7.0, 7, Color("#c8d6ce", 0.88))
 
 func _draw_placement_preview_corners(rect: Rect2, color: Color) -> void:

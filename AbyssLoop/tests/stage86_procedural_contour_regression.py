@@ -27,6 +27,14 @@ source_checks = {
     "new runs persist a dedicated geometry seed": 'route_geometry_seed = floor_seed' in manager and '"route_geometry_seed": route_geometry_seed' in manager,
     "legacy saved runs without the geometry seed preserve fixed contours": 'snapshot.get("route_geometry_seed", 0)' in manager,
     "map drawing and hit testing query the shared TileSystem contour": 'TileSystemScript.get_road_grid_coordinates_for_seed(route_shape_id, route_geometry_seed)' in view,
+    "build-grid contours appear only while a selected tile can be placed":
+        'placement_enabled = allow_placement and not tile_id.is_empty()' in view and
+        'placement_overlay_enabled = placement_enabled and placement_action_allowed' in view and
+        'if placement_overlay_enabled and roadside_lookup.has(coord_id):' in view and
+        'if placement_overlay_enabled:\\n\\t\\t\\t\\tdraw_rect(cell_rect, Color("#9bb59a", 0.10 + tone) if not high_contrast else Color("#e3f1dc", 0.36), false, 1.0)' in view and
+        'var variation_strength := 0.018 if not placement_overlay_enabled else 0.055' in view and
+        'var inset := maxf(2.0, cell_size * 0.08) if placement_overlay_enabled else 0.0' in view and
+        'if cell_id == hovered_world_cell_id and placement_overlay_enabled:' in view,
     "map cache key changes when geometry seed changes": 'var signature_parts: Array[String] = [route_shape_id, str(route_geometry_seed)]' in view,
     "live placement validation uses the same seeded contour as the renderer": 'can_place_world(route_cells, world_tiles, cell_id, placement_probe, route_shape_id, route_geometry_seed)' in view and 'get_route_geometry_seed())' in manager,
     "placement forecast receives the same geometry seed": 'get_world_placement_preview(manager.route, manager.world_tiles, cell_id, selected_tile, manager.equipment, manager.get_route_shape_id(), manager.get_route_geometry_seed())' in ui,
