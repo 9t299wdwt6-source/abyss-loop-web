@@ -1695,9 +1695,87 @@ func _build_tile_hand() -> void:
 		var tile_label := "%s%s\n%s" % [tile_short, zone_hint, str(tile.get("name", tile_definition.get("name", "Тайл")))]
 		var button := _button(tile_label, Callable(self, "_on_tile_selected").bind(i), selected)
 		button.custom_minimum_size = Vector2(148, 64)
-		button.tooltip_text = ("Размещение: только ландшафт. " if placement_zone == "landscape" else ("Размещение: только рядом с дорогой. " if placement_zone == "roadside" else ("Размещение: только дорога. " if placement_zone == "road" else ""))) + str(tile.get("description", ""))
+		var kind_label := _tile_kind_label(str(tile_definition.get("kind", "")))
+		button.tooltip_text = "Тип: %s\n%s%s" % [kind_label, ("Размещение: только ландшафт. " if placement_zone == "landscape" else ("Размещение: только рядом с дорогой. " if placement_zone == "roadside" else ("Размещение: только дорога. " if placement_zone == "road" else "Размещение: дорожная клетка или свободный ландшафт. "))), str(tile.get("description", ""))]
 		button.add_theme_font_size_override("font_size", 12)
+		_style_tile_hand_button(button, tile_definition, selected)
 		tile_hand_grid.add_child(button)
+
+
+func _tile_kind_label(kind: String) -> String:
+	match kind:
+		"economy": return "снабжение"
+		"danger": return "опасность"
+		"support": return "поддержка"
+		"control": return "контроль"
+		"rare": return "редкость"
+		"knowledge": return "знание"
+		_: return "особая карта"
+
+
+func _style_tile_hand_button(button: Button, tile_definition: Dictionary, selected: bool) -> void:
+	# Muted, category-specific cards communicate function without turning the hand
+	# into a wall of bright colors. Selection has one clear amber border.
+	var fill: Color
+	var category_edge: Color
+	match str(tile_definition.get("kind", "")):
+		"economy":
+			fill = Color("#302f27")
+			category_edge = Color("#827b54")
+		"danger":
+			fill = Color("#342b2a")
+			category_edge = Color("#8d6258")
+		"support":
+			fill = Color("#29352c")
+			category_edge = Color("#5d8060")
+		"control":
+			fill = Color("#293438")
+			category_edge = Color("#607d84")
+		"rare":
+			fill = Color("#302b37")
+			category_edge = Color("#817095")
+		"knowledge":
+			fill = Color("#2a3038")
+			category_edge = Color("#647c95")
+		_:
+			fill = Color("#293332")
+			category_edge = Color("#5b7465")
+	var high_contrast := bool(GameState.settings.get("high_contrast", false))
+	var border_color := Color("#f0f6ef") if high_contrast else (Color("#efc36b") if selected else category_edge)
+	if selected:
+		fill = fill.lerp(Color("#efc36b"), 0.10)
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = fill
+	normal.border_color = border_color
+	normal.set_border_width_all(3 if selected or high_contrast else 1)
+	normal.set_corner_radius_all(4)
+	normal.content_margin_left = 9.0
+	normal.content_margin_right = 8.0
+	normal.content_margin_top = 6.0
+	normal.content_margin_bottom = 6.0
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = fill.lerp(category_edge, 0.14)
+	if not selected and not high_contrast:
+		hover.border_color = category_edge.lerp(Color("#e2e8d2"), 0.25)
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = fill.lerp(Color("#071217"), 0.24)
+	var focus := normal.duplicate() as StyleBoxFlat
+	focus.border_color = Color("#f4f8ee") if high_contrast else Color("#fff2a8")
+	focus.set_border_width_all(3)
+	var disabled := normal.duplicate() as StyleBoxFlat
+	disabled.bg_color = fill.lerp(Color("#071217"), 0.42)
+	disabled.border_color = Color("#65716c") if high_contrast else category_edge.darkened(0.45)
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("focus", focus)
+	button.add_theme_stylebox_override("disabled", disabled)
+	button.add_theme_color_override("font_color", C_TEXT)
+	button.add_theme_color_override("font_hover_color", C_TEXT)
+	button.add_theme_color_override("font_pressed_color", C_TEXT)
+	button.add_theme_color_override("font_focus_color", C_TEXT)
+	button.add_theme_color_override("font_disabled_color", Color("#b0bbb4"))
 
 func _on_manager_changed() -> void:
 	_refresh_header()

@@ -111,6 +111,21 @@ func _run_acceptance() -> void:
 	ui.call("_sync_expedition_view", false)
 	_check(gear_panel != null and not gear_panel.visible, "equipment panel hides again when combat ends")
 
+	var tile_grid := ui.get("tile_hand_grid") as GridContainer
+	_check(tile_grid != null and tile_grid.get_child_count() >= 3, "tile hand renders as selectable category cards")
+	if tile_grid != null and tile_grid.get_child_count() > 0:
+		var first_card := tile_grid.get_child(0) as Button
+		var idle_card_style := first_card.get_theme_stylebox("normal") as StyleBoxFlat
+		_check(idle_card_style != null and idle_card_style.border_width_left == 1, "unselected tile cards use a restrained category border")
+		ui.call("_on_tile_selected", 0)
+		await get_tree().process_frame
+		tile_grid = ui.get("tile_hand_grid") as GridContainer
+		var selected_card := tile_grid.get_child(0) as Button if tile_grid != null and tile_grid.get_child_count() > 0 else null
+		var selected_card_style := selected_card.get_theme_stylebox("normal") as StyleBoxFlat if selected_card != null else null
+		_check(selected_card_style != null and selected_card_style.border_color == Color("#efc36b") and selected_card_style.border_width_left >= 2, "selected tile card gains a clear amber focus border")
+		ui.call("_on_tile_selected", 0)
+		await get_tree().process_frame
+
 	var hand_before: int = manager.tile_hand.size()
 	var invalid_road: Dictionary = manager.place_tile(0, 0)
 	_check(not bool(invalid_road.get("ok", false)), "placing a tile on the protected start node is rejected")
