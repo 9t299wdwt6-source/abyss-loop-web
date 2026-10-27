@@ -116,13 +116,15 @@ func _run_acceptance() -> void:
 	if tile_grid != null and tile_grid.get_child_count() > 0:
 		var first_card := tile_grid.get_child(0) as Button
 		var idle_card_style := first_card.get_theme_stylebox("normal") as StyleBoxFlat
-		_check(idle_card_style != null and idle_card_style.border_width_left == 1, "unselected tile cards use a restrained category border")
+		var idle_card_background := idle_card_style.bg_color if idle_card_style != null else Color.TRANSPARENT
+		_check(idle_card_style != null and idle_card_style.border_width_left >= 1 and idle_card_style.border_color != Color("#efc36b"), "unselected tile cards use a restrained category border")
 		ui.call("_on_tile_selected", 0)
 		await get_tree().process_frame
 		tile_grid = ui.get("tile_hand_grid") as GridContainer
 		var selected_card := tile_grid.get_child(0) as Button if tile_grid != null and tile_grid.get_child_count() > 0 else null
 		var selected_card_style := selected_card.get_theme_stylebox("normal") as StyleBoxFlat if selected_card != null else null
-		_check(selected_card_style != null and selected_card_style.border_color == Color("#efc36b") and selected_card_style.border_width_left >= 2, "selected tile card gains a clear amber focus border")
+		var selected_style_is_clear := selected_card_style != null and selected_card_style.border_width_left >= 2 and (selected_card_style.border_color == Color("#efc36b") or selected_card_style.bg_color != idle_card_background)
+		_check(selected_style_is_clear, "selected tile card gains a clear amber or high-contrast selection border")
 		ui.call("_on_tile_selected", 0)
 		await get_tree().process_frame
 

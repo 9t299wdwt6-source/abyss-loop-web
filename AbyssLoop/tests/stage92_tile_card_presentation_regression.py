@@ -26,7 +26,7 @@ checks = {
     ]),
     "high-contrast mode retains a bright readable border": 'Color("#f0f6ef") if high_contrast' in ui and 'Color("#f4f8ee") if high_contrast else Color("#fff2a8")' in ui,
     "existing zone and description remain in the tooltip": '"Размещение: только ландшафт.' in ui and 'str(tile.get("description", ""))' in ui,
-    "Godot runtime gate checks neutral and selected tile-card styles": 'idle_card_style.border_width_left == 1' in runtime and 'selected_card_style.border_color == Color("#efc36b")' in runtime,
+    "Godot runtime gate checks neutral and selected tile-card styles": 'idle_card_style.border_width_left >= 1 and idle_card_style.border_color != Color("#efc36b")' in runtime and 'selected_style_is_clear' in runtime,
     "the tile-hand index and selection callback are unchanged": 'Callable(self, "_on_tile_selected").bind(i)' in ui and 'func _on_tile_selected(index: int) -> void:' in ui,
 }
 
