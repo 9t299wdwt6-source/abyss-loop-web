@@ -291,7 +291,7 @@ func _capture_floor(campaign_seed: int, floor_number: int, armory_equips_before_
 		return {}
 	var source_run_id: String = str(summary.get("run_id", ""))
 	summary["source_run_id"] = source_run_id
-	summary["run_id"] = "qa-stage72-seed%d-floor%02d" % [campaign_seed, floor_number]
+	summary["run_id"] = "qa-stage72-%s-seed%d-floor%02d" % [capture_group, campaign_seed, floor_number]
 	summary["capture_kind"] = "automated_engine_run"
 	summary["capture_group"] = capture_group
 	summary["capture_building_upgrades_before_floor"] = investment_summary.get("building_upgrades", []).size()

@@ -68,7 +68,8 @@ checks = {
         'if not final_floor_cleared:' in capture and
         '"not_a_balance_verdict": true' in capture and
         '"not_human_playtest": true' in capture,
-    "report separates sequential campaign from isolated cold starts by scenario":
+    "paired campaigns use unique run IDs per scenario, and report stays separated from cold starts":
+        'summary["run_id"] = "qa-stage72-%s-seed%d-floor%02d" % [capture_group, campaign_seed, floor_number]' in capture and
         'capture_group = str(row.get("capture_group", "general"))' in analyzer and
         'row["capture_group"] = capture_group' in analyzer and
         'row["capture_group"]' in analyzer,
