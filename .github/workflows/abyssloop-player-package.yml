@@ -44,9 +44,9 @@ jobs:
           Это проект Godot, не самостоятельный EXE. Данная упаковка не является
           подтверждением ручного игрового теста и не включает экспорт Windows.
           EOF
-          (cd "$stage" && zip -qr "$RUNNER_TEMP/AbyssLoop.zip" AbyssLoop)
-          zip -T "$RUNNER_TEMP/AbyssLoop.zip"
-          python3 - "$RUNNER_TEMP/AbyssLoop.zip" <<'PY'
+          (cd "$stage" && zip -qr "$GITHUB_WORKSPACE/AbyssLoop.zip" AbyssLoop)
+          zip -T "$GITHUB_WORKSPACE/AbyssLoop.zip"
+          python3 - "$GITHUB_WORKSPACE/AbyssLoop.zip" <<'PY'
           import sys, zipfile
           path = sys.argv[1]
           with zipfile.ZipFile(path) as z:
@@ -60,12 +60,12 @@ jobs:
               assert not any(name.startswith("AbyssLoop/AbyssLoop/") for name in names), "Duplicated top-level folder"
               print(f"PACKAGE VALID: {len(names)} entries")
           PY
-          sha256sum "$RUNNER_TEMP/AbyssLoop.zip" | tee "$RUNNER_TEMP/AbyssLoop.zip.sha256"
+          sha256sum "$GITHUB_WORKSPACE/AbyssLoop.zip" | tee "$RUNNER_TEMP/AbyssLoop.zip.sha256"
 
       - name: Upload project ZIP for manual testing
         uses: actions/upload-artifact@v4
         with:
           name: AbyssLoop-manual-test-package
-          path: ${RUNNER_TEMP}/AbyssLoop.zip
+          path: AbyssLoop.zip
           if-no-files-found: error
           retention-days: 14
