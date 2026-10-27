@@ -256,6 +256,24 @@ func _update_content_scale() -> void:
 func _is_compact_layout() -> bool:
 	return get_viewport_rect().size.x < 900.0
 
+
+func _get_tile_hand_columns_for_width(viewport_width: float) -> int:
+	# Two cards fit on ordinary phone/tablet widths; very narrow canvases use one
+	# full-width column rather than clipping the right card beyond the panel.
+	return 1 if viewport_width < 360.0 else 2
+
+
+func _refresh_tile_hand_layout() -> void:
+	if tile_hand_grid == null or not is_instance_valid(tile_hand_grid):
+		return
+	var desired_columns := _get_tile_hand_columns_for_width(get_viewport_rect().size.x)
+	if tile_hand_grid.columns == desired_columns:
+		return
+	tile_hand_grid.columns = desired_columns
+	tile_hand_signature = ""
+	_sync_expedition_view(true)
+
+
 func _apply_responsive_shell() -> void:
 	var compact_layout := _is_compact_layout()
 	if is_instance_valid(shell):
@@ -302,6 +320,7 @@ func _on_viewport_size_changed() -> void:
 	_apply_responsive_shell()
 	var compact_layout := _is_compact_layout()
 	if compact_layout == _compact_layout_active:
+		_refresh_tile_hand_layout()
 		return
 	_compact_layout_active = compact_layout
 	# Rebuild only the content tree at a breakpoint transition. GameState and the
@@ -1385,7 +1404,7 @@ func _render_expedition() -> void:
 	tile_box.add_child(_label(_t("expedition.tiles.description"), 12, C_MUTED))
 	tile_box.add_child(route_hint_label)
 	tile_hand_grid = GridContainer.new()
-	tile_hand_grid.columns = 2
+	tile_hand_grid.columns = _get_tile_hand_columns_for_width(get_viewport_rect().size.x)
 	tile_hand_grid.add_theme_constant_override("h_separation", 6)
 	tile_hand_grid.add_theme_constant_override("v_separation", 6)
 	tile_box.add_child(tile_hand_grid)
@@ -1694,7 +1713,8 @@ func _build_tile_hand() -> void:
 		var zone_hint := " · ПОЛЕ" if placement_zone == "landscape" else (" · ПРИДОРОЖЬЕ" if placement_zone == "roadside" else (" · ДОРОГА" if placement_zone == "road" else ""))
 		var tile_label := "%s%s\n%s" % [tile_short, zone_hint, str(tile.get("name", tile_definition.get("name", "Тайл")))]
 		var button := _button(tile_label, Callable(self, "_on_tile_selected").bind(i), selected)
-		button.custom_minimum_size = Vector2(148, 64)
+		button.custom_minimum_size = Vector2(0 if tile_hand_grid.columns == 1 else 148, 64)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var kind_label := _tile_kind_label(str(tile_definition.get("kind", "")))
 		button.tooltip_text = "Тип: %s\n%s%s" % [kind_label, ("Размещение: только ландшафт. " if placement_zone == "landscape" else ("Размещение: только рядом с дорогой. " if placement_zone == "roadside" else ("Размещение: только дорога. " if placement_zone == "road" else "Размещение: дорожная клетка или свободный ландшафт. "))), str(tile.get("description", ""))]
 		button.add_theme_font_size_override("font_size", 12)

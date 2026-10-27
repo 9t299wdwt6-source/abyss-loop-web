@@ -128,6 +128,10 @@ func _run_acceptance() -> void:
 		ui.call("_on_tile_selected", 0)
 		await get_tree().process_frame
 
+	_check(int(ui.call("_get_tile_hand_columns_for_width", 320.0)) == 1, "very narrow screens use a single tile-card column")
+	_check(int(ui.call("_get_tile_hand_columns_for_width", 360.0)) == 2, "360-pixel screens retain the two-column tile-card hand")
+	_check(int(ui.call("_get_tile_hand_columns_for_width", 390.0)) == 2, "ordinary phone screens retain the two-column tile-card hand")
+
 	var hand_before: int = manager.tile_hand.size()
 	var invalid_road: Dictionary = manager.place_tile(0, 0)
 	_check(not bool(invalid_road.get("ok", false)), "placing a tile on the protected start node is rejected")
