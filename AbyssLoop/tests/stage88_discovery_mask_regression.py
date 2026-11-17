@@ -27,7 +27,7 @@ checks = {
     "no fog pass, unknown cell helper, discovery HUD, or question glyph remains": '_draw_unknown_cell_fog' not in view and '_draw_discovery_status_hud' not in view and '"?"' not in view and 'draw_discovery_status_hud' not in view,
     "landscape cell hover uses the normal empty-cell preview": 'tile.preview.empty.world' in ui and 'tile.preview.unknown.world' not in ui,
     "placement targets retain corner brackets and clear valid/invalid feedback": 'func _draw_placement_preview_corners(rect: Rect2, color: Color) -> void:' in view and 'tile.route.status.valid' in view and 'tile.route.status.invalid' in view,
-    "map cell IDs and geometry remain canonical and deterministic": 'TileSystemScript.map_world_cell_id(coord.x, coord.y)' in tile and 'get_road_grid_coordinates_for_seed(get_route_shape_id(), route_geometry_seed)' in manager,
+    "map cell IDs and geometry remain canonical and deterministic": 'static func map_world_cell_id(col: int, row: int) -> String:' in tile and 'func world_cell_coordinates(cell_id: String) -> Vector2i:' in tile and 'get_road_grid_coordinates_for_seed(get_route_shape_id(), route_geometry_seed)' in manager,
     "save schema continues accepting legacy masks and validates map IDs": 'if snapshot.has("discovered_world_cells"):' in save and 'discovery_value.size() > 232' in save and 'TileSystemScript.is_map_world_cell_id(discovery_key)' in save,
     "localization no longer promises exploration reveals hidden terrain": 'Неизведанная клетка' not in localization.get('tile.preview.unknown.world', '') and 'route.discovery.count' not in view,
 }
