@@ -1,45 +1,42 @@
 #!/usr/bin/env python3
-"""Stage 88 save-safe discovery mask source guards and independent map-mask shape tests.
+"""Stage88 compatibility guards updated for an always-visible landscape map.
 
-These tests validate source contracts and a numerical reference model; they do not
-compile GDScript or claim visual/runtime acceptance.
+These checks validate the persisted legacy field and the new presentation contract:
+the entire off-road area is visible immediately, without reveal radius, fog, or glyphs.
 """
 from __future__ import annotations
 from pathlib import Path
 import json
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 manager = (ROOT / "scripts/systems/expedition_manager.gd").read_text(encoding="utf-8")
 view = (ROOT / "scripts/ui/route_view.gd").read_text(encoding="utf-8")
 ui = (ROOT / "scripts/ui/ui_controller.gd").read_text(encoding="utf-8")
 save = (ROOT / "scripts/core/save_system.gd").read_text(encoding="utf-8")
+tile = (ROOT / "scripts/systems/tile_system.gd").read_text(encoding="utf-8")
 localization = json.loads((ROOT / "localization/strings_ru.json").read_text(encoding="utf-8"))
 
 checks = {
-    "expedition manager owns the persisted modern discovery mask": 'var discovered_world_cells: Dictionary = {}' in manager and '"discovered_world_cells": discovered_world_cells.duplicate(true)' in manager,
-    "new expeditions reveal a starting region and visits expand the mask": '_reveal_world_cells_near_route_index(0)' in manager and '_reveal_world_cells_near_route_index(index)' in manager,
-    "legacy snapshots without the new field default to a fully visible map": 'discovered_world_cells = _get_all_offroad_cells_discovered()' in manager and 'else:\n\t\tdiscovered_world_cells = _get_all_offroad_cells_discovered()' in manager,
-    "discovery normalization accepts only canonical m:col:row IDs": 'func _normalize_discovered_world_cells(value: Variant) -> Dictionary:' in manager and 'TileSystemScript.is_map_world_cell_id(cell_id)' in manager,
-    "reveal helper uses persisted route seed and excludes road cells": 'get_road_grid_coordinates_for_seed(get_route_shape_id(), route_geometry_seed)' in manager and 'road_lookup.has("%d:%d" % [col, row])' in manager,
-    "discovery mask keeps placement IDs unchanged and is saved with snapshots": 'discovered_world_cells[cell_id] = true' in manager and '"snapshot_version": 4' in manager,
-    "view accepts the mask and invalidates cached rendering when it changes": 'discovered_cells: Dictionary = {}' in view and 'str(discovered_cells.keys())' in view and 'discovered_world_cells = discovered_cells' in view,
-    "unknown cells are dimmed and visibly marked without a selected card": 'var is_discovered := discovered_world_cells.has(map_cell_id)' in view and '"#09161b", 0.98' in view and 'func _draw_unknown_cell_fog' in view and '"?"' in view,
-    "preview targets have corner brackets distinct from committed filled tiles": 'func _draw_placement_preview_corners(rect: Rect2, color: Color) -> void:' in view and '_draw_placement_preview_corners(tile_rect.grow(-1.0)' in view and 'draw_rect(tile_rect, fill, true)' in view,
-    "UI passes discovery state into RouteView": 'manager.get_route_geometry_seed(), manager.discovered_world_cells)' in ui,
-    "unknown cell hover explains exploration without blocking placement preview": 'tile.preview.unknown.world' in ui and 'Выбор и размещение карты по-прежнему доступны.' in localization.get('tile.preview.unknown.world', ''),
-    "save validator rejects malformed, oversized and road-overlapping masks": 'discovery_value.size() > 232' in save and 'TileSystemScript.is_map_world_cell_id(discovery_key)' in save and 'modern_road_coordinates.has(discovery_coord)' in save,
-    "discovery field remains optional for prior snapshot compatibility": 'if snapshot.has("discovered_world_cells"):' in save and 'discovered_world_cells = _get_all_offroad_cells_discovered()' in manager,
+    "expedition manager keeps the saved legacy map-visibility field": 'var discovered_world_cells: Dictionary = {}' in manager and '"discovered_world_cells": discovered_world_cells.duplicate(true)' in manager,
+    "new runs mark the complete off-road area visible before the first route step": '_reveal_world_cells_near_route_index(0)' in manager and 'discovered_world_cells = _get_all_offroad_cells_discovered()' in manager,
+    "the legacy reveal call no longer applies a walking-radius mask": 'func _reveal_world_cells_near_route_index(_route_index: int) -> void:' in manager and 'absi(col - pivot.x) + absi(row - pivot.y) > 3' not in manager,
+    "resume ignores partial legacy discovery masks and restores full landscape visibility": 'discovered_world_cells = _get_all_offroad_cells_discovered()' in manager and 'discovered_world_cells = _normalize_discovered_world_cells(snapshot.get("discovered_world_cells", {}))' not in manager,
+    "the full off-road map is exactly 232 valid map cells": 'func _get_all_offroad_cells_discovered() -> Dictionary:' in manager and 'TileSystemScript.map_world_cell_id(col, row)' in manager,
+    "route view draws terrain directly without discovery gating": 'var terrain_colors: Array[Color]' in view and 'if not is_discovered:' not in view and 'var is_discovered :=' not in view,
+    "no fog pass, unknown cell helper, discovery HUD, or question glyph remains": '_draw_unknown_cell_fog' not in view and '_draw_discovery_status_hud' not in view and '"?"' not in view and 'draw_discovery_status_hud' not in view,
+    "landscape cell hover uses the normal empty-cell preview": 'tile.preview.empty.world' in ui and 'tile.preview.unknown.world' not in ui,
+    "placement targets retain corner brackets and clear valid/invalid feedback": 'func _draw_placement_preview_corners(rect: Rect2, color: Color) -> void:' in view and 'tile.route.status.valid' in view and 'tile.route.status.invalid' in view,
+    "map cell IDs and geometry remain canonical and deterministic": 'TileSystemScript.map_world_cell_id(coord.x, coord.y)' in tile and 'get_road_grid_coordinates_for_seed(get_route_shape_id(), route_geometry_seed)' in manager,
+    "save schema continues accepting legacy masks and validates map IDs": 'if snapshot.has("discovered_world_cells"):' in save and 'discovery_value.size() > 232' in save and 'TileSystemScript.is_map_world_cell_id(discovery_key)' in save,
+    "localization no longer promises exploration reveals hidden terrain": 'Неизведанная клетка' not in localization.get('tile.preview.unknown.world', '') and 'route.discovery.count' not in view,
 }
+failed = [name for name, ok in checks.items() if not ok]
+for name, ok in checks.items():
+    print(f"{'PASS' if ok else 'FAIL'}: {name}")
 
-failures = []
-for name, passed in checks.items():
-    print(f"{'PASS' if passed else 'FAIL'}: {name}")
-    if not passed:
-        failures.append(name)
-
-# Numerical reference model: reveal Manhattan-radius 3 around a road cell, never
-# marking road cells as landscape. A rectangular route is used only as an independent
-# oracle for mask bounds; the actual seeded contour is validated in the Stage 86 test.
+# Independent geometry oracle: every off-road cell is visible immediately for
+# each of the current 34-cell closed routes, and no road cell is counted as terrain.
 MAP_W, MAP_H = 19, 14
 
 def perimeter(left: int, top: int, width: int, height: int) -> list[tuple[int, int]]:
@@ -50,20 +47,17 @@ def perimeter(left: int, top: int, width: int, height: int) -> list[tuple[int, i
     cells += [(left, y) for y in range(bottom - 1, top, -1)]
     return cells
 
-numeric_scenarios = 0
+scenarios = 0
 for left, top, width, height in [(4, 3, 11, 8), (5, 2, 9, 10), (4, 2, 10, 9), (3, 4, 13, 6)]:
     road = set(perimeter(left, top, width, height))
     assert len(road) == 34
-    assert all(0 <= x < MAP_W and 0 <= y < MAP_H for x, y in road)
-    for pivot in (perimeter(left, top, width, height)[0], perimeter(left, top, width, height)[len(road)//2]):
-        mask = {(x, y) for y in range(MAP_H) for x in range(MAP_W)
-                if (x, y) not in road and abs(x-pivot[0]) + abs(y-pivot[1]) <= 3}
-        assert len(mask) <= 232
-        assert not (mask & road)
-        assert all(0 <= x < MAP_W and 0 <= y < MAP_H for x, y in mask)
-        numeric_scenarios += 1
-print(f"PASS: independent discovery-mask model covers {numeric_scenarios} seed/route samples without marking road cells")
-if failures:
-    raise SystemExit(1)
-print(f"STAGE 88 DISCOVERY MASK REGRESSION PASSED: {len(checks)} source guards + {numeric_scenarios} reference scenarios")
-print("Source and numerical tests only; Godot runtime and browser rendering remain unconfirmed.")
+    visible = {(x, y) for y in range(MAP_H) for x in range(MAP_W) if (x, y) not in road}
+    assert len(visible) == 232
+    assert not (visible & road)
+    assert len(visible | road) == MAP_W * MAP_H
+    scenarios += 1
+print(f"PASS: full terrain visibility covers all 232 off-road cells in {scenarios} route profiles")
+if failed:
+    raise SystemExit("STAGE88 ALWAYS-VISIBLE MAP REGRESSION FAILED: " + "; ".join(failed))
+print(f"STAGE88 ALWAYS-VISIBLE MAP REGRESSION PASSED: {len(checks)} source guards + {scenarios} geometry scenarios")
+print("Source and numerical tests only; Godot/browser screenshots validate visual readability separately.")
