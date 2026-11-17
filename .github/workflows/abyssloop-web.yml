@@ -3,7 +3,7 @@ name: Abyss Loop Web Export and Browser QA
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, stage-92-eight-floor-progression]
     paths:
       - '.github/workflows/**'
       - 'AbyssLoop_Prototype61_Stage68C_Web_Export_Pipeline.zip'
