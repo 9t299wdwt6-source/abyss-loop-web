@@ -651,15 +651,23 @@ func migrate_expedition_snapshot(snapshot: Dictionary) -> Dictionary:
 					migrated_encounters[index] = _normalize_status_entity(migrated_encounters[index])
 			migrated_v3["encounter_enemies"] = migrated_encounters
 		migrated_v3["status_schema"] = 1
-		migrated_v3["floor_id"] = clampi(int(migrated_v3.get("floor_id", 1)), 1, ContentRegistry.ABYSS_FLOOR_COUNT)
-		migrated_v3["floor_choice_pending"] = bool(migrated_v3.get("floor_choice_pending", false))
+		if not migrated_v3.has("floor_id"):
+			migrated_v3["floor_id"] = 1
+		if not migrated_v3.has("floor_choice_pending"):
+			migrated_v3["floor_choice_pending"] = false
+		if not migrated_v3.has("boss_defeated_encounter"):
+			migrated_v3["boss_defeated_encounter"] = false
 		migrated_v3["snapshot_version"] = 4
 		_normalize_boss_phase_snapshot(migrated_v3)
 		return migrated_v3 if _validate_expedition_snapshot(migrated_v3) else {}
 	if version == 4:
 		var current := snapshot.duplicate(true)
-		current["floor_id"] = clampi(int(current.get("floor_id", 1)), 1, ContentRegistry.ABYSS_FLOOR_COUNT)
-		current["floor_choice_pending"] = bool(current.get("floor_choice_pending", false))
+		if not current.has("floor_id"):
+			current["floor_id"] = 1
+		if not current.has("floor_choice_pending"):
+			current["floor_choice_pending"] = false
+		if not current.has("boss_defeated_encounter"):
+			current["boss_defeated_encounter"] = false
 		_normalize_boss_phase_snapshot(current)
 		return current if _validate_expedition_snapshot(current) else {}
 	return {}
@@ -713,6 +721,8 @@ func _validate_expedition_snapshot(snapshot: Dictionary) -> bool:
 		if not _is_non_negative_integer(floor_id_value) or int(floor_id_value) < 1 or int(floor_id_value) > ContentRegistry.ABYSS_FLOOR_COUNT:
 			return false
 	if snapshot.has("floor_choice_pending") and typeof(snapshot.get("floor_choice_pending", null)) != TYPE_BOOL:
+		return false
+	if snapshot.has("boss_defeated_encounter") and typeof(snapshot.get("boss_defeated_encounter", null)) != TYPE_BOOL:
 		return false
 	# Inventory ordering is additive. Older snapshots remain accepted and are migrated
 	# by ExpeditionManager; malformed explicit versions are rejected.
