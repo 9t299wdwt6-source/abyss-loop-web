@@ -1,47 +1,51 @@
 #!/usr/bin/env python3
-"""Stage 90 source contracts and numerical layout checks for discovery-map readability."""
+"""Stage90 readability guards for the always-visible terrain presentation."""
 from __future__ import annotations
 import json
 from pathlib import Path
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 view = (ROOT / "scripts/ui/route_view.gd").read_text(encoding="utf-8")
+ui = (ROOT / "scripts/ui/ui_controller.gd").read_text(encoding="utf-8")
 localization = json.loads((ROOT / "localization/strings_ru.json").read_text(encoding="utf-8"))
 tile = (ROOT / "scripts/systems/tile_system.gd").read_text(encoding="utf-8")
+manager = (ROOT / "scripts/systems/expedition_manager.gd").read_text(encoding="utf-8")
 
 checks = {
-    "short header is selected for compact widths": 'size.x < 680.0' in view and 'Localization.text("route.header.compact")' in view,
-    "discovery counter is drawn from RouteView redraw": '_draw_discovery_status_hud(route_geometry)' in view and 'func _draw_discovery_status_hud(route_geometry: Dictionary)' in view,
-    "discovery count validates modern IDs and excludes current road cells": 'TileSystemScript.is_map_world_cell_id(cell_id)' in view and 'not road_lookup.has("%d:%d" % [coord.x, coord.y])' in view,
-    "discovery counter has RU localized format": localization.get('route.discovery.count') == 'РАЗВЕДАНО %d/%d',
-    "compact route title has RU localization": localization.get('route.header.compact') == 'МАРШРУТ · %d',
-    "unknown terrain gets a dedicated fog pass": 'func _draw_unknown_cell_fog(tile_rect: Rect2, coord: Vector2i, cell_size: float, emphasized: bool) -> void:' in view and '_draw_unknown_cell_fog(tile_rect, coord, cell_size, cell_id == hovered_world_cell_id)' in view,
-    "unknown state is marked at small but usable map-cell sizes": 'var font_size := 6 if cell_size < 16.0 else (7 if cell_size < 24.0 else 10)' in view and 'if not placement_enabled and cell_size >= 13.0:' in view,
-    "placement validity badge scales with cell size": 'var status_size := clampf(cell_size * 0.48, 8.0, 12.0)' in view and 'var compact_status := ("+" if world_target_is_valid else "X") if cell_size < 20.0 else status_text' in view,
-    "high contrast uses a distinct fog and status outline": 'Color("#eef7eb", 0.62)' in view and 'Color("#f4f8ee", 0.95)' in view,
-    "tile IDs and cell geometry remain driven by TileSystem": 'TileSystemScript.map_world_cell_id(coord.x, coord.y)' in view and 'TileSystemScript.world_cell_coordinates(cell_id)' in view and 'static func is_map_world_cell_id(cell_id: String) -> bool:' in tile,
+    "compact route header remains selected for narrow widths": 'size.x < 680.0' in view and 'Localization.text("route.header.compact")' in view,
+    "landscape is rendered as visible terrain cells from the first frame": 'var terrain_colors: Array[Color]' in view and 'draw_rect(tile_rect, base, true)' in view,
+    "terrain palette stays translucent over the illustrated background": 'Color("#45634d", 0.24)' in view and 'Color("#536d4b", 0.22)' in view,
+    "discovery count HUD is removed": '_draw_discovery_status_hud' not in view and 'route.discovery.count' not in view,
+    "fog marks and unknown glyphs are removed from the canvas": '_draw_unknown_cell_fog' not in view and '"?"' not in view and '"#09161b", 0.98' not in view,
+    "empty landscape hover no longer offers an explore-to-reveal state": 'tile.preview.unknown.world' not in ui and 'tile.preview.empty.world' in ui,
+    "new and resumed runs always initialize all off-road cells as visible": 'discovered_world_cells = _get_all_offroad_cells_discovered()' in manager and 'absi(col - pivot.x) + absi(row - pivot.y) > 3' not in manager,
+    "placement preview retains valid/invalid colour cues and compact badges": 'var compact_status := ("+" if world_target_is_valid else "X")' in view and 'tile.route.status.valid' in view and 'tile.route.status.invalid' in view,
+    "high contrast still strengthens terrain outlines": 'outline = Color("#f4f8ee", 0.96)' in view and 'Color("#f4f8ee") if high_contrast else outline' in view,
+    "pixel terrain symbols and committed placed tiles remain distinct": 'func _draw_pixel_symbol' in view and 'draw_rect(tile_rect, fill, true)' in view and 'world_tiles.get(cell_id, {})' in view,
+    "map cell identifiers and road exclusion remain stable": 'TileSystemScript.map_world_cell_id(coord.x, coord.y)' in view and 'get_road_grid_coordinates_for_seed(get_route_shape_id(), route_geometry_seed)' in manager,
+    "Russian unknown-role label and map previews contain no question punctuation": 'РОЛЬ?' not in localization.get('enemy.role.unknown', '') and '?' not in localization.get('tile.preview.empty.world', ''),
 }
 for label, ok in checks.items():
     print(f"{'PASS' if ok else 'FAIL'}: {label}")
 failures = [label for label, ok in checks.items() if not ok]
 
-# Independent layout model: the discovery pill is placed in reserved footer space,
-# inside the canvas, at desktop, tablet, and phone sizes.
-viewports = [(300, 350), (390, 844), (620, 420), (1440, 900), (1920, 1080)]
+# Independent readability model for the 19x14 board at desktop, tablet and phone sizes.
+viewports = [(300, 350), (390, 844), (620, 420), (900, 600), (1280, 800), (1440, 900)]
 for width, height in viewports:
     usable_w = max(1.0, width - 28.0)
     usable_h = max(1.0, height - 64.0)
-    cell_size = max(1.0, min(usable_w / 19.0, usable_h / 14.0))
-    map_h = 14.0 * cell_size
-    map_bottom = (height + map_h) * 0.5
-    pill_w = min(148.0, max(112.0, width - 24.0))
-    pill_x = width - pill_w - 12.0
-    pill_y = 9.0
-    assert pill_x >= 0 and pill_x + pill_w <= width - 12.0, (width, height, pill_x, pill_w)
-    assert pill_y + 18.0 < map_bottom, (width, height, pill_y, map_bottom)
-    assert pill_y + 18.0 <= 27.0, (width, height, pill_y)
-print(f"PASS: discovery HUD fits reserved map/footer boundary in {len(viewports)} target viewports")
+    cell_size = min(usable_w / 19.0, usable_h / 14.0)
+    assert cell_size > 0
+    map_width, map_height = 19.0 * cell_size, 14.0 * cell_size
+    left, top = (width - map_width) * 0.5, (height - map_height) * 0.5
+    assert left >= 0 and top >= 0
+    assert left + map_width <= width and top + map_height <= height
+    # A terrain cell must retain a visible surface, while remaining large enough
+    # to hit-test independently of the road and the rest of the UI.
+    assert cell_size >= 10.0, (width, height, cell_size)
+print(f"PASS: full-board terrain geometry remains inside {len(viewports)} supported viewport models")
 if failures:
-    raise SystemExit("Stage 90 discovery readability regression failed: " + "; ".join(failures))
-print(f"STAGE 90 DISCOVERY READABILITY REGRESSION PASSED: {len(checks)}/{len(checks)} source contracts + {len(viewports)} viewport scenarios")
-print("Static/source and layout-reference checks only; Godot runtime/browser rendering are not implied.")
+    raise SystemExit("STAGE90 ALWAYS-VISIBLE MAP REGRESSION FAILED: " + "; ".join(failures))
+print(f"STAGE90 ALWAYS-VISIBLE MAP REGRESSION PASSED: {len(checks)}/{len(checks)} source guards + {len(viewports)} viewport scenarios")
+print("Source and layout reference tests only; browser/Godot screenshot acceptance remains required.")
