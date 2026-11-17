@@ -23,7 +23,7 @@ checks = {
     "placement preview retains valid/invalid colour cues and compact badges": 'var compact_status := ("+" if world_target_is_valid else "X")' in view and 'tile.route.status.valid' in view and 'tile.route.status.invalid' in view,
     "high contrast still strengthens terrain outlines": 'outline = Color("#f4f8ee", 0.96)' in view and 'Color("#f4f8ee") if high_contrast else outline' in view,
     "pixel terrain symbols and committed placed tiles remain distinct": 'func _draw_pixel_symbol' in view and 'draw_rect(tile_rect, fill, true)' in view and 'world_tiles.get(cell_id, {})' in view,
-    "map cell identifiers and road exclusion remain stable": 'TileSystemScript.map_world_cell_id(coord.x, coord.y)' in view and 'get_road_grid_coordinates_for_seed(get_route_shape_id(), route_geometry_seed)' in manager,
+    "map cell identifiers and road exclusion remain stable": 'for cell_id_value in display_map.keys()' in view and 'var coord: Vector2i = display_map[cell_id]' in view and 'static func map_world_cell_id(col: int, row: int) -> String:' in tile and 'get_road_grid_coordinates_for_seed(get_route_shape_id(), route_geometry_seed)' in manager,
     "Russian unknown-role label and map previews contain no question punctuation": 'РОЛЬ?' not in localization.get('enemy.role.unknown', '') and '?' not in localization.get('tile.preview.empty.world', ''),
 }
 for label, ok in checks.items():

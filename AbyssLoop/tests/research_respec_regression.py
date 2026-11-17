@@ -20,7 +20,7 @@ checks = {
     "purchase history is included in persisted data": '"research_investments": research_investments.duplicate(true)' in state,
     "legacy saves remain valid without purchase ledger and investment fields are validated": 'data.get("research_investments", {})' in save and 'investments_value.size() > 256' in save and 'SAVE_VERSION := 3' in save,
     "unknown IDs are preserved and aliases support stable-ID migrations": 'Keep stable IDs even if a content definition is temporarily absent' in state and 'BASE_RESEARCH_ID_ALIASES := {}' in (ROOT / "scripts/core/content_registry.gd").read_text(encoding="utf-8") and 'canonical_research_id(node_id)' in state and 'resolves to unknown/cyclic target' in (ROOT / "scripts/core/content_registry.gd").read_text(encoding="utf-8"),
-    "research UI exposes reset, shows costs and requires explicit confirmation": all(token in ui for token in ('ПЕРЕРАСПРЕДЕЛИТЬ ИССЛЕДОВАНИЯ · ВЕРНУТЬ 80%', 'func _request_research_reset()', 'func _confirm_research_reset()', 'Перераспределить дерево исследований?', 'Вернётся (80%%, округление вниз)', '"confirm"')),
+    "research UI exposes reset, shows costs and requires explicit confirmation": all(token in ui for token in ('ПЕРЕРАСПРЕДЕЛИТЬ ИССЛЕДОВАНИЯ · ВЕРНУТЬ 80%', 'func _request_research_reset()', 'func _confirm_research_reset()', 'Перераспределить дерево исследований', 'Вернётся (80%%, округление вниз)', '"confirm"')),
 }
 
 # Check the documented integer refund policy with representative values, including flooring.

@@ -706,7 +706,7 @@ func _draw_world_field(route_geometry: Dictionary) -> void:
 		var tile_rect := cell_rect.grow(-inset)
 		var tile: Dictionary = world_tiles.get(cell_id, {})
 		if tile.is_empty():
-			var placement_probe := {"id": selected_tile_id} if not selected_tile_id.is_empty() else {}
+			var placement_probe: Dictionary = {"id": selected_tile_id} if not selected_tile_id.is_empty() else {}
 			var world_check: Dictionary = _placement_rules.can_place_world(route_cells, world_tiles, cell_id, placement_probe, route_shape_id, route_geometry_seed) if placement_enabled else {"ok": true}
 			var world_target_is_valid := placement_enabled and placement_action_allowed and bool(world_check.get("ok", false))
 			# The full terrain is visible on the first frame. Softly tinted square cells
@@ -726,7 +726,7 @@ func _draw_world_field(route_geometry: Dictionary) -> void:
 				outline = Color("#ed9d91", 0.88)
 			if cell_id == hovered_world_cell_id:
 				if placement_enabled and not world_target_is_valid:
-					base = Color("#c96562", 0.48)
+					base = Color("#c96562", 0.42)
 					outline = Color("#ed9d91", 1.0)
 				else:
 					base = Color("#a5d98b", 0.50)

@@ -16,7 +16,7 @@ checks = {
     "floor card samples invoke production TileSystem with a separate deterministic RNG": "manager.tile_system.draw_tile(sample_rng, false, [], floor_id)" in capture and "floor_card_pool_hits" in capture,
     "capture never forces hero or enemy stats": all(token not in capture for token in ['manager.hero["hp"] =', 'manager.enemy["hp"] =', 'fighter["hp"] =', 'fighter["attack"] =']),
     "rows retain floor identity and automated source label": 'summary["floor_id"] = floor_id' in capture and 'summary["floor_name"]' in capture and 'summary["capture_kind"] = "automated_engine_run"' in capture,
-    "all 24 cases must produce valid summaries or fail": "FLOOR_IDS.size() * FIXED_SEEDS.size()" in capture and "MAX_SIMULATION_STEPS" in capture and "get_tree().quit(1)" in capture,
+    "all 24 cases must produce valid summaries or fail": "_run_floor_ids.size() * FIXED_SEEDS.size()" in capture and "MAX_SIMULATION_STEPS" in capture and "get_tree().quit(1)" in capture,
     "runner scene launches the Stage92 capture script": 'path="res://tests/stage92_floor_progression_capture.gd"' in scene,
     "CI runs the Stage92 matrix and writes the floor report": "Capture Stage92 eight-floor progression engine matrix" in workflow and "stage92_floor_progression_capture_runner.tscn" in workflow and "floor_progression_report.py" in workflow and "STAGE92_FLOOR_PROGRESSION.json" in workflow,
     "legacy difficulty/contract matrix capture steps are no longer used": "Capture Stage71 difficulty/mode balance matrix and contract coverage" not in workflow and "Capture Stage71 real-engine balance matrix" not in workflow,

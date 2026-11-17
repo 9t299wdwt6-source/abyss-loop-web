@@ -18,7 +18,7 @@ roles = {
     "support": "ПОДД.",
     "hunter": "ОХОТ.",
     "boss": "БОСС",
-    "unknown": "РОЛЬ?",
+    "unknown": "НЕИЗВЕСТНАЯ РОЛЬ",
 }
 checks = {
     "all enemy role labels are localized and non-empty": all(catalog.get(f"enemy.role.{key}") == value for key, value in roles.items()),

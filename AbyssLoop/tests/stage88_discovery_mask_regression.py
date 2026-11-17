@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage88 compatibility guards updated for an always-visible landscape map.
+"""Stage88 save-safe compatibility guards for an always-visible landscape map.
 
 These checks validate the persisted legacy field and the new presentation contract:
 the entire off-road area is visible immediately, without reveal radius, fog, or glyphs.

@@ -17,7 +17,7 @@ checks = {
     "prepared run records actual loadout rarity, rank, archetype and power": all(token in capture for token in ['"rarity": str(item.get("rarity"', '"rank": int(item.get("rank"', '"archetype": str(item.get("archetype"', '"capture_equipment_power"']),
     "prepared output is separate from clean-start floor capture": "STAGE92_PREPARED_FLOOR_PROGRESSION.json" in capture and "STAGE92_FLOOR_PROGRESSION.json" in capture,
     "comparison report validates six slots on each prepared high-floor run": 'set(loadout) != {"weapon", "helmet", "armor", "shield", "amulet", "core"}' in reporter and '"capture_loadout_completed_slots"' in reporter,
-    "report compares clean and prepared outcomes without claiming final balance": '"Возвраты без экипировки"' in reporter and '"Возвраты с экипировкой"' in reporter and "не даёт статистически окончательного вердикта" in reporter,
+    "report compares clean and prepared outcomes without claiming final balance": 'Возвраты без экипировки' in reporter and 'Возвраты с экипировкой' in reporter and "не даёт статистически окончательного вердикта" in reporter,
     "CI runs the prepared sample and generates its comparison report": "Capture Stage92 prepared high-floor loadout matrix" in workflow and "stage92_prepared_floor_progression_runner.tscn" in workflow and "geared_floor_progression_report.py" in workflow,
 }
 failed = [name for name, passed in checks.items() if not passed]
