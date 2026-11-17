@@ -2226,6 +2226,7 @@ func _show_modal(title_text: String, body_text: String, buttons: Array, kind: St
 			var item_visual: Dictionary = item_visual_value
 			if not str(item_visual.get("slot", "")).is_empty():
 				button.icon = _create_equipment_slot_icon(item_visual)
+				button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 				button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
 				button.icon_max_width = 32
 				button.alignment = HORIZONTAL_ALIGNMENT_LEFT
