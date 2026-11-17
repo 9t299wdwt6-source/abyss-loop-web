@@ -43,6 +43,7 @@ var difficulty_id: String = "standard" # Legacy save field; floor_id now drives 
 var floor_id: int = 1
 var pending_floor_choice: bool = false
 var pending_floor_transition_id: int = 0
+var boss_defeated_encounter: bool = false
 var run_modifier_id: String = "standard"
 var expedition_mode_id: String = "standard"
 var run_challenge: Dictionary = {}
@@ -139,6 +140,7 @@ func start_run(requested_difficulty_id: String = "standard", requested_seed: int
 	floor_id = clampi(requested_floor_id, 1, ContentRegistry.ABYSS_FLOOR_COUNT)
 	pending_floor_choice = false
 	pending_floor_transition_id = 0
+	boss_defeated_encounter = false
 	run_modifier_id = requested_modifier_id if ContentRegistry.RUN_MODIFIERS.has(requested_modifier_id) else "standard"
 	expedition_mode_id = requested_mode_id if ContentRegistry.EXPEDITION_MODES.has(requested_mode_id) else "standard"
 	var modifier_definition: Dictionary = ContentRegistry.RUN_MODIFIERS.get(run_modifier_id, ContentRegistry.RUN_MODIFIERS["standard"])
@@ -528,6 +530,7 @@ func export_run_state() -> Dictionary:
 		"difficulty_id": difficulty_id,
 		"floor_id": floor_id,
 		"floor_choice_pending": pending_floor_choice,
+		"boss_defeated_encounter": boss_defeated_encounter,
 		"run_modifier_id": run_modifier_id,
 		"expedition_mode_id": expedition_mode_id,
 		"run_challenge": run_challenge.duplicate(true),
@@ -606,6 +609,7 @@ func restore_saved_run() -> bool:
 	if not GameState.is_abyss_floor_unlocked(floor_id):
 		return false
 	pending_floor_choice = bool(snapshot.get("floor_choice_pending", false))
+	boss_defeated_encounter = bool(snapshot.get("boss_defeated_encounter", false))
 	difficulty_id = "standard"
 	run_modifier_id = str(snapshot.get("run_modifier_id", "standard"))
 	if not ContentRegistry.RUN_MODIFIERS.has(run_modifier_id):
@@ -1764,6 +1768,10 @@ func _on_victory() -> void:
 		_request_feedback("loot", str(item.get("name", "Предмет найден")))
 	else:
 		_log("Предмет не выпал: шанс экипировки для этой победы составлял %d%%. Шанс редкости не бросался, поскольку предмета нет." % int(round(item_chance * 100.0)))
+	# A boss may have escorts on deeper floors. Remember the boss kill until the
+	# entire encounter is cleared; a save/reload mid-escort must not open the choice.
+	if is_boss:
+		boss_defeated_encounter = true
 	# Remove only the focused target. Remaining members keep their attack timers
 	# and continue the same battle; no extra rewards are granted for the target swap.
 	if not encounter_enemies.is_empty():
@@ -1777,8 +1785,9 @@ func _on_victory() -> void:
 		combat_cell = -1
 		combat_reward_bonus = 0.0
 		current_tile_spawn_bonus = 0.0
-		if is_boss:
+		if boss_defeated_encounter:
 			pending_floor_choice = true
+			boss_defeated_encounter = false
 			paused = true
 			if floor_id < ContentRegistry.ABYSS_FLOOR_COUNT:
 				if GameState.unlock_abyss_floor(floor_id + 1):
@@ -2216,6 +2225,11 @@ func resolve_floor_choice(choice_id: String) -> Dictionary:
 			pending_floor_transition_id = next_floor
 			pending_floor_choice = false
 			_finish_run("return")
+			if active:
+				pending_floor_choice = true
+				paused = true
+				changed.emit()
+				return {"ok": false, "reason": "Итог не удалось сохранить. Выбор оставлен открытым; повторите спуск после проверки места для сохранения."}
 			return {"ok": true, "reason": "Добыча сохранена; начинается переход на следующий этаж.", "next_floor_id": next_floor}
 		"return":
 			pending_floor_choice = false
