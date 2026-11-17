@@ -392,6 +392,10 @@ func _validate_save_data(data: Dictionary) -> bool:
 			return false
 	if data.has("echo_dust") and int(data.get("echo_dust", 0)) > 1000000:
 		return false
+	if data.has("highest_unlocked_floor"):
+		var highest_floor_value: Variant = data.get("highest_unlocked_floor", null)
+		if not _is_non_negative_integer(highest_floor_value) or int(highest_floor_value) < 1 or int(highest_floor_value) > ContentRegistry.ABYSS_FLOOR_COUNT:
+			return false
 	var settled_ids_value: Variant = data.get("settled_expedition_ids", [])
 	if typeof(settled_ids_value) != TYPE_ARRAY or settled_ids_value.size() > 1000:
 		return false
@@ -647,11 +651,15 @@ func migrate_expedition_snapshot(snapshot: Dictionary) -> Dictionary:
 					migrated_encounters[index] = _normalize_status_entity(migrated_encounters[index])
 			migrated_v3["encounter_enemies"] = migrated_encounters
 		migrated_v3["status_schema"] = 1
+		migrated_v3["floor_id"] = clampi(int(migrated_v3.get("floor_id", 1)), 1, ContentRegistry.ABYSS_FLOOR_COUNT)
+		migrated_v3["floor_choice_pending"] = bool(migrated_v3.get("floor_choice_pending", false))
 		migrated_v3["snapshot_version"] = 4
 		_normalize_boss_phase_snapshot(migrated_v3)
 		return migrated_v3 if _validate_expedition_snapshot(migrated_v3) else {}
 	if version == 4:
 		var current := snapshot.duplicate(true)
+		current["floor_id"] = clampi(int(current.get("floor_id", 1)), 1, ContentRegistry.ABYSS_FLOOR_COUNT)
+		current["floor_choice_pending"] = bool(current.get("floor_choice_pending", false))
 		_normalize_boss_phase_snapshot(current)
 		return current if _validate_expedition_snapshot(current) else {}
 	return {}
@@ -699,6 +707,12 @@ func _validate_trophy_counts(value: Variant, max_count: int = 1000000) -> bool:
 func _validate_expedition_snapshot(snapshot: Dictionary) -> bool:
 	var snapshot_version := int(snapshot.get("snapshot_version", -1))
 	if not [1, 2, 3, 4].has(snapshot_version):
+		return false
+	if snapshot.has("floor_id"):
+		var floor_id_value: Variant = snapshot.get("floor_id", null)
+		if not _is_non_negative_integer(floor_id_value) or int(floor_id_value) < 1 or int(floor_id_value) > ContentRegistry.ABYSS_FLOOR_COUNT:
+			return false
+	if snapshot.has("floor_choice_pending") and typeof(snapshot.get("floor_choice_pending", null)) != TYPE_BOOL:
 		return false
 	# Inventory ordering is additive. Older snapshots remain accepted and are migrated
 	# by ExpeditionManager; malformed explicit versions are rejected.
