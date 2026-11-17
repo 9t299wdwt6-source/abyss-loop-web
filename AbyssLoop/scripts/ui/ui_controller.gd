@@ -1187,7 +1187,7 @@ func _refresh_modifier_preview() -> void:
 	preview += "\nРЕЖИМ: %s — %s" % [str(mode.get("name", "Обычная экспедиция")), str(mode.get("description", ""))]
 	if selected_expedition_mode_id == "long_expedition":
 		preview += " Цель: 12 циклов и победа над боссом цикла 12. Максимальная опасность ×%.1f; награда за цикл ограничена множителем ×%.2f. Контрольные точки 3/6/9/12." % [float(mode.get("max_danger", 6.0)), float(mode.get("reward_multiplier_cap", 1.8))]
-	preview += " Рейтинг испытания ×%.2f." % float(difficulty.get("challenge_score_multiplier", 1.0))
+	preview += " Множитель рейтинга этажа ×%.2f." % float(floor_definition.get("challenge_score_multiplier", 1.0))
 	preview += "\n%s — %s" % [str(modifier.get("name", "Обычная экспедиция")), str(modifier.get("description", ""))]
 	var challenge_value: Variant = modifier.get("challenge", {})
 	if typeof(challenge_value) == TYPE_DICTIONARY and not challenge_value.is_empty():
@@ -1679,7 +1679,7 @@ func _try_show_boss_floor_choice() -> void:
 	if not settlement_pending:
 		buttons.append({"text": "Продолжить на этом этаже", "callback": Callable(self, "_resolve_floor_choice").bind("continue"), "accent": true})
 	if manager.floor_id < ContentRegistry.ABYSS_FLOOR_COUNT:
-		var next_floor_id := manager.floor_id + 1
+		var next_floor_id: int = int(manager.floor_id) + 1
 		var next_floor_name := str(ContentRegistry.get_abyss_floor(next_floor_id).get("name", "Новый этаж"))
 		var descend_label := "Спуститься на этаж %d · %s" % [next_floor_id, next_floor_name] if GameState.is_abyss_floor_unlocked(next_floor_id) else "Повторить открытие этажа %d · %s" % [next_floor_id, next_floor_name]
 		buttons.append({"text": descend_label, "callback": Callable(self, "_resolve_floor_choice").bind("descend"), "accent": false})

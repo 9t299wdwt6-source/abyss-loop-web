@@ -124,12 +124,13 @@ func _run_tests() -> void:
 			assert(objective_manager._objective_is_feasible_for_run(objective_a, modifier_id), "selected objective must be reachable under the selected modifier")
 			assert(int(objective_a.get("target", 0)) > 0 and str(objective_a.get("description", "")).length() > 0, "objective preview must show a real condition before launch")
 	objective_manager.free()
-	assert(ContentRegistry.DIFFICULTY_PRESETS.size() >= 4 and ContentRegistry.DIFFICULTY_PRESETS.has("abyssal"), "four gameplay difficulty profiles including the high-risk Abyss mode must exist")
-	var difficulty_smoke_manager = ExpeditionManagerType.new()
-	difficulty_smoke_manager.difficulty_id = "abyssal"
-	assert(difficulty_smoke_manager._scale_healing(100) == 55, "Abyss difficulty should apply its 55% healing factor deterministically")
-	assert(float(ContentRegistry.DIFFICULTY_PRESETS["abyssal"].get("defeat_keep_ratio", 1.0)) == 0.25, "Abyss difficulty should retain only a quarter of temporary loot on defeat")
-	difficulty_smoke_manager.free()
+	assert(ContentRegistry.ABYSS_FLOOR_COUNT == 8 and ContentRegistry.ABYSS_FLOORS.size() == 8, "the Abyss campaign must contain exactly eight floors")
+	var floor_smoke_manager = ExpeditionManagerType.new()
+	floor_smoke_manager.floor_id = 8
+	assert(floor_smoke_manager._scale_healing(100) == 72, "eighth floor should apply its 72% recovery factor deterministically")
+	assert(is_equal_approx(float(floor_smoke_manager.get_floor_config().get("defeat_keep_ratio", 1.0)), 0.25), "eighth floor should retain only a quarter of temporary loot on defeat")
+	assert(is_equal_approx(float(floor_smoke_manager.get_floor_config().get("enemy_attack_multiplier", 0.0)), 1.47), "eighth floor should use the final attack pressure tuning")
+	floor_smoke_manager.free()
 	# Long expedition soft caps are isolated from the standard run's original formulas.
 	var long_expedition_smoke_manager = ExpeditionManagerType.new()
 	long_expedition_smoke_manager.expedition_mode_id = "long_expedition"
@@ -540,7 +541,7 @@ func _run_tests() -> void:
 	assert(int(calculated_build.get("combined", {}).get("attack", 0)) == 10 and is_equal_approx(float(calculated_build.get("combined", {}).get("speed", 0.0)), 0.435), "combined loadout preview must include gear, synergy and perk ranks exactly once")
 	assert(ContentRegistry.BALANCE.has("encounter_chance_base"), "encounter chance must be configurable")
 	assert(ContentRegistry.BALANCE.has("loop_danger_growth"), "danger growth must be configurable")
-	assert(ContentRegistry.DIFFICULTY_PRESETS.has("volatile"), "volatile difficulty must be configured")
+	assert(ContentRegistry.ABYSS_FLOORS.has(8), "the eighth Abyss floor must be configured")
 	var resource_system = ResourceSystemType.new()
 	var ledger := {"scrap": 11, "crystals": 3}
 	var settled: Dictionary = resource_system.settle(ledger, 0.4)
