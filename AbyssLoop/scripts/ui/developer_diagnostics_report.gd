@@ -28,16 +28,16 @@ func build_report(manager: Variant, screen_mode: String) -> String:
 		lines.append("Контракт: %s · прогресс: %s · выполнен: %s" % [str(manager.run_contract.get("name", "—")), str(manager.run_contract.get("progress", 0)), str(manager.run_contract.get("completed", false))])
 		lines.append("Добыча: %s · вырубленные противники: %s · победы над боссами: %s · элиты: %s" % [str(manager.run_ledger.get("scrap", 0)), str(manager.run_ledger.get("victories", 0)), str(manager.run_ledger.get("bosses_defeated", 0)), str(manager.run_ledger.get("elites_defeated", 0))])
 		lines.append("Тайлы: рука=%d · поле=%d · размещено унаследованных=%d · событие ожидает=%s · выбор перка=%d" % [manager.tile_hand.size(), manager.world_tiles.size(), manager.placed_tiles.size(), str(not manager.pending_event.is_empty()), manager.pending_perk_count])
-		lines.append("Герой: HP %s/%s · ATK %s · DEF %s · уровень %s · XP %s" % [str(manager.hero.get("hp", "?")), str(manager.hero.get("max_hp", "?")), str(manager.hero.get("attack", "?")), str(manager.hero.get("defense", "?")), str(manager.hero.get("level", "?")), str(manager.hero.get("xp", "?"))])
+		lines.append("Герой: HP %s/%s · ATK %s · DEF %s · уровень %s · XP %s" % [str(manager.hero.get("hp", "—")), str(manager.hero.get("max_hp", "—")), str(manager.hero.get("attack", "—")), str(manager.hero.get("defense", "—")), str(manager.hero.get("level", "—")), str(manager.hero.get("xp", "—"))])
 		lines.append("Эффекты героя: %s" % format_debug_effects(manager.hero.get("status_effects", [])))
 		var encounter_lines: Array[String] = []
 		for enemy_value in manager.encounter_enemies:
 			if typeof(enemy_value) != TYPE_DICTIONARY:
 				continue
 			var enemy_data: Dictionary = enemy_value
-			encounter_lines.append("%s HP %s/%s эффекты=%s" % [str(enemy_data.get("name", enemy_data.get("id", "противник"))), str(enemy_data.get("hp", "?")), str(enemy_data.get("max_hp", "?")), format_debug_effects(enemy_data.get("status_effects", []))])
+			encounter_lines.append("%s HP %s/%s эффекты=%s" % [str(enemy_data.get("name", enemy_data.get("id", "противник"))), str(enemy_data.get("hp", "—")), str(enemy_data.get("max_hp", "—")), format_debug_effects(enemy_data.get("status_effects", []))])
 		if not manager.enemy.is_empty() and encounter_lines.is_empty():
-			encounter_lines.append("%s HP %s/%s эффекты=%s" % [str(manager.enemy.get("name", manager.enemy.get("id", "противник"))), str(manager.enemy.get("hp", "?")), str(manager.enemy.get("max_hp", "?")), format_debug_effects(manager.enemy.get("status_effects", []))])
+			encounter_lines.append("%s HP %s/%s эффекты=%s" % [str(manager.enemy.get("name", manager.enemy.get("id", "противник"))), str(manager.enemy.get("hp", "—")), str(manager.enemy.get("max_hp", "—")), format_debug_effects(manager.enemy.get("status_effects", []))])
 		lines.append("Противники: %s" % ("; ".join(encounter_lines) if not encounter_lines.is_empty() else "нет активной встречи"))
 	else:
 		lines.append("Активной экспедиции нет. Чтобы увидеть seed, маршрут, эффекты и боевые данные, запустите забег.")
@@ -71,6 +71,6 @@ func format_debug_effects(value: Variant) -> String:
 		if typeof(effect_value) != TYPE_DICTIONARY:
 			continue
 		var effect: Dictionary = effect_value
-		parts.append("%s x%s %.1fс" % [str(effect.get("id", "?")), str(effect.get("stacks", 1)), float(effect.get("duration", 0.0))])
+		parts.append("%s x%s %.1fс" % [str(effect.get("id", "—")), str(effect.get("stacks", 1)), float(effect.get("duration", 0.0))])
 	return ", ".join(parts) if not parts.is_empty() else "нет"
 
