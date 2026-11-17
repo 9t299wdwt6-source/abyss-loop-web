@@ -994,7 +994,7 @@ func _open_armory() -> void:
 		if i >= maxi(first_item, last_item - 3):
 			comparison_lines.append("%s%s — %s; набор %s." % [str(item.get("name", "Предмет")), level_suffix, _format_item_bonus(item), str(item.get("set_name", "без набора"))])
 		var text_value := "%02d · %s%s · %s" % [i + 1, str(item.get("name", "Предмет")), level_suffix, comparison]
-		buttons.append({"text": text_value, "callback": Callable(self, "_open_armory_item").bind(str(item.get("id", ""))), "accent": false})
+		buttons.append({"text": text_value, "callback": Callable(self, "_open_armory_item").bind(str(item.get("id", ""))), "accent": false, "item_visual": item})
 	if not comparison_lines.is_empty():
 		body_text += "\n\nНесколько предметов этой страницы:\n" + "\n".join(comparison_lines)
 	body_text += "\n\nНаборы: " + " · ".join(inventory_system.set_summary(GameState.loadout))
@@ -2221,6 +2221,15 @@ func _show_modal(title_text: String, body_text: String, buttons: Array, kind: St
 		var attach_inventory_behavior := kind == "backpack" and button_group in ["equipment_grid", "backpack_grid"]
 		var behavior_script: Script = InventoryDragButtonScript if attach_inventory_behavior else null
 		var button := _button(text_value, callback, bool(button_data.get("accent", false)), behavior_script)
+		var item_visual_value: Variant = button_data.get("item_visual", {})
+		if typeof(item_visual_value) == TYPE_DICTIONARY:
+			var item_visual: Dictionary = item_visual_value
+			if not str(item_visual.get("slot", "")).is_empty():
+				button.icon = _create_equipment_slot_icon(item_visual)
+				button.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+				button.icon_max_width = 32
+				button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+				button.add_theme_constant_override("h_separation", 9)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.custom_minimum_size = Vector2(0, 76 if not button_group.is_empty() else (64 if kind == "event" else (48 if kind == "perk" else 42)))
 		button.clip_text = false
@@ -2254,6 +2263,145 @@ func _show_modal(title_text: String, body_text: String, buttons: Array, kind: St
 		else:
 			button_parent.add_child(button)
 	call_deferred("_configure_overlay_focus", true, kind)
+
+
+func _create_equipment_slot_icon(item: Dictionary) -> Texture2D:
+	const ICON_SIZE := 24
+	var image := Image.create_empty(ICON_SIZE, ICON_SIZE, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0.0, 0.0, 0.0, 0.0))
+	var slot := str(item.get("slot", ""))
+	var empty_slot := bool(item.get("is_empty_slot", false))
+	var base := Color("#273c40")
+	var shade := Color("#142329")
+	var metal := Color("#9eb6b2")
+	var metal_light := Color("#e1d9b8")
+	var leather := Color("#79523d")
+	var cloth := Color("#a4b96d")
+	var glow := Color("#f4d27a")
+	var rarity := str(item.get("rarity", "Обычный"))
+	var rarity_color := _equipment_rarity_color(rarity)
+	_fill_equipment_icon_rect(image, 0, 0, 24, 24, shade)
+	_fill_equipment_icon_rect(image, 1, 1, 22, 22, base)
+	_fill_equipment_icon_rect(image, 3, 3, 18, 18, Color("#1d3035"))
+	if empty_slot:
+		_fill_equipment_icon_rect(image, 6, 6, 12, 12, Color("#31484a"))
+		_fill_equipment_icon_rect(image, 8, 8, 8, 8, Color("#263a3d"))
+		_fill_equipment_icon_rect(image, 11, 7, 2, 10, Color("#72817c"))
+		_fill_equipment_icon_rect(image, 7, 11, 10, 2, Color("#72817c"))
+	else:
+		match slot:
+			"weapon":
+				var archetype := str(item.get("archetype", "assault"))
+				match archetype:
+					"precision":
+						# A recurved bow and string, not another sword silhouette.
+						_fill_equipment_icon_rect(image, 6, 4, 2, 3, leather)
+						_fill_equipment_icon_rect(image, 5, 7, 2, 9, leather)
+						_fill_equipment_icon_rect(image, 6, 16, 2, 4, leather)
+						_fill_equipment_icon_rect(image, 8, 5, 2, 2, metal_light)
+						_fill_equipment_icon_rect(image, 8, 17, 2, 2, metal_light)
+						_fill_equipment_icon_rect(image, 9, 7, 1, 10, glow)
+						_fill_equipment_icon_rect(image, 10, 10, 8, 2, metal)
+						_fill_equipment_icon_rect(image, 16, 9, 3, 4, metal_light)
+					"wound":
+						# Long spear/needle with a narrow crystalline point.
+						_fill_equipment_icon_rect(image, 11, 3, 2, 3, metal_light)
+						_fill_equipment_icon_rect(image, 10, 6, 4, 3, metal)
+						_fill_equipment_icon_rect(image, 11, 9, 2, 10, leather)
+						_fill_equipment_icon_rect(image, 9, 17, 6, 2, leather)
+						_fill_equipment_icon_rect(image, 11, 1, 2, 2, glow)
+					"siphon", "leech":
+						# Curved hooked blade with a distinct warm grip.
+						_fill_equipment_icon_rect(image, 10, 3, 3, 3, metal_light)
+						_fill_equipment_icon_rect(image, 8, 6, 5, 3, metal)
+						_fill_equipment_icon_rect(image, 7, 9, 5, 3, metal)
+						_fill_equipment_icon_rect(image, 6, 12, 5, 3, metal_light)
+						_fill_equipment_icon_rect(image, 9, 15, 3, 4, leather)
+						_fill_equipment_icon_rect(image, 7, 18, 6, 2, leather)
+						_fill_equipment_icon_rect(image, 4, 11, 3, 2, glow)
+					_:
+						# Heavy assault sword with a broad guard and pommel.
+						_fill_equipment_icon_rect(image, 10, 3, 4, 10, metal_light)
+						_fill_equipment_icon_rect(image, 11, 2, 2, 3, glow)
+						_fill_equipment_icon_rect(image, 9, 12, 6, 2, metal)
+						_fill_equipment_icon_rect(image, 11, 14, 3, 5, leather)
+						_fill_equipment_icon_rect(image, 9, 18, 7, 2, leather)
+						_fill_equipment_icon_rect(image, 12, 4, 1, 7, Color("#fff0bd"))
+			"helmet":
+				# Domed helmet with brow and visor; silhouette differs from the shield.
+				_fill_equipment_icon_rect(image, 5, 6, 14, 9, outline_color())
+				_fill_equipment_icon_rect(image, 6, 7, 12, 7, metal)
+				_fill_equipment_icon_rect(image, 8, 4, 8, 4, metal_light)
+				_fill_equipment_icon_rect(image, 4, 13, 16, 3, leather)
+				_fill_equipment_icon_rect(image, 8, 10, 8, 2, shade)
+				_fill_equipment_icon_rect(image, 11, 7, 2, 3, glow)
+			"armor":
+				# Chestplate with shoulder plates, central seam and layered waist.
+				_fill_equipment_icon_rect(image, 4, 7, 5, 4, leather)
+				_fill_equipment_icon_rect(image, 15, 7, 5, 4, leather)
+				_fill_equipment_icon_rect(image, 7, 6, 10, 12, metal)
+				_fill_equipment_icon_rect(image, 9, 7, 6, 9, cloth)
+				_fill_equipment_icon_rect(image, 6, 16, 12, 3, leather)
+				_fill_equipment_icon_rect(image, 11, 8, 2, 7, metal_light)
+			"shield":
+				# Shield silhouette with a boss and broad edge.
+				_fill_equipment_icon_rect(image, 6, 4, 12, 2, metal_light)
+				_fill_equipment_icon_rect(image, 4, 6, 16, 10, metal)
+				_fill_equipment_icon_rect(image, 6, 16, 12, 3, metal)
+				_fill_equipment_icon_rect(image, 8, 19, 8, 2, leather)
+				_fill_equipment_icon_rect(image, 8, 8, 8, 7, cloth_dark_color())
+				_fill_equipment_icon_rect(image, 10, 9, 4, 5, glow)
+			"amulet":
+				# Pendant on a chain with a bright central gem.
+				_fill_equipment_icon_rect(image, 7, 3, 2, 5, metal_light)
+				_fill_equipment_icon_rect(image, 15, 3, 2, 5, metal_light)
+				_fill_equipment_icon_rect(image, 8, 3, 8, 2, metal)
+				_fill_equipment_icon_rect(image, 9, 8, 6, 3, leather)
+				_fill_equipment_icon_rect(image, 8, 11, 8, 7, glow)
+				_fill_equipment_icon_rect(image, 10, 13, 4, 3, Color("#fff2bf"))
+				_fill_equipment_icon_rect(image, 10, 18, 4, 2, metal)
+			"core":
+				# Faceted crystal with concentric energy pixels.
+				_fill_equipment_icon_rect(image, 9, 3, 6, 2, metal_light)
+				_fill_equipment_icon_rect(image, 6, 5, 12, 11, metal)
+				_fill_equipment_icon_rect(image, 8, 7, 8, 8, glow)
+				_fill_equipment_icon_rect(image, 10, 8, 4, 6, Color("#d8f1e3"))
+				_fill_equipment_icon_rect(image, 9, 16, 6, 3, metal_light)
+				_fill_equipment_icon_rect(image, 10, 19, 4, 2, glow)
+			_:
+				_fill_equipment_icon_rect(image, 7, 7, 10, 10, metal)
+	# A small inset frame uses the actual rarity colour without flattening the item silhouette.
+	_fill_equipment_icon_rect(image, 0, 0, 24, 1, rarity_color)
+	_fill_equipment_icon_rect(image, 0, 23, 24, 1, rarity_color)
+	_fill_equipment_icon_rect(image, 0, 0, 1, 24, rarity_color)
+	_fill_equipment_icon_rect(image, 23, 0, 1, 24, rarity_color)
+	return ImageTexture.create_from_image(image)
+
+func _fill_equipment_icon_rect(image: Image, x: int, y: int, width: int, height: int, color: Color) -> void:
+	for py in range(maxi(0, y), mini(image.get_height(), y + height)):
+		for px in range(maxi(0, x), mini(image.get_width(), x + width)):
+			image.set_pixel(px, py, color)
+
+func _equipment_rarity_color(rarity: String) -> Color:
+	match rarity:
+		"Редкий":
+			return Color("#63b8e8")
+		"Эпический":
+			return Color("#bb8af5")
+		"Реликтовый", "Боссовая":
+			return Color("#f3c86b")
+		"Элитная":
+			return Color("#ed9b75")
+		"Тайная":
+			return Color("#81dca4")
+		_:
+			return Color("#7f9c95")
+
+func outline_color() -> Color:
+	return Color("#293739")
+
+func cloth_dark_color() -> Color:
+	return Color("#435b43")
 
 func _prepare_overlay() -> void:
 	if not is_instance_valid(overlay):
@@ -2360,14 +2508,14 @@ func _open_run_backpack() -> void:
 		var slot_label := str(InventorySystemScript.SLOT_NAMES.get(slot, slot))
 		var item_name := str(item.get("name", "ПУСТО")) if not item.is_empty() else "ПУСТО"
 		var short_name := item_name.left(15) + ("…" if item_name.length() > 15 else "")
-		buttons.append({"text": "%s\n%s" % [slot_label, short_name], "callback": Callable(self, "_open_equipped_run_item").bind(slot), "accent": false, "disabled": false, "tooltip": "%s: %s\n%s\nПеретащите подходящий предмет сюда, чтобы экипировать." % [slot_label, item_name, _format_item_bonus(item) if not item.is_empty() else "Слот пуст"], "group": "equipment_grid", "equipment_slot": slot, "item_id": str(item.get("id", "")), "rarity": str(item.get("rarity", ""))})
+		buttons.append({"text": "%s\n%s" % [slot_label, short_name], "callback": Callable(self, "_open_equipped_run_item").bind(slot), "accent": false, "disabled": false, "tooltip": "%s: %s\n%s\nПеретащите подходящий предмет сюда, чтобы экипировать." % [slot_label, item_name, _format_item_bonus(item) if not item.is_empty() else "Слот пуст"], "group": "equipment_grid", "equipment_slot": slot, "item_id": str(item.get("id", "")), "rarity": str(item.get("rarity", "")), "item_visual": item if not item.is_empty() else {"slot": slot, "is_empty_slot": true}})
 	for index in range(manager.BACKPACK_CAPACITY):
 		if index < manager.bag.size() and typeof(manager.bag[index]) == TYPE_DICTIONARY:
 			var bag_item: Dictionary = manager.bag[index]
 			var bag_name := str(bag_item.get("name", "Предмет"))
 			var bag_name_short := bag_name.left(14) + ("…" if bag_name.length() > 14 else "")
 			var slot_label := str(InventorySystemScript.SLOT_NAMES.get(str(bag_item.get("slot", "")), "Неизвестный слот"))
-			buttons.append({"text": "%02d · %s\n%s · %.0f" % [index + 1, bag_name_short, slot_label, inventory_system.item_power(bag_item)], "callback": Callable(self, "_open_run_backpack_item").bind(str(bag_item.get("id", ""))), "accent": false, "tooltip": "%s · %s\nСлот: %s\n%s\nПравый клик — быстро надеть; перетащите для сортировки." % [bag_name, str(bag_item.get("rarity", "Обычный")), slot_label, _format_item_bonus(bag_item)], "group": "backpack_grid", "item_id": str(bag_item.get("id", "")), "inventory_cell_index": index, "draggable": true, "rarity": str(bag_item.get("rarity", "Обычный"))})
+			buttons.append({"text": "%02d · %s\n%s · %.0f" % [index + 1, bag_name_short, slot_label, inventory_system.item_power(bag_item)], "callback": Callable(self, "_open_run_backpack_item").bind(str(bag_item.get("id", ""))), "accent": false, "tooltip": "%s · %s\nСлот: %s\n%s\nПравый клик — быстро надеть; перетащите для сортировки." % [bag_name, str(bag_item.get("rarity", "Обычный")), slot_label, _format_item_bonus(bag_item)], "group": "backpack_grid", "item_id": str(bag_item.get("id", "")), "inventory_cell_index": index, "draggable": true, "rarity": str(bag_item.get("rarity", "Обычный")), "item_visual": bag_item})
 		else:
 			buttons.append({"text": "%02d\nПУСТО" % (index + 1), "callback": Callable(self, "_open_run_backpack"), "accent": false, "disabled": false, "tooltip": "Свободная ячейка. Перетащите предмет сюда, чтобы поменять очередь вытеснения.", "group": "backpack_grid", "inventory_cell_index": index, "draggable": false})
 	buttons.append({"text": "Закрыть рюкзак", "callback": Callable(self, "_close_overlay"), "accent": false})
