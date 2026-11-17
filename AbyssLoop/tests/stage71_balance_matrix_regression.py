@@ -22,6 +22,7 @@ checks = {
     "legacy difficulty/contract matrix capture steps are no longer used": "Capture Stage71 difficulty/mode balance matrix and contract coverage" not in workflow and "Capture Stage71 real-engine balance matrix" not in workflow,
     "report groups floors 1..8 and warns against balance verdicts": '"## Поэтажная сводка"' in reporter and '"automated_engine_run"' in reporter and "не статистически достаточная выборка" in reporter and "range(1, 9)" in reporter,
     "production manager does not read live pressure from legacy difficulty presets": "DIFFICULTY_PRESETS.get(difficulty_id" not in manager and "func get_floor_config() -> Dictionary:" in manager,
+    "ordinary encounter system excludes landscape-only floor creatures": 'preferred_definition.get("landscape_only", false)' in (ROOT / "scripts/systems/enemy_system.gd").read_text(encoding="utf-8") and 'landscape-only enemy %s into ordinary encounters' in (ROOT / "scripts/core/content_registry.gd").read_text(encoding="utf-8"),
 }
 failed = [name for name, passed in checks.items() if not passed]
 for name, passed in checks.items():

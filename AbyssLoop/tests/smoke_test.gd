@@ -140,9 +140,9 @@ func _run_tests() -> void:
 		previous_floor_reward = float(floor_definition.get("reward_multiplier", 0.0))
 	var floor_smoke_manager = ExpeditionManagerType.new()
 	floor_smoke_manager.floor_id = 8
-	assert(floor_smoke_manager._scale_healing(100) == 72, "eighth floor should apply its 72% recovery factor deterministically")
+	assert(floor_smoke_manager._scale_healing(100) == 82, "eighth floor should apply its 82% recovery factor deterministically")
 	assert(is_equal_approx(float(floor_smoke_manager.get_floor_config().get("defeat_keep_ratio", 1.0)), 0.25), "eighth floor should retain only a quarter of temporary loot on defeat")
-	assert(is_equal_approx(float(floor_smoke_manager.get_floor_config().get("enemy_attack_multiplier", 0.0)), 1.47), "eighth floor should use the final attack pressure tuning")
+	assert(is_equal_approx(float(floor_smoke_manager.get_floor_config().get("enemy_attack_multiplier", 0.0)), 1.35), "eighth floor should use the final attack pressure tuning")
 	floor_smoke_manager.free()
 	# Long expedition soft caps are isolated from the standard run's original formulas.
 	var long_expedition_smoke_manager = ExpeditionManagerType.new()

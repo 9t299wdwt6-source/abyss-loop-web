@@ -5,7 +5,12 @@ func create_enemy(loop_count: int, danger: float, rng: RandomNumberGenerator, st
 	var ids: Array = []
 	for preferred_value in preferred_pool:
 		var preferred_id := str(preferred_value)
-		if ContentRegistry.ENEMIES.has(preferred_id) and not ids.has(preferred_id):
+		if not ContentRegistry.ENEMIES.has(preferred_id) or ids.has(preferred_id):
+			continue
+		var preferred_definition: Dictionary = ContentRegistry.ENEMIES[preferred_id]
+		# Landscape-only creatures must enter normal combat through their
+		# corresponding placed landscape tile, never as a default road encounter.
+		if not bool(preferred_definition.get("landscape_only", false)):
 			ids.append(preferred_id)
 	if ids.is_empty():
 		for enemy_id_value in ContentRegistry.ENEMIES.keys():

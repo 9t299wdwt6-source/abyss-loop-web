@@ -57,6 +57,11 @@ checks["floors have validated biome-specific enemy and mixed card pools"] = (
     and '"sporeling"' in registry and '"prism_mite"' in registry
     and '"bone_warden"' in registry and '"echo_wisp"' in registry
 )
+checks["ordinary encounter pools exclude landscape-only creatures"] = (
+    'landscape-only enemy %s into ordinary encounters' in registry
+    and 'preferred_definition.get("landscape_only", false)' in (ROOT / "scripts/systems/enemy_system.gd").read_text(encoding="utf-8")
+    and '"enemy_pool": ["brute", "hunter", "hexer"]' in registry
+)
 crystal_bonuses = [
     float(re.search(r'"crystal_chance_bonus":\s*([0-9.]+)', line).group(1))
     for line in floor_lines
