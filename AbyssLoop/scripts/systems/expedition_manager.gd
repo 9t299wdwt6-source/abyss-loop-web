@@ -722,10 +722,9 @@ func restore_saved_run() -> bool:
 	world_tiles = world_tiles_value.duplicate(true) if typeof(world_tiles_value) == TYPE_DICTIONARY else {}
 	# Preserve the old fully visible map for saves created before Stage 88. Newer
 	# snapshots carry a bounded discovery dictionary and are validated on restore.
-	if snapshot.has("discovered_world_cells"):
-		discovered_world_cells = _normalize_discovered_world_cells(snapshot.get("discovered_world_cells", {}))
-	else:
-		discovered_world_cells = _get_all_offroad_cells_discovered()
+	# The full off-road landscape is visible immediately on every new or resumed run.
+	# Keep the field in saves for schema compatibility, but never restore a partial fog mask.
+	discovered_world_cells = _get_all_offroad_cells_discovered()
 	var hand_value: Variant = snapshot.get("tile_hand", [])
 	tile_hand = hand_value.duplicate(true) if typeof(hand_value) == TYPE_ARRAY else []
 	run_ledger["last_tile_exchange_loop"] = clampi(int(run_ledger.get("last_tile_exchange_loop", -1)), -1, maxi(-1, int(snapshot.get("loop_count", 0))))
@@ -901,28 +900,10 @@ func _get_all_offroad_cells_discovered() -> Dictionary:
 			result[TileSystemScript.map_world_cell_id(col, row)] = true
 	return result
 
-func _reveal_world_cells_near_route_index(route_index: int) -> void:
-	if route.is_empty():
-		return
-	var road_cells: Array[Vector2i] = TileSystemScript.get_road_grid_coordinates_for_seed(get_route_shape_id(), route_geometry_seed)
-	if road_cells.is_empty():
-		return
-	var route_slot := posmod(roundi(float(route_index) * float(road_cells.size()) / float(route.size())), road_cells.size())
-	var pivot: Vector2i = road_cells[route_slot]
-	var road_lookup: Dictionary = {}
-	for coord_value in road_cells:
-		var coord: Vector2i = coord_value
-		road_lookup["%d:%d" % [coord.x, coord.y]] = true
-	# Reveal a small Manhattan-radius around the visited road cell. Discovery is
-	# presentation-only: this does not change card eligibility or stable tile IDs.
-	for row in range(TileSystemScript.MAP_ROWS):
-		for col in range(TileSystemScript.MAP_COLUMNS):
-			if absi(col - pivot.x) + absi(row - pivot.y) > 3:
-				continue
-			if road_lookup.has("%d:%d" % [col, row]):
-				continue
-			var cell_id := TileSystemScript.map_world_cell_id(col, row)
-			discovered_world_cells[cell_id] = true
+func _reveal_world_cells_near_route_index(_route_index: int) -> void:
+	# Kept under the legacy method name for older call sites. All landscape
+	# cells are visible from the first frame; walking no longer reveals terrain.
+	discovered_world_cells = _get_all_offroad_cells_discovered()
 
 func _visit_cell(index: int) -> void:
 	if route.is_empty():

@@ -216,7 +216,6 @@ func _draw() -> void:
 	if high_contrast:
 		draw_string(ThemeDB.fallback_font, footer_position + Vector2(1, 1), selected_text, HORIZONTAL_ALIGNMENT_LEFT, size.x - 28, 12, Color("#071217"))
 	draw_string(ThemeDB.fallback_font, footer_position, selected_text, HORIZONTAL_ALIGNMENT_LEFT, size.x - 28, 12, footer_color)
-	_draw_discovery_status_hud(route_geometry)
 	if feedback_time > 0.0 and not feedback_text.is_empty():
 		var toast_width := minf(size.x - 24.0, 420.0)
 		var toast_rect := Rect2(Vector2(size.x - toast_width - 12.0, 12.0), Vector2(toast_width, 34.0))
@@ -707,39 +706,41 @@ func _draw_world_field(route_geometry: Dictionary) -> void:
 		var tile_rect := cell_rect.grow(-inset)
 		var tile: Dictionary = world_tiles.get(cell_id, {})
 		if tile.is_empty():
-			var map_cell_id := TileSystemScript.map_world_cell_id(coord.x, coord.y)
-			var is_discovered := discovered_world_cells.has(map_cell_id)
-			var placement_probe: Dictionary = {"id": selected_tile_id} if not selected_tile_id.is_empty() else {}
+			var placement_probe := {"id": selected_tile_id} if not selected_tile_id.is_empty() else {}
 			var world_check: Dictionary = _placement_rules.can_place_world(route_cells, world_tiles, cell_id, placement_probe, route_shape_id, route_geometry_seed) if placement_enabled else {"ok": true}
 			var world_target_is_valid := placement_enabled and placement_action_allowed and bool(world_check.get("ok", false))
-			var base := Color("#253c32", 0.30)
-			var outline := Color("#b6d2a0", 0.18)
+			# The full terrain is visible on the first frame. Softly tinted square cells
+			# preserve the background artwork; no fog, discovery marks or question glyphs.
+			var terrain_variant := posmod(coord.x * 17 + coord.y * 29 + posmod(route_geometry_seed, 31), 5)
+			var terrain_colors: Array[Color] = [
+				Color("#45634d", 0.24), Color("#536d4b", 0.22), Color("#3b5d4e", 0.26),
+				Color("#5c704f", 0.20), Color("#3f5a51", 0.23)
+			]
+			var base: Color = terrain_colors[terrain_variant]
+			var outline := Color("#b6d2a0", 0.23)
 			if placement_enabled and world_target_is_valid:
-				base = Color("#82b96e", 0.36)
+				base = Color("#82b96e", 0.42)
 				outline = Color("#c1e89b", 0.98)
 			elif placement_enabled:
-				base = Color("#c96562", 0.18)
-				outline = Color("#ed9d91", 0.82)
-			if not is_discovered:
-				if placement_enabled:
-					# Preserve readable valid/invalid preview while strongly muting the unknown biome.
-					base = base.lerp(Color("#101b20"), 0.58)
-					outline = Color("#b3c6b6", 0.72) if not high_contrast else Color("#f4f8ee", 0.92)
-				else:
-					# The fog is nearly opaque so hidden terrain details cannot leak through.
-					base = Color("#09161b", 0.98)
-					outline = Color("#71847e", 0.92) if not high_contrast else Color("#f4f8ee", 0.96)
+				base = Color("#c96562", 0.28)
+				outline = Color("#ed9d91", 0.88)
 			if cell_id == hovered_world_cell_id:
 				if placement_enabled and not world_target_is_valid:
-					base = Color("#c96562", 0.42)
+					base = Color("#c96562", 0.48)
 					outline = Color("#ed9d91", 1.0)
 				else:
-					base = Color("#a5d98b", 0.48)
+					base = Color("#a5d98b", 0.50)
 					outline = Color("#e3f4b6", 1.0)
 			draw_rect(tile_rect, base, true)
-			if not is_discovered:
-				_draw_unknown_cell_fog(tile_rect, coord, cell_size, cell_id == hovered_world_cell_id)
-			draw_rect(tile_rect, Color("#f4f8ee") if high_contrast else outline, false, 2.0 if placement_enabled else 1.0)
+			# Sparse deterministic ground pixels add texture without hiding the scene.
+			var mark_index := posmod(coord.x * 7 + coord.y * 11 + terrain_variant, 4)
+			var mark_color := Color("#d0d49a", 0.34) if mark_index % 2 == 0 else Color("#1c382f", 0.32)
+			var mark_size := maxf(1.0, cell_size * 0.07)
+			if mark_index != 3 and not placement_enabled:
+				draw_rect(Rect2(tile_rect.position + Vector2(cell_size * 0.22, cell_size * 0.28), Vector2(mark_size * 1.5, mark_size)), mark_color, true)
+			if high_contrast:
+				outline = Color("#f4f8ee", 0.96)
+			draw_rect(tile_rect, outline, false, 2.0 if placement_enabled else 1.0)
 			var center := tile_rect.get_center()
 			if cell_id == hovered_world_cell_id and placement_enabled:
 				_draw_placement_preview_corners(tile_rect.grow(-1.0), Color("#f4f8ee") if high_contrast else outline)
@@ -769,53 +770,6 @@ func _draw_world_field(route_geometry: Dictionary) -> void:
 			draw_string(ThemeDB.fallback_font, Vector2(world_label_rect.position.x, world_label_rect.end.y - 1.0), str(tile.get("short", Localization.text("route.tile.short"))), HORIZONTAL_ALIGNMENT_CENTER, world_label_rect.size.x, 6 if cell_size < 24.0 else 7, Color("#10191c") if high_contrast else Color("#f5f4e6"))
 			if cell_id == hovered_world_cell_id and placement_enabled:
 				draw_rect(tile_rect.grow(2.0), Color("#ec8a7d"), false, 2.0)
-
-func _draw_discovery_status_hud(route_geometry: Dictionary) -> void:
-	# A compact map status is kept outside the tile board so that it never covers
-	# road/landscape hit targets, including phone-sized layouts.
-	var road_lookup: Dictionary = {}
-	var road_cells: Array = route_geometry.get("road_cells", [])
-	for road_value in road_cells:
-		var road_coord: Vector2i = road_value
-		road_lookup["%d:%d" % [road_coord.x, road_coord.y]] = true
-	var discovered_count := 0
-	for key_value in discovered_world_cells.keys():
-		var cell_id := str(key_value)
-		if not bool(discovered_world_cells[key_value]) or not TileSystemScript.is_map_world_cell_id(cell_id):
-			continue
-		var coord: Vector2i = TileSystemScript.world_cell_coordinates(cell_id)
-		if not road_lookup.has("%d:%d" % [coord.x, coord.y]):
-			discovered_count += 1
-	var total_world_cells := maxi(0, MAP_COLUMNS * MAP_ROWS - road_cells.size())
-	var label := Localization.text("route.discovery.count") % [mini(discovered_count, total_world_cells), total_world_cells]
-	var pill_width := minf(148.0, maxf(112.0, size.x - 24.0))
-	var pill_rect := Rect2(Vector2(size.x - pill_width - 12.0, 9.0), Vector2(pill_width, 18.0))
-	draw_rect(pill_rect, Color("#071419", 0.96), true)
-	draw_rect(pill_rect, Color("#f4f8ee", 0.95) if high_contrast else Color("#9eafa1", 0.92), false, 1.0)
-	var font_size := 8 if size.x < 480.0 else 9
-	var text_color := Color("#071217") if high_contrast else Color("#e4eddd")
-	draw_string(ThemeDB.fallback_font, Vector2(pill_rect.position.x + 4.0, pill_rect.position.y + 10.5), label, HORIZONTAL_ALIGNMENT_CENTER, pill_width - 8.0, font_size, text_color)
-
-func _draw_unknown_cell_fog(tile_rect: Rect2, coord: Vector2i, cell_size: float, emphasized: bool) -> void:
-	# Opaque fog hides biome texture; deterministic sparse marks keep the unknown
-	# state perceptible at tiny sizes without making every cell visually noisy.
-	var color := Color("#82958e", 0.28) if not high_contrast else Color("#eef7eb", 0.62)
-	var origin := tile_rect.position
-	var mark := posmod(coord.x * 13 + coord.y * 17 + posmod(route_geometry_seed, 97), 5)
-	var pixel := maxf(1.0, cell_size * 0.055)
-	if mark % 2 == 0:
-		draw_line(origin + Vector2(cell_size * 0.22, cell_size * 0.24), origin + Vector2(cell_size * 0.39, cell_size * 0.41), color, pixel, true)
-	if mark % 3 == 1:
-		draw_rect(Rect2(origin + Vector2(cell_size * 0.62, cell_size * 0.65), Vector2(pixel * 1.8, pixel)), color, true)
-	if not placement_enabled and cell_size >= 13.0:
-		var font_size := 6 if cell_size < 16.0 else (7 if cell_size < 24.0 else 10)
-		var glyph_color := Color("#eef7eb") if high_contrast else Color("#a3b6ac")
-		if emphasized:
-			glyph_color = Color("#ffffff") if high_contrast else Color("#d5e5da")
-		var center := tile_rect.get_center()
-		draw_string(ThemeDB.fallback_font, center + Vector2(-3.0, font_size * 0.36), "?", HORIZONTAL_ALIGNMENT_CENTER, 7.0, font_size, glyph_color)
-	elif placement_enabled and cell_size >= 20.0:
-		draw_string(ThemeDB.fallback_font, origin + Vector2(2.0, 8.0), "?", HORIZONTAL_ALIGNMENT_LEFT, 7.0, 7, Color("#c8d6ce", 0.88))
 
 func _draw_placement_preview_corners(rect: Rect2, color: Color) -> void:
 	# Preview targets use corner brackets; a committed tile is a solid filled square.

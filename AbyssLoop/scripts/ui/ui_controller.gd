@@ -1805,10 +1805,7 @@ func _on_world_cell_hovered(cell_id: String) -> void:
 	if selected_tile_hand_index < 0 or selected_tile_hand_index >= manager.tile_hand.size():
 		var placed: Dictionary = manager.world_tiles.get(cell_id, {})
 		if placed.is_empty():
-			if TileSystemScript.is_map_world_cell_id(cell_id) and not manager.discovered_world_cells.has(cell_id):
-				tile_preview_label.text = _t("tile.preview.unknown.world")
-			else:
-				tile_preview_label.text = _t("tile.preview.empty.world") % cell_id
+			tile_preview_label.text = _t("tile.preview.empty.world") % cell_id
 		else:
 			tile_preview_label.text = _t("tile.preview.placed.world") % [str(placed.get("name", "Тайл")), str(placed.get("description", "")), int(placed.get("route_index", -1)) + 1]
 		tile_preview_label.add_theme_color_override("font_color", C_MUTED)
