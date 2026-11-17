@@ -1674,13 +1674,18 @@ func _try_show_boss_floor_choice() -> void:
 		return
 	if overlay == null or not is_instance_valid(overlay) or overlay.visible:
 		return
-	var buttons: Array = [
-		{"text": "Продолжить на этом этаже", "callback": Callable(self, "_resolve_floor_choice").bind("continue"), "accent": true},
-	]
-	if manager.floor_id < ContentRegistry.ABYSS_FLOOR_COUNT and GameState.is_abyss_floor_unlocked(manager.floor_id + 1):
-		buttons.append({"text": "Спуститься на этаж %d · %s" % [manager.floor_id + 1, str(ContentRegistry.get_abyss_floor(manager.floor_id + 1).get("name", "Новый этаж"))], "callback": Callable(self, "_resolve_floor_choice").bind("descend"), "accent": false})
-	buttons.append({"text": "Вернуться на базу", "callback": Callable(self, "_resolve_floor_choice").bind("return"), "accent": false})
-	_show_modal("Босс повержен · этаж %d/8" % manager.floor_id, "Следующий этаж открывается навсегда. Продолжение сохранит текущий уровень героя и рюкзак; спуск зафиксирует добычу и начнёт новый этаж с уровня 1 и пустым рюкзаком. Возвращение завершит экспедицию.", buttons, "floor_choice")
+	var settlement_pending := not str(manager.pending_end_outcome).is_empty()
+	var buttons: Array = []
+	if not settlement_pending:
+		buttons.append({"text": "Продолжить на этом этаже", "callback": Callable(self, "_resolve_floor_choice").bind("continue"), "accent": true})
+	if manager.floor_id < ContentRegistry.ABYSS_FLOOR_COUNT:
+		var next_floor_id := manager.floor_id + 1
+		var next_floor_name := str(ContentRegistry.get_abyss_floor(next_floor_id).get("name", "Новый этаж"))
+		var descend_label := "Спуститься на этаж %d · %s" % [next_floor_id, next_floor_name] if GameState.is_abyss_floor_unlocked(next_floor_id) else "Повторить открытие этажа %d · %s" % [next_floor_id, next_floor_name]
+		buttons.append({"text": descend_label, "callback": Callable(self, "_resolve_floor_choice").bind("descend"), "accent": false})
+	buttons.append({"text": "Повторить сохранение возврата на базу" if settlement_pending else "Вернуться на базу", "callback": Callable(self, "_resolve_floor_choice").bind("return"), "accent": false})
+	var decision_text := "Сохранение итогов не завершилось. Продолжение забега временно заблокировано: повторите спуск или возврат, чтобы безопасно зафиксировать добычу." if settlement_pending else "Следующий этаж открывается навсегда. Продолжение сохранит текущий уровень героя и рюкзак; спуск зафиксирует добычу и начнёт новый этаж с уровня 1 и пустым рюкзаком. Возвращение завершит экспедицию."
+	_show_modal("Босс повержен · этаж %d/8" % manager.floor_id, decision_text, buttons, "floor_choice")
 
 func _resolve_floor_choice(choice_id: String) -> void:
 	_close_overlay(false)
