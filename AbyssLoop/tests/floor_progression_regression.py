@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 registry = (ROOT / "scripts/core/content_registry.gd").read_text(encoding="utf-8")
 game_state = (ROOT / "scripts/core/game_state.gd").read_text(encoding="utf-8")
 save_system = (ROOT / "scripts/core/save_system.gd").read_text(encoding="utf-8")
+inventory = (ROOT / "scripts/systems/inventory_system.gd").read_text(encoding="utf-8")
+tiles = (ROOT / "scripts/systems/tile_system.gd").read_text(encoding="utf-8")
 manager = (ROOT / "scripts/systems/expedition_manager.gd").read_text(encoding="utf-8")
 ui = (ROOT / "scripts/ui/ui_controller.gd").read_text(encoding="utf-8")
 smoke = (ROOT / "tests/smoke_test.gd").read_text(encoding="utf-8")
@@ -45,6 +47,23 @@ checks["floor registry validates all eight configs and progression direction"] =
     "ABYSS_FLOORS.size() != ABYSS_FLOOR_COUNT" in registry
     and "abyss floor pressure/rewards must not decrease" in registry
     and "func get_abyss_floor(floor_id: int) -> Dictionary:" in registry
+)
+
+checks["floors have validated biome-specific enemy and mixed card pools"] = (
+    'floor_definition.get("enemy_pool", [])' in registry
+    and 'floor_definition.get("tile_pool", [])' in registry
+    and 'if not ENEMIES.has(str(enemy_id_value))' in registry
+    and 'if not TILE_DEFS.has(str(tile_id_value))' in registry
+    and '"sporeling"' in registry and '"prism_mite"' in registry
+    and '"bone_warden"' in registry and '"echo_wisp"' in registry
+)
+crystal_bonuses = [
+    float(re.search(r'"crystal_chance_bonus":\s*([0-9.]+)', line).group(1))
+    for line in floor_lines
+]
+checks["deep floors have increasing bonus crystal-find probability"] = (
+    len(crystal_bonuses) == 8 and crystal_bonuses == sorted(crystal_bonuses)
+    and crystal_bonuses[0] == 0.0 and crystal_bonuses[-1] > 0.2
 )
 
 # Permanent unlock progression must be loaded, saved, bounded, and rollback on write failure.
@@ -89,6 +108,26 @@ checks["live combat, events, healing and defeat retention use floor configuratio
     and "var active_difficulty: Dictionary = get_floor_config()" in manager
     and "var floor_definition: Dictionary = get_floor_config()" in manager
     and "DIFFICULTY_PRESETS.get(difficulty_id" not in manager
+)
+
+checks["floor draws route cards and selects biome enemy pools"] = (
+    "floor_id: int = 1) -> Dictionary:" in tiles
+    and 'floor_definition.get("tile_pool", [])' in tiles
+    and 'floor_definition.get("enemy_pool", [])' in manager
+    and "active_enemy_pool = floor_enemy_pool_value.duplicate(true)" in manager
+    and "tile_system.draw_tile(_rng_for_draw(), false, [], floor_id)" in manager
+    and "tile_system.draw_tile(run_rng, unlock_rare, [old_tile_id], floor_id)" in manager
+)
+checks["equipment and boss relic ranks scale with floor depth"] = (
+    "abyss_floor: int = 1" in inventory
+    and "floor_rank_bonus := int(floor(float(maxi(1, abyss_floor) - 1) / 2.0))" in inventory
+    and '"abyss_floor": clampi(abyss_floor, 1, ContentRegistry.ABYSS_FLOOR_COUNT)' in inventory
+    and "roll_boss_item(defeated_enemy, drop_rng, loop_count, int(hero.level), floor_id)" in manager
+    and "roll_item(drop_rng, loop_count, int(hero.level), boss_rarity_bonus, floor_id)" in manager
+)
+checks["crystal resources get a floor-specific discovery chance"] = (
+    'get_floor_config().get("crystal_chance_bonus", 0.0)' in manager
+    and 'reward["crystals"] = maxi(0, int(reward.get("crystals", 0))) + 1' in manager
 )
 checks["floor, pending decision, and boss escort marker are checkpointed and restored"] = (
     '"floor_id": floor_id' in manager
