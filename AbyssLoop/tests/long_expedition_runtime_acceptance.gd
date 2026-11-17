@@ -135,7 +135,7 @@ func _run_acceptance() -> void:
 	_check(int(final_summary.get("bosses_defeated", 0)) == 4, "the durable campaign summary records all four boss victories")
 	_check(int(GameState.runs_completed) == 1, "one completed long run creates exactly one campaign settlement")
 	_check(not GameState.has_saved_expedition(), "successful endgame settlement removes the saved expedition checkpoint")
-	_check(int(GameState.highest_unlocked_floor) == 5, "bosses on loops 3/6/9/12 permanently unlock floors 2 through 5")
+	_check(int(GameState.highest_unlocked_floor) == 2, "bosses on loops 3/6/9/12 of the same floor permanently unlock only the next floor once")
 
 	var checkpoint_value: Variant = manager.run_ledger.get("long_run_checkpoints", [])
 	var checkpoints: Array = checkpoint_value if typeof(checkpoint_value) == TYPE_ARRAY else []
