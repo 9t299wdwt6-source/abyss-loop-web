@@ -37,8 +37,14 @@ def read_capture(path: Path, expected_prepared: bool) -> dict[int, list[dict[str
             raise ValueError(f"{path}: a run row is not an object")
         floor_id = row.get("floor_id")
         run_id = str(row.get("run_id", ""))
-        if not isinstance(floor_id, int) or isinstance(floor_id, bool) or floor_id not in (5, 6, 7, 8):
-            raise ValueError(f"{path}: invalid high-floor ID in a run row")
+        if not isinstance(floor_id, int) or isinstance(floor_id, bool) or floor_id not in range(1, 9):
+            raise ValueError(f"{path}: invalid Abyss floor ID in a run row")
+        # The clean-start capture covers all eight floors; the paired comparison
+        # intentionally uses only the shared high-floor range 5..8.
+        if floor_id < 5:
+            if expected_prepared:
+                raise ValueError(f"{path}: prepared capture unexpectedly contains floor {floor_id}")
+            continue
         if not run_id or run_id in seen:
             raise ValueError(f"{path}: missing or duplicate run ID")
         if row.get("capture_kind") != "automated_engine_run" or row.get("outcome") not in {"return", "defeat"}:
