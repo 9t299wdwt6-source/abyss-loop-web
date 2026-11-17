@@ -27,6 +27,9 @@ def read_capture(path: Path, expected_prepared: bool) -> dict[int, list[dict[str
         raise ValueError(f"{path}: capture is not labelled automated_engine_run")
     if bool(metadata.get("prepared_loadout_run", False)) != expected_prepared:
         raise ValueError(f"{path}: prepared_loadout_run metadata does not match expected mode")
+    expected_seeds = metadata.get("fixed_seeds", [])
+    if expected_seeds != [91001, 91003, 91007]:
+        raise ValueError(f"{path}: expected the three matched Stage92 seeds")
     grouped: dict[int, list[dict[str, Any]]] = defaultdict(list)
     seen: set[str] = set()
     for row in payload["runs"]:
@@ -51,6 +54,10 @@ def read_capture(path: Path, expected_prepared: bool) -> dict[int, list[dict[str
     missing = [floor_id for floor_id in (5, 6, 7, 8) if not grouped[floor_id]]
     if missing:
         raise ValueError(f"{path}: high floors without captures: {missing}")
+    for floor_id in (5, 6, 7, 8):
+        seeds = sorted(int(row.get("capture_seed", -1)) for row in grouped[floor_id])
+        if seeds != expected_seeds:
+            raise ValueError(f"{path}: floor {floor_id} seed set {seeds} does not match {expected_seeds}")
     return grouped
 
 
@@ -74,6 +81,11 @@ def main() -> int:
     try:
         base = read_capture(args.base_input, expected_prepared=False)
         prepared = read_capture(args.prepared_input, expected_prepared=True)
+        for floor_id in (5, 6, 7, 8):
+            base_seeds = sorted(int(row.get("capture_seed", -1)) for row in base[floor_id])
+            prepared_seeds = sorted(int(row.get("capture_seed", -1)) for row in prepared[floor_id])
+            if base_seeds != prepared_seeds:
+                raise ValueError(f"floor {floor_id}: bare/prepared seeds differ: {base_seeds} vs {prepared_seeds}")
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
