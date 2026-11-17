@@ -2152,7 +2152,7 @@ func _finish_run(outcome: String) -> void:
 		"best_hp": int(hero.get("hp", 0)),
 		"danger": snappedf(danger, 0.1),
 		"challenge_score": challenge_score,
-		"run_id": "%d-%d-floor-%d" % [GameState.runs_started, run_seed, floor_id],
+		"run_id": "%d-%d-%s-floor-%d" % [GameState.runs_started, run_seed, difficulty_id, floor_id],
 		"timestamp_unix": int(Time.get_unix_time_from_system()),
 		"date": Time.get_datetime_string_from_system(false, true),
 		"game_version": str(ProjectSettings.get_setting("application/config/version", "0.61.0")),
