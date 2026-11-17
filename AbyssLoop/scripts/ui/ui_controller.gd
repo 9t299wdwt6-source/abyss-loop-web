@@ -2589,7 +2589,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if overlay != null and overlay.visible:
 			if modal_kind == "settings":
 				_close_settings()
-			elif modal_kind in ["event", "perk", "confirm", "confirm_reset", "confirm_salvage"]:
+			elif modal_kind in ["event", "perk", "floor_choice", "confirm", "confirm_reset", "confirm_salvage"]:
 				return # Decisions and destructive confirmations cannot be dismissed accidentally.
 			else:
 				_close_overlay()
