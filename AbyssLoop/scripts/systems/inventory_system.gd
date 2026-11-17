@@ -274,7 +274,7 @@ func roll_rarity(rng: RandomNumberGenerator, rarity_bonus: float = 0.0) -> Strin
 			return rarity_name
 	return "Реликтовый"
 
-func roll_item(rng: RandomNumberGenerator, loop_count: int, hero_level: int, rarity_bonus: float = 0.0) -> Dictionary:
+func roll_item(rng: RandomNumberGenerator, loop_count: int, hero_level: int, rarity_bonus: float = 0.0, abyss_floor: int = 1) -> Dictionary:
 	var slots: Array = EQUIPMENT_SLOTS.duplicate()
 	var slot: String = str(slots[rng.randi_range(0, slots.size() - 1)])
 	# The caller applies gear and route preparation bonuses only on a successful drop.
@@ -286,7 +286,8 @@ func roll_item(rng: RandomNumberGenerator, loop_count: int, hero_level: int, rar
 		"Эпический": multiplier = 1.8
 		"Реликтовый": multiplier = 2.15
 		_: multiplier = 1.0
-	var rank := 1 + int(floor(float(loop_count) / 2.0)) + int(floor(float(hero_level) / 3.0))
+	var floor_rank_bonus := int(floor(float(maxi(1, abyss_floor) - 1) / 2.0))
+	var rank := 1 + int(floor(float(loop_count) / 2.0)) + int(floor(float(hero_level) / 3.0)) + floor_rank_bonus
 	var archetype_values: Array = ARCHETYPES.get(slot, [])
 	var archetype: Dictionary = {"id": "standard", "name": "Стандарт", "description": "Базовые характеристики", "stats": {}}
 	if not archetype_values.is_empty():
@@ -300,6 +301,7 @@ func roll_item(rng: RandomNumberGenerator, loop_count: int, hero_level: int, rar
 		"name": "%s · %s · %s" % [SLOT_NAMES[slot], str(archetype.get("name", "Стандарт")), rarity],
 		"rarity": rarity,
 		"rank": rank,
+		"abyss_floor": clampi(abyss_floor, 1, ContentRegistry.ABYSS_FLOOR_COUNT),
 		"upgrade_level": 0,
 		"archetype": str(archetype.get("id", "standard")),
 		"archetype_name": str(archetype.get("name", "Стандарт")),
@@ -432,7 +434,7 @@ func apply_random_affixes(item: Dictionary, rng: RandomNumberGenerator) -> Dicti
 	result["power"] = item_power(result)
 	return result
 
-func roll_boss_item(enemy: Dictionary, rng: RandomNumberGenerator, loop_count: int, hero_level: int) -> Dictionary:
+func roll_boss_item(enemy: Dictionary, rng: RandomNumberGenerator, loop_count: int, hero_level: int, abyss_floor: int = 1) -> Dictionary:
 	var boss_id := str(enemy.get("id", ""))
 	var templates_value: Variant = BOSS_RELIC_TABLES.get(boss_id, [])
 	if typeof(templates_value) != TYPE_ARRAY:
@@ -449,12 +451,13 @@ func roll_boss_item(enemy: Dictionary, rng: RandomNumberGenerator, loop_count: i
 		return {}
 	var set_id := str(template.get("set_id", ""))
 	var set_definition: Dictionary = SET_DEFS.get(set_id, {})
-	var rank := 1 + int(floor(float(maxi(0, loop_count)) / 2.0)) + int(floor(float(maxi(1, hero_level)) / 3.0))
+	var floor_rank_bonus := int(floor(float(maxi(1, abyss_floor) - 1) / 2.0))
+	var rank := 1 + int(floor(float(maxi(0, loop_count)) / 2.0)) + int(floor(float(maxi(1, hero_level)) / 3.0)) + floor_rank_bonus
 	var item := {
 		"id": "boss_%s_%d_%d" % [str(template.get("id", boss_id)), loop_count, rng.randi()],
 		"unique_id": str(template.get("id", boss_id)), "slot": slot,
 		"name": str(template.get("name", "Реликвия бездны")), "rarity": "Боссовая",
-		"rank": rank, "upgrade_level": 0,
+		"rank": rank, "abyss_floor": clampi(abyss_floor, 1, ContentRegistry.ABYSS_FLOOR_COUNT), "upgrade_level": 0,
 		"archetype": str(template.get("archetype", "standard")),
 		"archetype_name": str(template.get("archetype_name", "Реликвия")),
 		"archetype_description": str(template.get("archetype_description", "Именная экипировка босса.")),
