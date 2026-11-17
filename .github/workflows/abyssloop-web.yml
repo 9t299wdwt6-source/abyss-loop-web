@@ -8,6 +8,8 @@ on:
       - '.github/workflows/**'
       - 'AbyssLoop_Prototype61_Stage68C_Web_Export_Pipeline.zip'
       - 'AbyssLoop/**/*.gd'
+      - 'AbyssLoop/**/*.py'
+      - 'AbyssLoop/**/*.md'
       - 'AbyssLoop/**/*.tscn'
       - 'AbyssLoop/**/*.tres'
       - 'AbyssLoop/**/*.json'
