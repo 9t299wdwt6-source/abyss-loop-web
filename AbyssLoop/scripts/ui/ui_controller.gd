@@ -800,7 +800,7 @@ func _resume_expedition() -> void:
 
 func _confirm_discard_saved_run() -> void:
 	_show_modal(
-		"Отказаться от забега?",
+		"Отказаться от забега",
 		"Будут удалены только сохранённое состояние текущей экспедиции и её незакреплённая добыча. Постоянные ресурсы, экипировка и улучшения убежища останутся.",
 		[
 			{"text": "Продолжить сохранённый забег", "callback": Callable(self, "_close_overlay"), "accent": false},
@@ -953,7 +953,7 @@ func _request_research_reset() -> void:
 	var preserved_unknown_count := int(preview.get("preserved_unknown_count", 0))
 	if preserved_unknown_count > 0:
 		body += "\nВременно недоступные узлы (%d) и их история останутся нетронутыми." % preserved_unknown_count
-	_show_modal("Перераспределить дерево исследований?", body, [
+	_show_modal("Перераспределить дерево исследований", body, [
 		{"text": "Отмена", "callback": Callable(self, "_cancel_research_reset"), "accent": false},
 		{"text": "Сбросить и вернуть 80%", "callback": Callable(self, "_confirm_research_reset"), "accent": true}
 	], "confirm")
@@ -1865,7 +1865,7 @@ func _request_return() -> void:
 	if bool(forecast.get("boss_next", false)):
 		next_step_text += " Следующий цикл включает плановую встречу с боссом."
 	_show_modal(
-		"Завершить экспедицию?",
+		"Завершить экспедицию",
 		"Сейчас добыто: %d материалов и %d редких ресурсов. При поражении сохранилось бы примерно %d материалов и %d редких ресурсов. %s Безопасный возврат сохраняет текущую добычу полностью; после выхода этот забег нельзя продолжить." % [int(forecast.get("scrap", 0)), int(forecast.get("crystals", 0)), int(forecast.get("defeat_scrap", 0)), int(forecast.get("defeat_crystals", 0)), next_step_text],
 		[
 			{"text": "Продолжить путь", "callback": Callable(self, "_cancel_return_request"), "accent": false},
@@ -2921,7 +2921,7 @@ func _export_save_selected(path: String) -> void:
 		_open_message("Не удалось экспортировать", "Файл не записан. Проверьте путь и доступ к выбранной папке; исходное сохранение не изменялось.")
 
 func _confirm_import_save() -> void:
-	_show_modal("Импортировать сохранение?", "Содержимое выбранного файла заменит текущий профиль. Перед заменой создаётся резервная копия текущего сохранения. После успешного импорта перезапустите игру, чтобы загрузить импортированный прогресс.", [
+	_show_modal("Импортировать сохранение", "Содержимое выбранного файла заменит текущий профиль. Перед заменой создаётся резервная копия текущего сохранения. После успешного импорта перезапустите игру, чтобы загрузить импортированный прогресс.", [
 		{"text": "Отмена", "callback": Callable(self, "_open_settings"), "accent": false},
 		{"text": "Выбрать файл…", "callback": Callable(self, "_open_save_import_dialog"), "accent": true}
 	], "confirm")
@@ -3072,7 +3072,7 @@ func _apply_audio_settings() -> void:
 			AudioServer.set_bus_volume_linear(bus_index, maxf(0.0001, value))
 
 func _open_reset_confirmation() -> void:
-	_show_modal("Сбросить весь прогресс?", "Будут удалены ресурсы, улучшения и статистика убежища. Действие нельзя отменить.", [
+	_show_modal("Сбросить весь прогресс", "Будут удалены ресурсы, улучшения и статистика убежища. Действие нельзя отменить.", [
 		{"text": "Оставить как есть", "callback": Callable(self, "_open_settings"), "accent": false},
 		{"text": "Сбросить прогресс", "callback": Callable(self, "_reset_progress"), "accent": true}
 	], "confirm_reset")
