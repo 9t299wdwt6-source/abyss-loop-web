@@ -222,7 +222,7 @@ func start_run(requested_difficulty_id: String = "standard", requested_seed: int
 		starting_tile_count = maxi(starting_tile_count, int(ContentRegistry.BALANCE.get("first_run_min_starting_tiles", 3)))
 	starting_tile_count = mini(starting_tile_count, 6)
 	for i in range(starting_tile_count):
-		tile_hand.append(tile_system.draw_tile(_rng_for_draw(), false))
+		tile_hand.append(tile_system.draw_tile(_rng_for_draw(), false, [], floor_id))
 	run_baseline = _build_run_baseline()
 	active = true
 	_log("Экспедиция началась на этаже %d/8: %s · %s." % [floor_id, str(floor_config.get("name", "Этаж %d" % floor_id)), str(floor_config.get("theme", ""))])
@@ -1080,7 +1080,7 @@ func _try_cache_equipment_drop(route_index: int) -> void:
 	var pending_rarity_bonus := clampf(float(run_ledger.get("pending_item_rarity_bonus", 0.0)), 0.0, 0.18)
 	var equipped_rarity_bonus := clampf(float(hero.get("equipped_rare_find_bonus", 0.0)), 0.0, 0.12)
 	var effective_rarity_bonus: float = inventory_system.get_effective_rarity_bonus(equipped_rarity_bonus, pending_rarity_bonus, loot_system.get_source_rarity_bonus("cache"))
-	var item: Dictionary = inventory_system.roll_item(drop_rng, loop_count, int(hero.get("level", 1)), effective_rarity_bonus)
+	var item: Dictionary = inventory_system.roll_item(drop_rng, loop_count, int(hero.get("level", 1)), effective_rarity_bonus, floor_id)
 	if item.is_empty():
 		return
 	item["drop_source"] = "cache"
@@ -1303,7 +1303,12 @@ func _start_encounter(index: int, strength_bonus: float, reward_bonus: float, bo
 	var active_difficulty: Dictionary = get_floor_config()
 	var modifier: Dictionary = get_run_modifier()
 	var encounter_scaling_loop := _effective_scaling_loop(loop_count)
-	encounter_enemies = enemy_system.create_encounter(encounter_scaling_loop, danger, _rng_for_event(), strength_bonus, boss_encounter, int(active_difficulty.get("extra_group_members", 0)) + int(modifier.get("extra_group_members", 0)), enemy_pool)
+	var active_enemy_pool := enemy_pool.duplicate(true)
+	if active_enemy_pool.is_empty():
+		var floor_enemy_pool_value: Variant = active_difficulty.get("enemy_pool", [])
+		if typeof(floor_enemy_pool_value) == TYPE_ARRAY:
+			active_enemy_pool = floor_enemy_pool_value.duplicate(true)
+	encounter_enemies = enemy_system.create_encounter(encounter_scaling_loop, danger, _rng_for_event(), strength_bonus, boss_encounter, int(active_difficulty.get("extra_group_members", 0)) + int(modifier.get("extra_group_members", 0)), active_enemy_pool)
 	if encounter_enemies.is_empty():
 		return
 	var elite_interval := maxi(1, int(ContentRegistry.BALANCE.get("elite_loop_interval", 4)))
@@ -1654,6 +1659,10 @@ func _on_victory() -> void:
 	var contextual_trophy_bonus := clampf(float(hero.get("equipped_" + defeated_biome + "_trophy_bonus", 0.0)), 0.0, 0.12)
 	var trophy: Dictionary = loot_system.roll_biome_trophy(defeated_enemy, trophy_rng, _get_current_landscape_tile_ids(), float(hero.get("equipped_trophy_find_bonus", 0.0)), contextual_trophy_bonus)
 	var reward: Dictionary = loot_system.roll_victory(defeated_enemy, loop_count, trophy_rng, reward_bonus)
+	var floor_crystal_bonus := clampf(float(get_floor_config().get("crystal_chance_bonus", 0.0)), 0.0, 0.5)
+	if floor_crystal_bonus > 0.0 and trophy_rng.randf() < floor_crystal_bonus:
+		reward["crystals"] = maxi(0, int(reward.get("crystals", 0))) + 1
+		_log("Добыча этажа: глубинный кристалл найден благодаря особенностям текущего слоя.")
 	resource_system.add(run_ledger, "scrap", int(reward.scrap))
 	resource_system.add(run_ledger, "crystals", int(reward.crystals))
 	if not trophy.is_empty():
@@ -1719,10 +1728,10 @@ func _on_victory() -> void:
 	if drop_rng.randf() < item_chance:
 		if not is_boss and echo_charges > 0:
 			run_ledger["echo_item_charges"] = maxi(0, echo_charges - 1)
-		var item: Dictionary = inventory_system.roll_boss_item(defeated_enemy, drop_rng, loop_count, int(hero.level)) if is_boss else {}
+		var item: Dictionary = inventory_system.roll_boss_item(defeated_enemy, drop_rng, loop_count, int(hero.level), floor_id) if is_boss else {}
 		if item.is_empty():
 			var boss_rarity_bonus: float = 0.0 if is_boss else effective_rarity_bonus
-			item = inventory_system.roll_item(drop_rng, loop_count, int(hero.level), boss_rarity_bonus)
+			item = inventory_system.roll_item(drop_rng, loop_count, int(hero.level), boss_rarity_bonus, floor_id)
 		if not is_boss:
 			# Prepared road-card bonuses are consumed only when an ordinary/elite
 			# equipment drop actually succeeds, never by a failed chance roll.
@@ -1832,7 +1841,7 @@ func exchange_tile(hand_index: int) -> Dictionary:
 	run_ledger["crystals"] = maxi(0, int(run_ledger.get("crystals", 0)) - 1)
 	run_ledger["last_tile_exchange_loop"] = loop_count
 	var unlock_rare := loop_count >= 3 or GameState.get_unlock_effect("unlock_rare_tiles") > 0.0
-	var new_tile: Dictionary = tile_system.draw_tile(run_rng, unlock_rare, [old_tile_id])
+	var new_tile: Dictionary = tile_system.draw_tile(run_rng, unlock_rare, [old_tile_id], floor_id)
 	if str(new_tile.get("id", "")) == old_tile_id:
 		# Fail closed if the eligible pool ever changes to contain only one card.
 		run_ledger = previous_ledger
@@ -1855,7 +1864,7 @@ func _maybe_add_tile(source: String, chance: float) -> void:
 	if tile_hand.size() >= get_tile_hand_limit():
 		return
 	if run_rng.randf() < clampf(chance, 0.0, 1.0):
-		var new_tile: Dictionary = tile_system.draw_tile(run_rng, loop_count >= 3 or GameState.get_unlock_effect("unlock_rare_tiles") > 0.0)
+		var new_tile: Dictionary = tile_system.draw_tile(run_rng, loop_count >= 3 or GameState.get_unlock_effect("unlock_rare_tiles") > 0.0, [], floor_id)
 		tile_hand.append(new_tile)
 		_log("%s: получен тайл «%s»." % [source, str(new_tile.name)])
 
