@@ -64,6 +64,19 @@ func _run_acceptance() -> void:
 			_check(false, "the run never becomes stuck in a failed settlement transaction")
 			break
 
+		if bool(manager.pending_floor_choice):
+			var target_loops := int(manager.get_expedition_goal_progress().get("target_loops", 12))
+			var target_bosses := int(manager.get_expedition_goal_progress().get("target_bosses", 4))
+			var completed_bosses := int(manager.run_ledger.get("bosses_defeated", 0))
+			var final_boss_done := bool(manager.run_ledger.get("endgame_completed", false)) and int(manager.loop_count) >= target_loops and completed_bosses >= target_bosses
+			var floor_choice := "return" if final_boss_done else "continue"
+			var floor_result: Dictionary = manager.resolve_floor_choice(floor_choice)
+			_check(bool(floor_result.get("ok", false)), "boss floor decision resolves with %s at loop %d" % [floor_choice, int(manager.loop_count)])
+			if not bool(floor_result.get("ok", false)):
+				break
+			await get_tree().process_frame
+			continue
+
 		if not manager.pending_event.is_empty():
 			manager.run_ledger["scrap"] = maxi(100000, int(manager.run_ledger.get("scrap", 0)))
 			manager.run_ledger["crystals"] = maxi(100000, int(manager.run_ledger.get("crystals", 0)))
@@ -122,6 +135,7 @@ func _run_acceptance() -> void:
 	_check(int(final_summary.get("bosses_defeated", 0)) == 4, "the durable campaign summary records all four boss victories")
 	_check(int(GameState.runs_completed) == 1, "one completed long run creates exactly one campaign settlement")
 	_check(not GameState.has_saved_expedition(), "successful endgame settlement removes the saved expedition checkpoint")
+	_check(int(GameState.highest_unlocked_floor) == 5, "bosses on loops 3/6/9/12 permanently unlock floors 2 through 5")
 
 	var checkpoint_value: Variant = manager.run_ledger.get("long_run_checkpoints", [])
 	var checkpoints: Array = checkpoint_value if typeof(checkpoint_value) == TYPE_ARRAY else []

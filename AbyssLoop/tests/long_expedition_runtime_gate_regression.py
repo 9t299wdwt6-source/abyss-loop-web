@@ -12,6 +12,7 @@ checks = {
     "runtime gate asserts 12 loops and four required bosses": '"target_loops", 0)) == 12' in runner and '"target_bosses", 0)) == 4' in runner,
     "runtime gate verifies the four configured boss loops": '_boss_loops_seen == [3, 6, 9, 12]' in runner,
     "runtime gate verifies the four durable checkpoints and endgame result": 'checkpoint_loops == [3, 6, 9, 12]' in runner and 'final_summary.get("endgame_completed", false)' in runner,
+    "runtime gate explicitly resolves each boss floor choice and returns after the final boss": 'if bool(manager.pending_floor_choice):' in runner and 'manager.resolve_floor_choice(floor_choice)' in runner and 'floor_choice := "return" if final_boss_done else "continue"' in runner,
     "runtime gate exercises production route and encounter methods": 'manager._tick_route(0.0)' in runner and 'manager._tick_combat(0.01)' in runner and 'manager.resolve_event_choice(choice_id)' in runner,
     "runtime scene points at the actual acceptance script": 'path="res://tests/long_expedition_runtime_acceptance.gd"' in scene,
     "CI runs the long expedition runtime scene with a bounded timeout": 'Run 12-loop long expedition runtime acceptance' in workflow and 'res://tests/long_expedition_runtime_acceptance_runner.tscn' in workflow and 'timeout 90s' in workflow,

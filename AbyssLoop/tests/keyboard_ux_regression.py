@@ -10,7 +10,7 @@ checks = {
     "buttons are reachable by keyboard": "button.focus_mode = Control.FOCUS_ALL" in ui,
     "F1 opens contextual help": "KEY_F1" in ui and 'Callable(self, "_open_help_menu")' in ui,
     "Escape handles modal state": "key_event.keycode == KEY_ESCAPE" in ui,
-    "event and level-up choices are not accidentally dismissed": 'modal_kind in ["event", "perk", "confirm", "confirm_reset", "confirm_salvage"]' in ui,
+    "event and level-up choices are not accidentally dismissed": 'modal_kind in ["event", "perk", "floor_choice", "confirm", "confirm_reset", "confirm_salvage"]' in ui,
     "Space toggles expedition pause": "key_event.keycode == KEY_SPACE" in ui and "manager.set_pause(not manager.paused)" in ui,
     "1/2/3 switch simulation speed": all(f"key_event.keycode == KEY_{n}" in ui for n in (1, 2, 3)),
     "right column is bounded by a scroll container": "var right_scroll := ScrollContainer.new()" in ui,
