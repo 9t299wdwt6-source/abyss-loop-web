@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/stage92_floor_progression_capture.gd" id="1_prepared_capture"]
+
+[node name="Stage92PreparedFloorProgressionCapture" type="Node"]
+script = ExtResource("1_prepared_capture")
+prepare_previous_floor_loadout = true
