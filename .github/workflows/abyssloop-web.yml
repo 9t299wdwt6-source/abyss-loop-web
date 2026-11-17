@@ -147,6 +147,23 @@ jobs:
             --input "${RUNNER_TEMP}/web-qa/STAGE92_FLOOR_PROGRESSION.json" \
             --output "${RUNNER_TEMP}/web-qa/STAGE92_FLOOR_PROGRESSION_REPORT.md"
 
+      - name: Capture Stage92 prepared high-floor loadout matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_root="${RUNNER_TEMP}/AbyssLoopRuntimeAcceptance"
+          mkdir -p "${RUNNER_TEMP}/web-qa"
+          profile_data="$HOME/.local/share/godot/app_userdata/Abyss Loop CI Acceptance"
+          rm -f "$profile_data/STAGE92_PREPARED_FLOOR_PROGRESSION.json"
+          timeout 600s "$GODOT_BIN" --headless --path "$test_root" res://tests/stage92_prepared_floor_progression_runner.tscn
+          capture="$profile_data/STAGE92_PREPARED_FLOOR_PROGRESSION.json"
+          test -s "$capture"
+          cp "$capture" "${RUNNER_TEMP}/web-qa/STAGE92_PREPARED_FLOOR_PROGRESSION.json"
+          python3 AbyssLoop/tools/geared_floor_progression_report.py \
+            --base-input "${RUNNER_TEMP}/web-qa/STAGE92_FLOOR_PROGRESSION.json" \
+            --prepared-input "${RUNNER_TEMP}/web-qa/STAGE92_PREPARED_FLOOR_PROGRESSION.json" \
+            --output "${RUNNER_TEMP}/web-qa/STAGE92_PREPARED_FLOOR_PROGRESSION_REPORT.md"
+
       - name: Export Godot Web build
         run: |
           set -euo pipefail
