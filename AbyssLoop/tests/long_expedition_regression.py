@@ -14,7 +14,7 @@ catalog = json.loads((ROOT / "localization/strings_ru.json").read_text(encoding=
 checks = {
     "standalone expedition mode is separate from difficulty and route modifiers": 'const EXPEDITION_MODES :=' in registry and 'var expedition_mode_id: String = "standard"' in manager and 'var run_modifier_id: String = "standard"' in manager,
     "endgame target is 12 loops and four scheduled bosses": '"goal_loops": 12' in registry and '"goal_bosses": 4' in registry and 'boss_loop_interval' in manager,
-    "mode selection is exposed in the preparation screen": '_t("base.mode.label")' in ui and catalog.get("base.mode.label") == "РЕЖИМ ЭКСПЕДИЦИИ" and 'for mode_key in ContentRegistry.EXPEDITION_MODES.keys()' in ui and 'selected_expedition_mode_id)' in ui,
+    "mode selection is exposed in the preparation screen": '_t("base.mode.label")' in ui and catalog.get("base.mode.label") == "РЕЖИМ ЭКСПЕДИЦИИ" and 'for mode_key in ContentRegistry.EXPEDITION_MODES.keys()' in ui and 'expedition_mode_option.item_selected.connect(_on_expedition_mode_selected)' in ui,
     "mode is passed through start-run and stored in the run snapshot": 'selected_modifier_id, "none", selected_expedition_mode_id, selected_floor_id)' in ui and '"expedition_mode_id": expedition_mode_id' in manager,
     "old snapshots without mode fall back to standard": 'snapshot.get("expedition_mode_id", "standard")' in manager and 'if not ContentRegistry.EXPEDITION_MODES.has(expedition_mode_id)' in manager,
     "long mode applies soft cap to danger while standard mode remains unchanged": 'func _clamp_long_mode_danger' in manager and 'return value' in manager and 'max_danger' in registry,
