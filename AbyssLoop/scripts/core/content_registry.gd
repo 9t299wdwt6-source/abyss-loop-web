@@ -86,6 +86,25 @@ const DIFFICULTY_PRESETS := {
 	"abyssal": {"name": "Бездна", "description": "Для подготовленных героев: сильные группы, мало лечения и лишь четверть добычи при поражении. Максимальный счёт испытания.", "enemy_attack_multiplier": 1.30, "enemy_health_multiplier": 1.22, "enemy_defense_multiplier": 1.18, "reward_multiplier": 1.65, "encounter_chance_delta": 0.08, "danger_growth_multiplier": 1.30, "event_damage_multiplier": 1.30, "healing_multiplier": 0.55, "defeat_keep_ratio": 0.25, "starting_danger": 1.15, "challenge_score_multiplier": 1.75, "extra_group_members": 1}
 }
 
+
+# The Abyss has eight distinct, persistent progression floors. The floor is the
+# sole campaign pressure tier; route modifiers and expedition modes remain separate.
+const ABYSS_FLOOR_COUNT := 8
+const ABYSS_FLOORS := {
+	1: {"name": "Кромка Бездны", "theme": "Каменный уступ", "description": "Входной пояс: знакомство с маршрутом, первыми стаями и базовыми ловушками.", "biome": "stonewood", "enemy_attack_multiplier": 1.00, "enemy_health_multiplier": 1.00, "enemy_defense_multiplier": 1.00, "reward_multiplier": 1.00, "encounter_chance_delta": 0.00, "danger_growth_multiplier": 1.00, "event_damage_multiplier": 1.00, "healing_multiplier": 1.00, "defeat_keep_ratio": 0.40, "starting_danger": 1.00, "challenge_score_multiplier": 1.00, "extra_group_members": 0},
+	2: {"name": "Лес колокольчиков", "theme": "Споровая чаща", "description": "Споры и хищная растительность чаще втягивают героя в затяжные столкновения.", "biome": "spore", "enemy_attack_multiplier": 1.05, "enemy_health_multiplier": 1.07, "enemy_defense_multiplier": 1.02, "reward_multiplier": 1.12, "encounter_chance_delta": 0.01, "danger_growth_multiplier": 1.04, "event_damage_multiplier": 1.04, "healing_multiplier": 0.97, "defeat_keep_ratio": 0.40, "starting_danger": 1.02, "challenge_score_multiplier": 1.08, "extra_group_members": 0},
+	3: {"name": "Затонувший горизонт", "theme": "Подземное озеро", "description": "Влажные тоннели скрывают быстрых стайных противников и редкие кристаллы.", "biome": "crystal", "enemy_attack_multiplier": 1.10, "enemy_health_multiplier": 1.13, "enemy_defense_multiplier": 1.05, "reward_multiplier": 1.25, "encounter_chance_delta": 0.02, "danger_growth_multiplier": 1.07, "event_damage_multiplier": 1.07, "healing_multiplier": 0.94, "defeat_keep_ratio": 0.38, "starting_danger": 1.04, "challenge_score_multiplier": 1.16, "extra_group_members": 0},
+	4: {"name": "Сад исполинов", "theme": "Корневые развалины", "description": "Массивные стражи держат узкие проходы; ошибки в подготовке обходятся дороже.", "biome": "root", "enemy_attack_multiplier": 1.16, "enemy_health_multiplier": 1.20, "enemy_defense_multiplier": 1.08, "reward_multiplier": 1.39, "encounter_chance_delta": 0.03, "danger_growth_multiplier": 1.10, "event_damage_multiplier": 1.10, "healing_multiplier": 0.91, "defeat_keep_ratio": 0.37, "starting_danger": 1.06, "challenge_score_multiplier": 1.25, "extra_group_members": 1},
+	5: {"name": "Море костей", "theme": "Пепельная низина", "description": "Опасные дозорные и тяжёлые события вынуждают следить за здоровьем и экипировкой.", "biome": "bone", "enemy_attack_multiplier": 1.23, "enemy_health_multiplier": 1.28, "enemy_defense_multiplier": 1.12, "reward_multiplier": 1.55, "encounter_chance_delta": 0.04, "danger_growth_multiplier": 1.14, "event_damage_multiplier": 1.14, "healing_multiplier": 0.87, "defeat_keep_ratio": 0.35, "starting_danger": 1.08, "challenge_score_multiplier": 1.36, "extra_group_members": 1},
+	6: {"name": "Город без возврата", "theme": "Затерянные руины", "description": "Слаженные группы противников и более жёсткие столкновения проверяют собранный билд.", "biome": "ruins", "enemy_attack_multiplier": 1.30, "enemy_health_multiplier": 1.37, "enemy_defense_multiplier": 1.17, "reward_multiplier": 1.73, "encounter_chance_delta": 0.05, "danger_growth_multiplier": 1.18, "event_damage_multiplier": 1.18, "healing_multiplier": 0.83, "defeat_keep_ratio": 0.33, "starting_danger": 1.10, "challenge_score_multiplier": 1.49, "extra_group_members": 1},
+	7: {"name": "Последний водоворот", "theme": "Искажённый разлом", "description": "Элитные враги появляются чаще, а цена неудачного решения становится высокой.", "biome": "rift", "enemy_attack_multiplier": 1.38, "enemy_health_multiplier": 1.47, "enemy_defense_multiplier": 1.23, "reward_multiplier": 1.93, "encounter_chance_delta": 0.07, "danger_growth_multiplier": 1.23, "event_damage_multiplier": 1.23, "healing_multiplier": 0.78, "defeat_keep_ratio": 0.30, "starting_danger": 1.13, "challenge_score_multiplier": 1.64, "extra_group_members": 1},
+	8: {"name": "Нижняя пустота", "theme": "Бездна под бездной", "description": "Предельный слой: сильнейшие противники, редкие окна для восстановления и максимальная награда.", "biome": "abyss", "enemy_attack_multiplier": 1.47, "enemy_health_multiplier": 1.58, "enemy_defense_multiplier": 1.30, "reward_multiplier": 2.16, "encounter_chance_delta": 0.09, "danger_growth_multiplier": 1.29, "event_damage_multiplier": 1.29, "healing_multiplier": 0.72, "defeat_keep_ratio": 0.25, "starting_danger": 1.16, "challenge_score_multiplier": 1.82, "extra_group_members": 1}
+}
+
+func get_abyss_floor(floor_id: int) -> Dictionary:
+	var safe_floor := clampi(floor_id, 1, ABYSS_FLOOR_COUNT)
+	return ABYSS_FLOORS.get(safe_floor, ABYSS_FLOORS[1]).duplicate(true)
+
 # Expedition mode controls the overall contract of a run. It remains separate from difficulty
 # (enemy pressure) and route modifiers (shape/tactical twist).
 const EXPEDITION_MODES := {
@@ -903,16 +922,31 @@ func validate_content_registry() -> Array[String]:
 		var perk: Dictionary = PERKS[perk_id_value]
 		if int(perk.get("max_stacks", 0)) < 1 or str(perk.get("name", "")).strip_edges().is_empty():
 			issues.append("perk:%s has invalid name or stack limit" % perk_id)
-	for preset_id in ["standard", "volatile", "attrition", "abyssal"]:
-		if not DIFFICULTY_PRESETS.has(preset_id):
-			issues.append("missing difficulty preset %s" % preset_id)
+	if ABYSS_FLOORS.size() != ABYSS_FLOOR_COUNT:
+		issues.append("abyss floor catalogue must contain exactly %d entries" % ABYSS_FLOOR_COUNT)
+	var previous_attack := 0.0
+	var previous_health := 0.0
+	var previous_reward := 0.0
+	for floor_number in range(1, ABYSS_FLOOR_COUNT + 1):
+		if not ABYSS_FLOORS.has(floor_number):
+			issues.append("missing abyss floor %d" % floor_number)
 			continue
-		var preset: Dictionary = DIFFICULTY_PRESETS[preset_id]
-		for field in ["name", "description", "healing_multiplier", "defeat_keep_ratio", "starting_danger", "challenge_score_multiplier"]:
-			if not preset.has(field):
-				issues.append("difficulty:%s missing %s" % [preset_id, field])
-		if float(preset.get("healing_multiplier", 0.0)) <= 0.0 or float(preset.get("defeat_keep_ratio", -1.0)) < 0.0 or float(preset.get("defeat_keep_ratio", 1.0)) > 1.0 or float(preset.get("challenge_score_multiplier", 0.0)) < 1.0:
-			issues.append("difficulty:%s has invalid risk/reward fields" % preset_id)
+		var floor_definition: Dictionary = ABYSS_FLOORS[floor_number]
+		for field in ["name", "theme", "description", "biome", "enemy_attack_multiplier", "enemy_health_multiplier", "enemy_defense_multiplier", "reward_multiplier", "healing_multiplier", "defeat_keep_ratio", "starting_danger", "challenge_score_multiplier", "extra_group_members"]:
+			if not floor_definition.has(field):
+				issues.append("abyss_floor:%d missing %s" % [floor_number, field])
+		var attack_value := float(floor_definition.get("enemy_attack_multiplier", 0.0))
+		var health_value := float(floor_definition.get("enemy_health_multiplier", 0.0))
+		var reward_value := float(floor_definition.get("reward_multiplier", 0.0))
+		var healing_value := float(floor_definition.get("healing_multiplier", 0.0))
+		var retention_value := float(floor_definition.get("defeat_keep_ratio", -1.0))
+		if attack_value <= 0.0 or health_value <= 0.0 or reward_value <= 0.0 or healing_value <= 0.0 or retention_value < 0.0 or retention_value > 1.0:
+			issues.append("abyss_floor:%d has invalid risk/reward values" % floor_number)
+		if floor_number > 1 and (attack_value < previous_attack or health_value < previous_health or reward_value < previous_reward):
+			issues.append("abyss floor pressure/rewards must not decrease at floor %d" % floor_number)
+		previous_attack = attack_value
+		previous_health = health_value
+		previous_reward = reward_value
 	for modifier_id_value in RUN_MODIFIERS.keys():
 		var modifier_id := str(modifier_id_value)
 		var modifier: Dictionary = RUN_MODIFIERS[modifier_id_value]
