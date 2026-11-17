@@ -2218,6 +2218,8 @@ func resolve_floor_choice(choice_id: String) -> Dictionary:
 		return {"ok": false, "reason": "Решение о следующем этапе сейчас недоступно."}
 	match choice_id:
 		"continue":
+			if not pending_end_outcome.is_empty():
+				return {"ok": false, "reason": "Сначала повторите сохранение завершения экспедиции. Продолжение забега после незавершённого расчёта недоступно."}
 			pending_floor_choice = false
 			paused = false
 			_log("Экспедиция продолжается на этаже %d." % floor_id)
@@ -2229,8 +2231,12 @@ func resolve_floor_choice(choice_id: String) -> Dictionary:
 			return {"ok": true, "reason": "Экспедиция продолжается на текущем этаже."}
 		"descend":
 			var next_floor := floor_id + 1
-			if next_floor > ContentRegistry.ABYSS_FLOOR_COUNT or not GameState.is_abyss_floor_unlocked(next_floor):
-				return {"ok": false, "reason": "Следующий этаж ещё не открыт."}
+			if next_floor > ContentRegistry.ABYSS_FLOOR_COUNT:
+				return {"ok": false, "reason": "Достигнут последний этаж Бездны."}
+			# If the original profile write failed immediately after the boss kill,
+			# permit a retry here; the choice itself proves the boss was defeated.
+			if not GameState.is_abyss_floor_unlocked(next_floor) and not GameState.unlock_abyss_floor(next_floor):
+				return {"ok": false, "reason": "Не удалось сохранить открытие следующего этажа. Повторите попытку после проверки сохранения."}
 			pending_floor_transition_id = next_floor
 			pending_floor_choice = false
 			_finish_run("return")
