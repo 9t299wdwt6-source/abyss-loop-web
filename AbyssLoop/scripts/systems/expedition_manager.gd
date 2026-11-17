@@ -39,7 +39,10 @@ var route_geometry_seed: int = 0
 # Bounded local measurements for reproducible balance capture; no network telemetry.
 var run_elapsed_seconds: float = 0.0
 var run_baseline: Dictionary = {}
-var difficulty_id: String = "standard"
+var difficulty_id: String = "standard" # Legacy save field; floor_id now drives campaign pressure.
+var floor_id: int = 1
+var pending_floor_choice: bool = false
+var pending_floor_transition_id: int = 0
 var run_modifier_id: String = "standard"
 var expedition_mode_id: String = "standard"
 var run_challenge: Dictionary = {}
@@ -123,15 +126,19 @@ func can_accept_contract(contract_id: String) -> Dictionary:
 		return {"ok": false, "reason": "Условия контракта некорректны."}
 	return {"ok": true, "reason": "Контракт доступен.", "scrap_cost": scrap_cost, "crystal_cost": crystal_cost}
 
-func start_run(requested_difficulty_id: String = "standard", requested_seed: int = 0, requested_modifier_id: String = "standard", requested_contract_id: String = "none", requested_mode_id: String = "standard") -> bool:
-	if active:
+func start_run(requested_difficulty_id: String = "standard", requested_seed: int = 0, requested_modifier_id: String = "standard", requested_contract_id: String = "none", requested_mode_id: String = "standard", requested_floor_id: int = 1) -> bool:
+	if active or not GameState.is_abyss_floor_unlocked(requested_floor_id):
 		return false
 	pending_end_outcome = ""
 	_snapshot_save_failure_notified = false
 	var contract_acceptance := can_accept_contract(requested_contract_id)
 	if not bool(contract_acceptance.get("ok", false)):
 		return false
-	difficulty_id = requested_difficulty_id if ContentRegistry.DIFFICULTY_PRESETS.has(requested_difficulty_id) else "standard"
+	# Retain the old field only so existing summaries/snapshots stay readable.
+	difficulty_id = "standard"
+	floor_id = clampi(requested_floor_id, 1, ContentRegistry.ABYSS_FLOOR_COUNT)
+	pending_floor_choice = false
+	pending_floor_transition_id = 0
 	run_modifier_id = requested_modifier_id if ContentRegistry.RUN_MODIFIERS.has(requested_modifier_id) else "standard"
 	expedition_mode_id = requested_mode_id if ContentRegistry.EXPEDITION_MODES.has(requested_mode_id) else "standard"
 	var modifier_definition: Dictionary = ContentRegistry.RUN_MODIFIERS.get(run_modifier_id, ContentRegistry.RUN_MODIFIERS["standard"])
@@ -164,8 +171,8 @@ func start_run(requested_difficulty_id: String = "standard", requested_seed: int
 	distance = 0.0
 	processed_steps = 0
 	loop_count = 0
-	var difficulty_config: Dictionary = ContentRegistry.DIFFICULTY_PRESETS[difficulty_id]
-	danger = maxf(1.0, float(difficulty_config.get("starting_danger", 1.0)))
+	var floor_config: Dictionary = get_floor_config()
+	danger = maxf(1.0, float(floor_config.get("starting_danger", 1.0)))
 	paused = false
 	speed = 1.0
 	run_ledger = {"scrap": 0, "crystals": 0, "victories": 0, "bosses_defeated": 0, "elites_defeated": 0, "events_resolved": 0, "event_history": [], "event_flags": {}, "trophy_drops": _empty_trophy_counts(), "echo_item_charges": 0, "pending_item_rarity_bonus": 0.0, "pending_item_drop_bonus": 0.0, "inventory_ejections": [], "inventory_ejections_count": 0, "inventory_ejections_dust": 0, "last_tile_exchange_loop": -1}
@@ -216,7 +223,8 @@ func start_run(requested_difficulty_id: String = "standard", requested_seed: int
 		tile_hand.append(tile_system.draw_tile(_rng_for_draw(), false))
 	run_baseline = _build_run_baseline()
 	active = true
-	_log("Экспедиция началась. Маршрут сгенерирован по seed %d." % run_seed)
+	_log("Экспедиция началась на этаже %d/8: %s · %s." % [floor_id, str(floor_config.get("name", "Этаж %d" % floor_id)), str(floor_config.get("theme", ""))])
+	_log("Маршрут сгенерирован по seed %d." % run_seed)
 	_log("Режим: %s." % str(get_expedition_mode().get("name", "Обычная экспедиция")))
 	_log("Условия маршрута: %s." % str(modifier_definition.get("name", "Обычная экспедиция")))
 	if expedition_mode_id == "long_expedition":
@@ -235,6 +243,9 @@ func start_run(requested_difficulty_id: String = "standard", requested_seed: int
 		return false
 	changed.emit()
 	return true
+
+func get_floor_config() -> Dictionary:
+	return ContentRegistry.get_abyss_floor(floor_id)
 
 func get_tile_hand_limit() -> int:
 	var modifier: Dictionary = ContentRegistry.RUN_MODIFIERS.get(run_modifier_id, ContentRegistry.RUN_MODIFIERS["standard"])
@@ -308,10 +319,10 @@ func _maybe_finish_long_expedition() -> void:
 		return
 	if int(run_ledger.get("bosses_defeated", 0)) < int(goal.get("target_bosses", 4)):
 		return
-	run_ledger["endgame_completed"] = true
-	run_ledger["endgame_completed_loop"] = loop_count
-	_log("ФИНАЛ ДЛИННОЙ ЭКСПЕДИЦИИ: 12 циклов пройдены, финальный босс побеждён. Вся добыча сохранена.")
-	_finish_run("return")
+	if not bool(run_ledger.get("endgame_completed", false)):
+		run_ledger["endgame_completed"] = true
+		run_ledger["endgame_completed_loop"] = loop_count
+		_log("ФИНАЛ ДЛИННОЙ ЭКСПЕДИЦИИ: цель выполнена. Выберите продолжение, спуск или возвращение на базу.")
 
 func get_route_shape_id() -> String:
 	return str(get_run_modifier().get("route_shape", "classic_ring"))
@@ -462,7 +473,7 @@ func _update_objective_progress() -> void:
 	changed.emit()
 
 func get_return_forecast() -> Dictionary:
-	var active_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
+	var active_difficulty: Dictionary = get_floor_config()
 	var modifier: Dictionary = get_run_modifier()
 	var next_loop := loop_count + 1
 	var projected_danger := minf(float(ContentRegistry.BALANCE.get("max_danger", 6.0)), danger + float(ContentRegistry.BALANCE.get("loop_danger_growth", 0.18)) * float(active_difficulty.get("danger_growth_multiplier", 1.0)) * float(modifier.get("danger_growth_multiplier", 1.0)))
@@ -515,6 +526,8 @@ func export_run_state() -> Dictionary:
 		"run_seed": run_seed,
 		"route_geometry_seed": route_geometry_seed,
 		"difficulty_id": difficulty_id,
+		"floor_id": floor_id,
+		"floor_choice_pending": pending_floor_choice,
 		"run_modifier_id": run_modifier_id,
 		"expedition_mode_id": expedition_mode_id,
 		"run_challenge": run_challenge.duplicate(true),
@@ -589,9 +602,11 @@ func restore_saved_run() -> bool:
 	run_elapsed_seconds = maxf(0.0, float(snapshot.get("run_elapsed_seconds", 0.0)))
 	var baseline_value: Variant = snapshot.get("run_baseline", {})
 	run_baseline = baseline_value.duplicate(true) if typeof(baseline_value) == TYPE_DICTIONARY else {}
-	difficulty_id = str(snapshot.get("difficulty_id", "standard"))
-	if not ContentRegistry.DIFFICULTY_PRESETS.has(difficulty_id):
-		difficulty_id = "standard"
+	floor_id = clampi(int(snapshot.get("floor_id", 1)), 1, ContentRegistry.ABYSS_FLOOR_COUNT)
+	if not GameState.is_abyss_floor_unlocked(floor_id):
+		return false
+	pending_floor_choice = bool(snapshot.get("floor_choice_pending", false))
+	difficulty_id = "standard"
 	run_modifier_id = str(snapshot.get("run_modifier_id", "standard"))
 	if not ContentRegistry.RUN_MODIFIERS.has(run_modifier_id):
 		run_modifier_id = "standard"
@@ -830,7 +845,7 @@ func _tick_route(delta: float) -> void:
 		var cell_index := posmod(processed_steps, route.size())
 		if cell_index == 0:
 			loop_count += 1
-			var active_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
+			var active_difficulty: Dictionary = get_floor_config()
 			danger += float(ContentRegistry.BALANCE.get("loop_danger_growth", 0.18)) * float(active_difficulty.get("danger_growth_multiplier", 1.0)) * float(get_run_modifier().get("danger_growth_multiplier", 1.0)) * float(get_expedition_mode().get("danger_growth_multiplier", 1.0))
 			danger = _clamp_long_mode_danger(danger)
 			var loop_reward_base := int(ContentRegistry.BALANCE.route_reward_scrap) + GameState.get_effective_loop_scrap_bonus()
@@ -1038,7 +1053,7 @@ func _visit_cell(index: int) -> void:
 	if should_offer_event:
 		_begin_expedition_event(index, spawn_bonus, strength_bonus, reward_bonus, encounter_pool)
 		return
-	var active_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
+	var active_difficulty: Dictionary = get_floor_config()
 	var base_chance := clampf(float(ContentRegistry.BALANCE.get("encounter_chance_base", 0.22)) + float(loop_count) * float(ContentRegistry.BALANCE.get("encounter_chance_per_loop", 0.04)) + spawn_bonus + float(active_difficulty.get("encounter_chance_delta", 0.0)) + _get_modifier_chance_delta(), float(ContentRegistry.BALANCE.get("encounter_chance_min", 0.08)), float(ContentRegistry.BALANCE.get("encounter_chance_max", 0.96)))
 	var boss_interval := maxi(1, int(ContentRegistry.BALANCE.get("boss_loop_interval", 3)))
 	var is_boss_node := index == 0 and loop_count > 0 and loop_count % boss_interval == 0
@@ -1189,7 +1204,7 @@ func resolve_event_choice(choice_id: String) -> Dictionary:
 		run_ledger["scrap"] = maxi(0, int(run_ledger.get("scrap", 0)) - cost_scrap)
 	resource_system.add(run_ledger, "scrap", maxi(0, int(effects.get("scrap", 0))))
 	resource_system.add(run_ledger, "crystals", maxi(0, int(effects.get("crystals", 0))))
-	var event_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
+	var event_difficulty: Dictionary = get_floor_config()
 	var event_damage_value: float = float(effects.get("damage", 0)) * float(event_difficulty.get("event_damage_multiplier", 1.0)) * float(get_run_modifier().get("event_damage_multiplier", 1.0))
 	var research_damage_reduction: float = clampf(GameState.get_unlock_effect("event_damage_reduction"), 0.0, 0.75)
 	var damage: int = maxi(0, int(ceil(event_damage_value * (1.0 - research_damage_reduction))))
@@ -1254,7 +1269,7 @@ func resolve_event_choice(choice_id: String) -> Dictionary:
 	var reward_bonus: float = float(context.get("reward_bonus", 0.0)) + float(effects.get("reward_bonus", 0.0))
 	var event_pool_value: Variant = context.get("enemy_pool", [])
 	var event_enemy_pool: Array = event_pool_value.duplicate(true) if typeof(event_pool_value) == TYPE_ARRAY else []
-	var encounter_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
+	var encounter_difficulty: Dictionary = get_floor_config()
 	var base_chance: float = clampf(float(ContentRegistry.BALANCE.get("encounter_chance_base", 0.22)) + float(loop_count) * float(ContentRegistry.BALANCE.get("encounter_chance_per_loop", 0.04)) + spawn_bonus + float(encounter_difficulty.get("encounter_chance_delta", 0.0)) + _get_modifier_chance_delta(), float(ContentRegistry.BALANCE.get("encounter_chance_min", 0.08)), float(ContentRegistry.BALANCE.get("encounter_chance_max", 0.96)))
 	if _rng_for_event().randf() < base_chance:
 		_start_encounter(int(context.get("cell_index", current_cell())), strength_bonus, reward_bonus, false, event_enemy_pool)
@@ -1281,7 +1296,7 @@ func _grant_secret_event_item(relic_id: String) -> Dictionary:
 	return item
 
 func _start_encounter(index: int, strength_bonus: float, reward_bonus: float, boss_encounter: bool, enemy_pool: Array = []) -> void:
-	var active_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
+	var active_difficulty: Dictionary = get_floor_config()
 	var modifier: Dictionary = get_run_modifier()
 	var encounter_scaling_loop := _effective_scaling_loop(loop_count)
 	encounter_enemies = enemy_system.create_encounter(encounter_scaling_loop, danger, _rng_for_event(), strength_bonus, boss_encounter, int(active_difficulty.get("extra_group_members", 0)) + int(modifier.get("extra_group_members", 0)), enemy_pool)
@@ -1762,6 +1777,16 @@ func _on_victory() -> void:
 		combat_cell = -1
 		combat_reward_bonus = 0.0
 		current_tile_spawn_bonus = 0.0
+		if is_boss:
+			pending_floor_choice = true
+			paused = true
+			if floor_id < ContentRegistry.ABYSS_FLOOR_COUNT:
+				if GameState.unlock_abyss_floor(floor_id + 1):
+					_log("ОТКРЫТ НОВЫЙ ЭТАЖ: %d/8 · %s. Выберите, куда двигаться дальше." % [floor_id + 1, str(ContentRegistry.get_abyss_floor(floor_id + 1).get("name", "Новый этаж"))])
+				else:
+					_log("Не удалось сохранить открытие следующего этажа. Повторите выбор после проверки сохранения.")
+			else:
+				_log("ПОСЛЕДНИЙ ЭТАЖ: босс повержен. Можно продолжить исследование или вернуться на базу.")
 		_maybe_finish_long_expedition()
 	changed.emit()
 	if active:
@@ -2048,7 +2073,7 @@ func _finish_run(outcome: String) -> void:
 	_update_challenge_progress()
 	active = false
 	paused = false
-	var active_difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
+	var active_difficulty: Dictionary = get_floor_config()
 	var defeat_keep_ratio := clampf(float(active_difficulty.get("defeat_keep_ratio", ContentRegistry.BALANCE.get("defeat_keep_ratio", 0.4))), 0.0, 1.0)
 	# Build every durable result field before the settlement transaction. Rewards,
 	# checkpoint deletion, campaign journal and difficulty record must become durable
@@ -2081,7 +2106,7 @@ func _finish_run(outcome: String) -> void:
 		if recent_decisions.size() >= 5:
 			break
 	var contract_status := "completed" if bool(run_contract.get("completed", false)) and not bool(run_contract.get("failed", false)) else ("failed" if bool(run_contract.get("failed", false)) else ("active" if not run_contract.is_empty() else "none"))
-	var record_key := difficulty_id if expedition_mode_id == "standard" else "%s:%s" % [difficulty_id, expedition_mode_id]
+	var record_key := "floor_%02d" % floor_id if expedition_mode_id == "standard" else "floor_%02d:%s" % [floor_id, expedition_mode_id]
 	var inventory_ejections_value: Variant = run_ledger.get("inventory_ejections", [])
 	var inventory_ejection_count: int = inventory_ejections_value.size() if typeof(inventory_ejections_value) == TYPE_ARRAY else 0
 	var summary_metadata: Dictionary = {
@@ -2091,8 +2116,11 @@ func _finish_run(outcome: String) -> void:
 		"elites_defeated": int(run_ledger.get("elites_defeated", 0)),
 		"seed": run_seed,
 		"difficulty_id": difficulty_id,
+		"floor_id": floor_id,
+		"floor_name": str(get_floor_config().get("name", "Этаж %d" % floor_id)),
+		"next_floor_id": pending_floor_transition_id,
 		"modifier_id": run_modifier_id,
-		"difficulty_name": str(ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, {}).get("name", "Стандарт")),
+		"difficulty_name": "Этаж %d" % floor_id,
 		"modifier_name": str(get_run_modifier().get("name", "Обычная экспедиция")),
 		"expedition_mode_id": expedition_mode_id,
 		"expedition_mode_name": str(get_expedition_mode().get("name", "Обычная экспедиция")),
@@ -2106,7 +2134,7 @@ func _finish_run(outcome: String) -> void:
 		"best_hp": int(hero.get("hp", 0)),
 		"danger": snappedf(danger, 0.1),
 		"challenge_score": challenge_score,
-		"run_id": "%d-%d-%s" % [GameState.runs_started, run_seed, difficulty_id],
+		"run_id": "%d-%d-floor-%d" % [GameState.runs_started, run_seed, floor_id],
 		"timestamp_unix": int(Time.get_unix_time_from_system()),
 		"date": Time.get_datetime_string_from_system(false, true),
 		"game_version": str(ProjectSettings.get_setting("application/config/version", "0.61.0")),
@@ -2167,6 +2195,35 @@ func _finish_run(outcome: String) -> void:
 	changed.emit()
 	run_finished.emit(summary.duplicate(true))
 
+func resolve_floor_choice(choice_id: String) -> Dictionary:
+	if not active or not pending_floor_choice or not enemy.is_empty() or not pending_event.is_empty() or pending_perk_count > 0:
+		return {"ok": false, "reason": "Решение о следующем этапе сейчас недоступно."}
+	match choice_id:
+		"continue":
+			pending_floor_choice = false
+			paused = false
+			_log("Экспедиция продолжается на этаже %d." % floor_id)
+			changed.emit()
+			if not save_run_snapshot():
+				paused = true
+				pending_floor_choice = true
+				return {"ok": false, "reason": "Не удалось сохранить продолжение экспедиции; выбор оставлен открытым."}
+			return {"ok": true, "reason": "Экспедиция продолжается на текущем этаже."}
+		"descend":
+			var next_floor := floor_id + 1
+			if next_floor > ContentRegistry.ABYSS_FLOOR_COUNT or not GameState.is_abyss_floor_unlocked(next_floor):
+				return {"ok": false, "reason": "Следующий этаж ещё не открыт."}
+			pending_floor_transition_id = next_floor
+			pending_floor_choice = false
+			_finish_run("return")
+			return {"ok": true, "reason": "Добыча сохранена; начинается переход на следующий этаж.", "next_floor_id": next_floor}
+		"return":
+			pending_floor_choice = false
+			pending_floor_transition_id = 0
+			_finish_run("return")
+			return {"ok": true, "reason": "Экспедиция возвращается на базу."}
+	return {"ok": false, "reason": "Неизвестный вариант перехода."}
+
 func _get_field_cache_item_names() -> Array[String]:
 	var names: Array[String] = []
 	for item_value in field_cache:
@@ -2198,8 +2255,8 @@ func _build_run_baseline() -> Dictionary:
 func _scale_healing(amount: int) -> int:
 	if amount <= 0:
 		return 0
-	var difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
-	var multiplier := clampf(float(difficulty.get("healing_multiplier", 1.0)), 0.1, 2.0)
+	var floor_definition: Dictionary = get_floor_config()
+	var multiplier := clampf(float(floor_definition.get("healing_multiplier", 1.0)), 0.1, 2.0)
 	return maxi(1, int(floor(float(amount) * multiplier)))
 
 func current_cell() -> int:
