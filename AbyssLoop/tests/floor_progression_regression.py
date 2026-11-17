@@ -113,7 +113,7 @@ checks["live combat, events, healing and defeat retention use floor configuratio
 checks["floor draws route cards and selects biome enemy pools"] = (
     "floor_id: int = 1) -> Dictionary:" in tiles
     and 'floor_definition.get("tile_pool", [])' in tiles
-    and 'floor_definition.get("enemy_pool", [])' in manager
+    and 'active_difficulty.get("enemy_pool", [])' in manager
     and "active_enemy_pool = floor_enemy_pool_value.duplicate(true)" in manager
     and "tile_system.draw_tile(_rng_for_draw(), false, [], floor_id)" in manager
     and "tile_system.draw_tile(run_rng, unlock_rare, [old_tile_id], floor_id)" in manager
