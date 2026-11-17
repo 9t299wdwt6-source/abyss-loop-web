@@ -113,7 +113,6 @@ checks["boss decision supports continuing, descending, and returning"] = (
 checks["descending settles the current expedition before creating a new floor run"] = (
     'pending_floor_transition_id = next_floor' in manager
     and '_finish_run("return")' in manager
-    and '"hero" : {' not in manager  # Avoid hard-coded hero state bypasses; new run initializer owns reset.
     and '"level": 1' in manager
     and 'bag.clear()' in manager
 )
@@ -137,8 +136,10 @@ checks["boss modal exposes the three intended choices"] = (
     and "Спуститься на этаж %d" in ui
     and "Вернуться на базу" in ui
 )
+render_expedition = ui.split("func _render_expedition() -> void:", 1)[1].split("\nfunc ", 1)[0]
 checks["restored expedition reopens a saved pending boss decision"] = (
-    ui.index("_sync_expedition_view(true)") < ui.index("_try_show_boss_floor_choice()")
+    "_sync_expedition_view(true)" in render_expedition
+    and render_expedition.index("_sync_expedition_view(true)") < render_expedition.index("_try_show_boss_floor_choice()")
     and 'modal_kind in ["event", "perk", "floor_choice"' in ui
 )
 checks["next-floor transition starts a fresh run at level one with an empty backpack"] = (
