@@ -199,15 +199,11 @@ func _draw() -> void:
 	# Hero interpolation still follows the same route indices that drive combat.
 	var hero_point: Vector2 = _get_hero_grid_position(hero_progress, route_geometry)
 	var hero_scale := clampf(_map_cell_size() / 30.0, 0.62, 1.15)
-	# Original block-built explorer stays custom and is scaled with grid size.
-	draw_rect(Rect2(hero_point + Vector2(-8, 4) * hero_scale, Vector2(17, 4) * hero_scale), Color(0.0, 0.0, 0.0, 0.42), true)
-	draw_rect(Rect2(hero_point + Vector2(-7, -5) * hero_scale, Vector2(5, 8) * hero_scale), Color("#8b6646"), true)
-	draw_rect(Rect2(hero_point + Vector2(-3, -7) * hero_scale, Vector2(7, 11) * hero_scale), Color("#a6c66e"), true)
-	draw_rect(Rect2(hero_point + Vector2(-4, -13) * hero_scale, Vector2(9, 7) * hero_scale), Color("#dfbd73"), true)
-	draw_rect(Rect2(hero_point + Vector2(-1, -11) * hero_scale, Vector2(3, 3) * hero_scale), Color("#253e42"), true)
-	draw_rect(Rect2(hero_point + Vector2(6, -10) * hero_scale, Vector2(2, 14) * hero_scale), Color("#c7b48a"), true)
-	draw_rect(Rect2(hero_point + Vector2(5, -11) * hero_scale, Vector2(4, 4) * hero_scale), Color("#f4d27e"), true)
-	draw_rect(Rect2(hero_point + Vector2(6, -10) * hero_scale, Vector2(2, 2) * hero_scale), Color("#fff3b0"), true)
+	# Chibi pixel explorer: 24x40-style proportions, a broad field hat and a
+	# loaded pack keep the face/hair hidden while making the silhouette readable.
+	var facing := _get_hero_facing_direction(route_geometry)
+	var gait_frame := 0 if reduced_motion else posmod(int(floor(hero_progress * 8.0)), 8)
+	_draw_hero_pixel_sprite(hero_point, hero_scale, facing, gait_frame)
 	var header_position := Vector2(14, 24)
 	var header_text := (Localization.text("route.header.compact") if size.x < 680.0 else Localization.text("route.header")) % count
 	var header_color := Color("#ffffff") if high_contrast else Color("#d2d9af")
@@ -570,6 +566,118 @@ func _is_near_route_line(position: Vector2) -> bool:
 		if nearest_point.distance_to(position) <= cell_size * 0.46:
 			return true
 	return false
+
+
+func _draw_hero_pixel_sprite(center: Vector2, scale: float, facing: String, gait_frame: int) -> void:
+	var outline := Color("#202b2d")
+	var shadow := Color(0.0, 0.0, 0.0, 0.44)
+	var leather := Color("#745039")
+	var leather_light := Color("#a87a4a")
+	var cloth := Color("#778b55")
+	var cloth_light := Color("#a7bf70")
+	var cloth_dark := Color("#435b43")
+	var scarf := Color("#bd6638")
+	var scarf_light := Color("#e59a4e")
+	var skin := Color("#d9b68a")
+	var hat := Color("#b87d3e")
+	var hat_light := Color("#e2b95f")
+	var metal := Color("#718c91")
+	var glow := Color("#f7d978")
+	var step := 0
+	if gait_frame % 8 in [1, 2, 5, 6]:
+		step = 1
+	var side_view := facing in ["left", "right"]
+	var pack_on_left := facing != "left"
+
+	# Ground shadow and alternating boots/legs.
+	_draw_hero_pixel_block(center, -9, 9, 18, 3, shadow, scale)
+	_draw_hero_pixel_block(center, -5 + step, 5, 4, 5, outline, scale)
+	_draw_hero_pixel_block(center, -4 + step, 5, 3, 4, leather_light, scale)
+	_draw_hero_pixel_block(center, 2 - step, 5, 4, 5, outline, scale)
+	_draw_hero_pixel_block(center, 3 - step, 5, 3, 4, leather, scale)
+	_draw_hero_pixel_block(center, -6 + step, 8, 5, 2, outline, scale)
+	_draw_hero_pixel_block(center, 2 - step, 8, 5, 2, outline, scale)
+
+	# Backpack sits behind the torso, with a distinct flap and stitched side pocket.
+	var pack_x := -10 if pack_on_left else 5
+	_draw_hero_pixel_block(center, pack_x, -11, 6, 15, outline, scale)
+	_draw_hero_pixel_block(center, pack_x + 1, -10, 4, 12, leather, scale)
+	_draw_hero_pixel_block(center, pack_x + 1, -9, 4, 4, leather_light, scale)
+	_draw_hero_pixel_block(center, pack_x + 2, -4, 3, 5, Color("#5c4032"), scale)
+	_draw_hero_pixel_block(center, pack_x + 2, -3, 2, 2, hat_light, scale)
+	_draw_hero_pixel_block(center, pack_x + 1, 2, 4, 2, leather_light, scale)
+
+	# Tunic silhouette and belt, with dark pixel outlines.
+	_draw_hero_pixel_block(center, -6, -12, 12, 20, outline, scale)
+	_draw_hero_pixel_block(center, -5, -11, 10, 17, cloth_dark, scale)
+	_draw_hero_pixel_block(center, -4, -10, 8, 14, cloth, scale)
+	_draw_hero_pixel_block(center, -4, -8, 2, 8, cloth_light, scale)
+	_draw_hero_pixel_block(center, 2, -8, 2, 8, cloth_dark, scale)
+	_draw_hero_pixel_block(center, -5, -1, 10, 3, leather, scale)
+	_draw_hero_pixel_block(center, -1, -1, 3, 3, hat_light, scale)
+	_draw_hero_pixel_block(center, -3, 2, 6, 3, cloth_dark, scale)
+
+	# Arms and warm scarf are separate shapes so the silhouette reads at small scale.
+	_draw_hero_pixel_block(center, -8, -9, 3, 10, outline, scale)
+	_draw_hero_pixel_block(center, -7, -8, 2, 8, cloth, scale)
+	_draw_hero_pixel_block(center, 5, -9, 3, 10, outline, scale)
+	_draw_hero_pixel_block(center, 6, -8, 2, 8, cloth_light, scale)
+	_draw_hero_pixel_block(center, -6, -13, 12, 4, outline, scale)
+	_draw_hero_pixel_block(center, -5, -12, 10, 2, scarf, scale)
+	_draw_hero_pixel_block(center, -2, -12, 5, 1, scarf_light, scale)
+	_draw_hero_pixel_block(center, 4, -10, 3, 5, scarf, scale)
+
+	# Head and explorer hat: no exposed animated hair.
+	_draw_hero_pixel_block(center, -5, -22, 10, 10, outline, scale)
+	_draw_hero_pixel_block(center, -4, -21, 8, 8, skin, scale)
+	_draw_hero_pixel_block(center, -4, -20, 8, 2, Color("#8d6247"), scale)
+	if facing == "up":
+		_draw_hero_pixel_block(center, -4, -21, 8, 7, cloth_dark, scale)
+	else:
+		if facing == "left":
+			_draw_hero_pixel_block(center, -4, -18, 2, 2, outline, scale)
+			_draw_hero_pixel_block(center, -5, -18, 2, 3, skin, scale)
+		else:
+			_draw_hero_pixel_block(center, 2, -18, 2, 2, outline, scale)
+			_draw_hero_pixel_block(center, 3, -18, 2, 3, skin, scale)
+	_draw_hero_pixel_block(center, -8, -23, 16, 3, outline, scale)
+	_draw_hero_pixel_block(center, -7, -22, 14, 2, hat_light, scale)
+	_draw_hero_pixel_block(center, -6, -28, 12, 7, outline, scale)
+	_draw_hero_pixel_block(center, -5, -27, 10, 5, hat, scale)
+	_draw_hero_pixel_block(center, -4, -27, 4, 4, hat_light, scale)
+	_draw_hero_pixel_block(center, 1, -26, 3, 4, Color("#976139"), scale)
+	_draw_hero_pixel_block(center, -1, -23, 6, 1, Color("#70482f"), scale)
+	_draw_hero_pixel_block(center, -1, -29, 3, 2, hat_light, scale)
+
+	# A brass field lamp and small metal fittings give the silhouette a depth-explorer read.
+	var lamp_x := 8 if facing != "left" else -12
+	_draw_hero_pixel_block(center, lamp_x, -8, 4, 6, outline, scale)
+	_draw_hero_pixel_block(center, lamp_x + 1, -7, 2, 4, glow, scale)
+	_draw_hero_pixel_block(center, lamp_x + 1, -6, 1, 2, Color("#fff3b1"), scale)
+	_draw_hero_pixel_block(center, -7, -4, 2, 2, metal, scale)
+	_draw_hero_pixel_block(center, 5, 1, 2, 2, metal, scale)
+
+	# Back-facing view gets a visible pack flap instead of a facial highlight.
+	if facing == "up":
+		_draw_hero_pixel_block(center, -3, -18, 6, 3, cloth_light, scale)
+	elif facing == "left" or facing == "right":
+		_draw_hero_pixel_block(center, -1 if facing == "left" else 2, -18, 2, 2, outline, scale)
+
+func _draw_hero_pixel_block(center: Vector2, x: int, y: int, width: int, height: int, color: Color, scale: float) -> void:
+	draw_rect(Rect2(center + Vector2(x, y) * scale, Vector2(width, height) * scale), color, true)
+
+func _get_hero_facing_direction(geometry: Dictionary) -> String:
+	var road_cells: Array = geometry.get("road_cells", [])
+	if road_cells.size() < 2 or route_cells.is_empty():
+		return "down"
+	var physical_progress := maxf(0.0, hero_progress) * float(road_cells.size()) / float(route_cells.size())
+	var slot := posmod(int(floor(physical_progress)), road_cells.size())
+	var from_coord: Vector2i = road_cells[slot]
+	var to_coord: Vector2i = road_cells[posmod(slot + 1, road_cells.size())]
+	var delta := to_coord - from_coord
+	if absi(delta.x) > absi(delta.y):
+		return "right" if delta.x > 0 else "left"
+	return "down" if delta.y > 0 else "up"
 
 func _get_hero_grid_position(progress: float, geometry: Dictionary) -> Vector2:
 	# For older saves whose logical route has fewer than 34 nodes, walk along the
