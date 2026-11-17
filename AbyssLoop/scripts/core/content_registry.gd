@@ -647,6 +647,18 @@ const ROUTE_CELL_TYPES := {
 # automated tests and in-editor diagnostics can report them without crashing a run.
 func validate_content_registry() -> Array[String]:
 	var issues: Array[String] = []
+	# Legacy difficulty data remains validated for old saves, history and compatibility.
+	# Live campaign pressure is driven only by the selected Abyss floor.
+	for preset_id in ["standard", "volatile", "attrition", "abyssal"]:
+		if not DIFFICULTY_PRESETS.has(preset_id):
+			issues.append("missing difficulty preset %s" % preset_id)
+			continue
+		var preset: Dictionary = DIFFICULTY_PRESETS[preset_id]
+		for field in ["name", "description", "healing_multiplier", "defeat_keep_ratio", "starting_danger", "challenge_score_multiplier"]:
+			if not preset.has(field):
+				issues.append("difficulty:%s missing %s" % [preset_id, field])
+		if float(preset.get("healing_multiplier", 0.0)) <= 0.0 or float(preset.get("defeat_keep_ratio", -1.0)) < 0.0 or float(preset.get("defeat_keep_ratio", 1.0)) > 1.0 or float(preset.get("challenge_score_multiplier", 0.0)) < 1.0:
+			issues.append("difficulty:%s has invalid risk/reward fields" % preset_id)
 	for legacy_id_value in BASE_RESEARCH_ID_ALIASES.keys():
 		var legacy_id := str(legacy_id_value)
 		var canonical_id := canonical_research_id(legacy_id)
