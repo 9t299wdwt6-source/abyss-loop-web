@@ -30,14 +30,12 @@ const TUTORIAL_STEPS := [
 	{"title_key": "tutorial.5.title", "body_key": "tutorial.5.body", "tip_key": "tutorial.5.tip"}
 ]
 var manager
-var selected_difficulty_id: String = "standard"
+var selected_floor_id: int = 1
 var selected_modifier_id: String = "standard"
-var selected_contract_id: String = "none"
 var selected_expedition_mode_id: String = "standard"
 var expedition_mode_option: OptionButton
-var difficulty_option: OptionButton
+var floor_option: OptionButton
 var modifier_option: OptionButton
-var contract_option: OptionButton
 var modifier_preview_label: Label
 var seed_input: LineEdit
 var pending_preview_seed: int = 0
@@ -463,6 +461,7 @@ func _on_game_state_changed() -> void:
 	_refresh_header()
 
 func _render_base() -> void:
+	selected_floor_id = clampi(selected_floor_id, 1, GameState.highest_unlocked_floor)
 	var compact_layout := _is_compact_layout()
 	if is_instance_valid(overlay) and overlay.visible:
 		_close_overlay(false)
@@ -530,18 +529,18 @@ func _render_base() -> void:
 		var preparation_row: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()
 		preparation_row.add_theme_constant_override("separation", 8)
 		launch_box.add_child(preparation_row)
-		difficulty_option = OptionButton.new()
-		_apply_keyboard_focus_outline(difficulty_option)
-		difficulty_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		difficulty_option.tooltip_text = "Сложность фиксируется на весь забег. Нельзя изменить её до возвращения на базу или поражения. Подробные коэффициенты показаны ниже."
-		for difficulty_key in ContentRegistry.DIFFICULTY_PRESETS.keys():
-			var difficulty_definition: Dictionary = ContentRegistry.DIFFICULTY_PRESETS[difficulty_key]
-			difficulty_option.add_item(str(difficulty_definition.get("name", difficulty_key)))
-			difficulty_option.set_item_metadata(difficulty_option.item_count - 1, str(difficulty_key))
-			if str(difficulty_key) == selected_difficulty_id:
-				difficulty_option.select(difficulty_option.item_count - 1)
-		difficulty_option.item_selected.connect(_on_difficulty_selected)
-		preparation_row.add_child(difficulty_option)
+		floor_option = OptionButton.new()
+		_apply_keyboard_focus_outline(floor_option)
+		floor_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		floor_option.tooltip_text = "Выберите любой этаж, который уже открыт. Новый этаж открывается после победы над боссом предыдущего."
+		for floor_number in range(1, GameState.highest_unlocked_floor + 1):
+			var floor_definition: Dictionary = ContentRegistry.get_abyss_floor(floor_number)
+			floor_option.add_item("%d/8 · %s" % [floor_number, str(floor_definition.get("name", "Этаж %d" % floor_number))])
+			floor_option.set_item_metadata(floor_option.item_count - 1, floor_number)
+			if floor_number == selected_floor_id:
+				floor_option.select(floor_option.item_count - 1)
+		floor_option.item_selected.connect(_on_floor_selected)
+		preparation_row.add_child(floor_option)
 		modifier_option = OptionButton.new()
 		_apply_keyboard_focus_outline(modifier_option)
 		modifier_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -564,22 +563,6 @@ func _render_base() -> void:
 		seed_input.text = "0"
 		seed_input.text_changed.connect(_on_seed_input_changed)
 		preparation_row.add_child(seed_input)
-		var contract_row: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()
-		contract_row.add_theme_constant_override("separation", 8)
-		launch_box.add_child(contract_row)
-		contract_row.add_child(_label(_t("base.contract.label"), 12, C_ACCENT, true))
-		contract_option = OptionButton.new()
-		_apply_keyboard_focus_outline(contract_option)
-		contract_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		contract_option.tooltip_text = "Необязательная задача с платой, целью, сроком и дополнительной наградой."
-		for contract_key in ContentRegistry.EXPEDITION_CONTRACTS.keys():
-			var contract_definition: Dictionary = ContentRegistry.EXPEDITION_CONTRACTS[contract_key]
-			contract_option.add_item(str(contract_definition.get("name", contract_key)))
-			contract_option.set_item_metadata(contract_option.item_count - 1, str(contract_key))
-			if str(contract_key) == selected_contract_id:
-				contract_option.select(contract_option.item_count - 1)
-		contract_option.item_selected.connect(_on_contract_selected)
-		contract_row.add_child(contract_option)
 		modifier_preview_label = _label("", 11, C_GOLD, true)
 		modifier_preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		launch_box.add_child(modifier_preview_label)
@@ -678,7 +661,9 @@ func _render_base() -> void:
 	bottom_box.add_child(history_button)
 	_refresh_header()
 	var base_focus_target: Control = _base_primary_action
-	if expedition_mode_option != null:
+	if floor_option != null:
+		base_focus_target = floor_option
+	elif expedition_mode_option != null:
 		base_focus_target = expedition_mode_option
 	if base_focus_target != null:
 		call_deferred("_focus_control_if_valid", base_focus_target)
@@ -749,7 +734,7 @@ func _open_expedition_history(filter_id: String = "all") -> void:
 		var card_box := VBoxContainer.new()
 		card_box.add_theme_constant_override("separation", 4)
 		card.add_child(card_box)
-		var title_text := "%s · %s · цикл %d · ур. %d" % ["ВОЗВРАЩЕНИЕ" if is_return else "ПОРАЖЕНИЕ", str(entry.get("difficulty_name", "Стандарт")), int(entry.get("loops", 0)), int(entry.get("hero_level", 1))]
+		var title_text := "%s · этаж %d/8 · %s · цикл %d · ур. %d" % ["ВОЗВРАЩЕНИЕ" if is_return else "ПОРАЖЕНИЕ", int(entry.get("floor_id", 1)), str(entry.get("floor_name", "Кромка Бездны")), int(entry.get("loops", 0)), int(entry.get("hero_level", 1))]
 		card_box.add_child(_label(title_text, 13, C_ACCENT if is_return else C_RED, true))
 		card_box.add_child(_label("%s · seed %d · v%s · счёт %d" % [str(entry.get("date", "Дата неизвестна")), int(entry.get("seed", 0)), str(entry.get("game_version", "unknown")), int(entry.get("challenge_score", 0))], 10, C_MUTED))
 		var endgame_completed := bool(entry.get("endgame_completed", false))
@@ -760,8 +745,6 @@ func _open_expedition_history(filter_id: String = "all") -> void:
 		var detail_parts: Array[String] = []
 		if not str(entry.get("objective_name", "")).is_empty():
 			detail_parts.append("Цель: %s (%s)" % [str(entry.get("objective_name", "")), "выполнена" if bool(entry.get("objective_completed", false)) else "не выполнена"])
-		if not str(entry.get("contract_name", "")).is_empty():
-			detail_parts.append("Контракт: %s — %s" % [str(entry.get("contract_name", "")), str(entry.get("contract_status", "active"))])
 		var tiles_value: Variant = entry.get("tiles", [])
 		if typeof(tiles_value) == TYPE_ARRAY and not tiles_value.is_empty():
 			var tile_names := PackedStringArray()
@@ -1162,11 +1145,11 @@ func _on_expedition_mode_selected(index: int) -> void:
 		selected_expedition_mode_id = str(expedition_mode_option.get_item_metadata(index))
 	_refresh_modifier_preview()
 
-func _on_difficulty_selected(index: int) -> void:
-	if difficulty_option == null or index < 0 or index >= difficulty_option.item_count:
-		selected_difficulty_id = "standard"
-		return
-	selected_difficulty_id = str(difficulty_option.get_item_metadata(index))
+func _on_floor_selected(index: int) -> void:
+	if floor_option == null or index < 0 or index >= floor_option.item_count:
+		selected_floor_id = 1
+	else:
+		selected_floor_id = clampi(int(floor_option.get_item_metadata(index)), 1, GameState.highest_unlocked_floor)
 	_refresh_modifier_preview()
 
 func _on_modifier_selected(index: int) -> void:
@@ -1178,13 +1161,6 @@ func _on_modifier_selected(index: int) -> void:
 	_refresh_modifier_preview()
 
 func _on_seed_input_changed(_new_text: String) -> void:
-	_refresh_modifier_preview()
-
-func _on_contract_selected(index: int) -> void:
-	if contract_option == null or index < 0 or index >= contract_option.item_count:
-		selected_contract_id = "none"
-	else:
-		selected_contract_id = str(contract_option.get_item_metadata(index))
 	_refresh_modifier_preview()
 
 func _make_preview_seed() -> int:
@@ -1205,13 +1181,13 @@ func _refresh_modifier_preview() -> void:
 	if modifier_preview_label == null or not is_instance_valid(modifier_preview_label):
 		return
 	var modifier: Dictionary = ContentRegistry.RUN_MODIFIERS.get(selected_modifier_id, ContentRegistry.RUN_MODIFIERS["standard"])
-	var difficulty: Dictionary = ContentRegistry.DIFFICULTY_PRESETS.get(selected_difficulty_id, ContentRegistry.DIFFICULTY_PRESETS["standard"])
+	var floor_definition: Dictionary = ContentRegistry.get_abyss_floor(selected_floor_id)
 	var mode: Dictionary = ContentRegistry.EXPEDITION_MODES.get(selected_expedition_mode_id, ContentRegistry.EXPEDITION_MODES["standard"])
-	var preview := "РЕЖИМ: %s — %s" % [str(mode.get("name", "Обычная экспедиция")), str(mode.get("description", ""))]
+	var preview := "ЭТАЖ БЕЗДНЫ %d/8: %s · %s — %s" % [selected_floor_id, str(floor_definition.get("name", "Этаж %d" % selected_floor_id)), str(floor_definition.get("theme", "")), str(floor_definition.get("description", ""))]
+	preview += "\nПараметры этажа: атака врагов ×%.2f, здоровье ×%.2f, защита ×%.2f; награда ×%.2f; восстановление ×%.0f%%; сохранение добычи при поражении %d%%." % [float(floor_definition.get("enemy_attack_multiplier", 1.0)), float(floor_definition.get("enemy_health_multiplier", 1.0)), float(floor_definition.get("enemy_defense_multiplier", 1.0)), float(floor_definition.get("reward_multiplier", 1.0)), float(floor_definition.get("healing_multiplier", 1.0)) * 100.0, int(round(float(floor_definition.get("defeat_keep_ratio", 0.4)) * 100.0))]
+	preview += "\nРЕЖИМ: %s — %s" % [str(mode.get("name", "Обычная экспедиция")), str(mode.get("description", ""))]
 	if selected_expedition_mode_id == "long_expedition":
 		preview += " Цель: 12 циклов и победа над боссом цикла 12. Максимальная опасность ×%.1f; награда за цикл ограничена множителем ×%.2f. Контрольные точки 3/6/9/12." % [float(mode.get("max_danger", 6.0)), float(mode.get("reward_multiplier_cap", 1.8))]
-	preview += "\nСЛОЖНОСТЬ: %s — %s" % [str(difficulty.get("name", "Стандарт")), str(difficulty.get("description", ""))]
-	preview += "\nВраги: атака ×%.2f, здоровье ×%.2f, защита ×%.2f; награда ×%.2f; лечение ×%.0f%%; при поражении сохраняется %d%% добычи." % [float(difficulty.get("enemy_attack_multiplier", 1.0)), float(difficulty.get("enemy_health_multiplier", 1.0)), float(difficulty.get("enemy_defense_multiplier", 1.0)), float(difficulty.get("reward_multiplier", 1.0)), float(difficulty.get("healing_multiplier", 1.0)) * 100.0, int(round(float(difficulty.get("defeat_keep_ratio", 0.4)) * 100.0))]
 	preview += " Рейтинг испытания ×%.2f." % float(difficulty.get("challenge_score_multiplier", 1.0))
 	preview += "\n%s — %s" % [str(modifier.get("name", "Обычная экспедиция")), str(modifier.get("description", ""))]
 	var challenge_value: Variant = modifier.get("challenge", {})
@@ -1220,14 +1196,7 @@ func _refresh_modifier_preview() -> void:
 	var objective_preview: Dictionary = manager.preview_objective_for_seed(_get_preview_seed(), selected_modifier_id)
 	if not objective_preview.is_empty():
 		preview += "\nАВТОЦЕЛЬ ЭКСПЕДИЦИИ (по seed): %s. Условие: %s. Награда: +%d материалов и +%d редких ресурсов. Seed: %d." % [str(objective_preview.get("name", "Экспедиция")), str(objective_preview.get("description", "")), int(objective_preview.get("scrap_reward", 0)), int(objective_preview.get("crystal_reward", 0)), _get_preview_seed()]
-	var contract_definition: Dictionary = ContentRegistry.EXPEDITION_CONTRACTS.get(selected_contract_id, ContentRegistry.EXPEDITION_CONTRACTS["none"])
-	if selected_contract_id != "none":
-		var affordability: Dictionary = manager.can_accept_contract(selected_contract_id)
-		var afford_text := "" if bool(affordability.get("ok", false)) else " НЕДОСТАТОЧНО РЕСУРСОВ: " + str(affordability.get("reason", ""))
-		preview += "\nКОНТРАКТ: %s. %s. Плата: %d материалов / %d редких ресурсов. Срок: до цикла %d. Награда: +%d материалов / +%d редких ресурсов.%s" % [str(contract_definition.get("name", "Контракт")), str(contract_definition.get("description", "")), int(contract_definition.get("scrap_cost", 0)), int(contract_definition.get("crystal_cost", 0)), int(contract_definition.get("deadline_loops", 0)), int(contract_definition.get("scrap_reward", 0)), int(contract_definition.get("crystal_reward", 0)), afford_text]
-	else:
-		preview += "\nКонтракт не выбран: стоимость 0, никаких дополнительных требований."
-	preview += "\nЕсли поле Seed = 0, будет использован показанный seed — цель совпадёт с фактической целью забега."
+	preview += "\nПосле победы над боссом можно продолжить текущий этаж, спуститься ниже или вернуться на базу."
 	modifier_preview_label.text = preview
 
 func _start_expedition() -> void:
@@ -1240,11 +1209,7 @@ func _start_expedition() -> void:
 			return
 	if requested_seed <= 0:
 		requested_seed = _get_preview_seed()
-	var acceptance: Dictionary = manager.can_accept_contract(selected_contract_id)
-	if not bool(acceptance.get("ok", false)):
-		_open_message("Контракт недоступен", str(acceptance.get("reason", "Недостаточно ресурсов.")))
-		return
-	if not manager.start_run(selected_difficulty_id, requested_seed, selected_modifier_id, selected_contract_id, selected_expedition_mode_id):
+	if not manager.start_run("standard", requested_seed, selected_modifier_id, "none", selected_expedition_mode_id, selected_floor_id):
 		_open_message("Не удалось начать экспедицию", "Начальное состояние и плата не сохранены. Проверьте свободное место для сохранения и повторите попытку.")
 		return
 	_render_expedition()
@@ -1313,7 +1278,7 @@ func _render_expedition() -> void:
 	map_title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	map_header.add_child(map_title_box)
 	map_title_box.add_child(_label(_t("expedition.map.title"), 13, C_ACCENT, true))
-	map_title_box.add_child(_label("Seed: %d · %s · %s · %s · замкнутый маршрут." % [int(manager.run_seed), str(ContentRegistry.EXPEDITION_MODES.get(manager.expedition_mode_id, {}).get("name", "Обычная экспедиция")), str(ContentRegistry.DIFFICULTY_PRESETS.get(manager.difficulty_id, {}).get("name", "Стандарт")), str(manager.get_run_modifier().get("name", "Обычная экспедиция"))], 11, C_MUTED))
+	map_title_box.add_child(_label("Seed: %d · этаж %d/8: %s · %s · %s · замкнутый маршрут." % [int(manager.run_seed), manager.floor_id, str(manager.get_floor_config().get("name", "Этаж")), str(ContentRegistry.EXPEDITION_MODES.get(manager.expedition_mode_id, {}).get("name", "Обычная экспедиция")), str(manager.get_run_modifier().get("name", "Обычная экспедиция"))], 11, C_MUTED))
 	fight_status_label = _label(_t("expedition.hero_moving"), 13, C_TEXT, true)
 	fight_status_label.visible = not compact_layout
 	map_header.add_child(fight_status_label)
@@ -1494,15 +1459,7 @@ func _sync_expedition_view(rebuild_tiles: bool) -> void:
 			challenge_label.visible = true
 			var challenge_state := "ВЫПОЛНЕНО" if bool(challenge.get("completed", false)) else "В ПРОЦЕССЕ"
 			challenge_label.text = "ИСПЫТАНИЕ: %s · %d/%d · %s" % [str(challenge.get("name", "Испытание")), int(challenge.get("progress", 0)), int(challenge.get("target", 1)), challenge_state]
-	if contract_label != null:
-		var contract: Dictionary = manager.run_contract
-		if contract.is_empty():
-			contract_label.visible = false
-		else:
-			contract_label.visible = true
-			var contract_state := "ПРОВАЛЕН" if bool(contract.get("failed", false)) else ("ВЫПОЛНЕН" if bool(contract.get("completed", false)) else "В ПРОЦЕССЕ")
-			contract_label.text = "КОНТРАКТ: %s · %d/%d · до цикла %d · %s" % [str(contract.get("name", "Контракт")), int(contract.get("progress", 0)), int(contract.get("target", 0)), int(contract.get("deadline_loops", 0)), contract_state]
-			contract_label.tooltip_text = str(contract.get("description", "")) + "\nПлата уже списана при начале забега; провал контракта не отнимает дополнительных ресурсов."
+
 	if status_effects_label != null:
 		var show_status_symbols := bool(GameState.settings.get("status_symbols", true))
 		var status_lines: Array[String] = [status_effect_presenter.format_line(manager.status_effect_system, manager.hero, "ГЕРОЙ", 3, show_status_symbols)]
@@ -1711,6 +1668,33 @@ func _on_manager_changed() -> void:
 	_refresh_header()
 	if screen_mode == "expedition":
 		_sync_expedition_view(false)
+		_try_show_boss_floor_choice()
+
+func _try_show_boss_floor_choice() -> void:
+	if manager == null or not is_instance_valid(manager) or not bool(manager.pending_floor_choice):
+		return
+	if not manager.active or manager.pending_perk_count > 0 or not manager.enemy.is_empty() or not manager.pending_event.is_empty():
+		return
+	if overlay == null or not is_instance_valid(overlay) or overlay.visible:
+		return
+	var buttons: Array = [
+		{"text": "Продолжить на этом этаже", "callback": Callable(self, "_resolve_floor_choice").bind("continue"), "accent": true},
+	]
+	if manager.floor_id < ContentRegistry.ABYSS_FLOOR_COUNT and GameState.is_abyss_floor_unlocked(manager.floor_id + 1):
+		buttons.append({"text": "Спуститься на этаж %d · %s" % [manager.floor_id + 1, str(ContentRegistry.get_abyss_floor(manager.floor_id + 1).get("name", "Новый этаж"))], "callback": Callable(self, "_resolve_floor_choice").bind("descend"), "accent": false})
+	buttons.append({"text": "Вернуться на базу", "callback": Callable(self, "_resolve_floor_choice").bind("return"), "accent": false})
+	_show_modal("Босс повержен · этаж %d/8" % manager.floor_id, "Следующий этаж открывается навсегда. Продолжение сохранит текущий уровень героя и рюкзак; спуск зафиксирует добычу и начнёт новый этаж с уровня 1 и пустым рюкзаком. Возвращение завершит экспедицию.", buttons, "floor_choice")
+
+func _resolve_floor_choice(choice_id: String) -> void:
+	_close_overlay(false)
+	var result: Dictionary = manager.resolve_floor_choice(choice_id)
+	if not bool(result.get("ok", false)):
+		_open_message("Переход не выполнен", str(result.get("reason", "Не удалось применить выбор.")))
+		return
+	if choice_id == "continue":
+		_sync_expedition_view(false)
+		if pause_button != null:
+			call_deferred("_focus_control_if_valid", pause_button)
 
 func _on_exchange_selected_tile() -> void:
 	if manager == null or not is_instance_valid(manager):
@@ -1905,7 +1889,22 @@ func _confirm_return() -> void:
 func _on_run_finished(summary: Dictionary) -> void:
 	current_summary = summary.duplicate(true)
 	_close_overlay(false)
+	var next_floor := int(summary.get("next_floor_id", 0))
+	if next_floor >= 1 and next_floor <= GameState.highest_unlocked_floor:
+		selected_floor_id = next_floor
+		call_deferred("_begin_next_floor_after_boss")
+		return
 	_render_summary(summary)
+
+func _begin_next_floor_after_boss() -> void:
+	if manager == null or not is_instance_valid(manager):
+		return
+	var next_seed := _make_preview_seed()
+	if not manager.start_run("standard", next_seed, selected_modifier_id, "none", selected_expedition_mode_id, selected_floor_id):
+		_render_base()
+		_open_message("Переход не завершён", "Этаж %d открыт и сохранён, но новый забег не удалось безопасно начать. Запустите его с базы." % selected_floor_id)
+		return
+	_render_expedition()
 
 func _render_summary(summary: Dictionary) -> void:
 	if is_instance_valid(overlay) and overlay.visible:
@@ -1934,12 +1933,12 @@ func _render_summary(summary: Dictionary) -> void:
 	header_box.add_child(_label("ЭКСПЕДИЦИЯ ЗАВЕРШЕНА", 11, C_ACCENT if returned else C_RED, true))
 	header_box.add_child(_label("Добыча возвращена в убежище." if returned else "Герой потерпел поражение.", 24, C_TEXT, true))
 	header_box.add_child(_label("Маршрут seed %s · пройдено циклов: %d · уровень героя: %d" % [str(summary.get("seed", "—")), int(summary.get("loops", 0)), int(summary.get("hero_level", 1))], 12, C_MUTED))
-	header_box.add_child(_label("Сложность: %s · счёт испытания: %d" % [str(summary.get("difficulty_name", "Стандарт")), int(summary.get("challenge_score", 0))], 12, C_GOLD, true))
+	header_box.add_child(_label("Этаж Бездны %d/8 · %s · счёт экспедиции: %d" % [int(summary.get("floor_id", 1)), str(summary.get("floor_name", "Кромка Бездны")), int(summary.get("challenge_score", 0))], 12, C_GOLD, true))
 	var record_value: Variant = summary.get("difficulty_record", {})
 	if typeof(record_value) == TYPE_DICTIONARY:
 		var record: Dictionary = record_value
 		if not record.is_empty():
-			header_box.add_child(_label("Рекорд сложности: %d очков · лучший цикл: %d · возвращений: %d/%d" % [int(record.get("best_score", 0)), int(record.get("best_loops", 0)), int(record.get("returns", 0)), int(record.get("runs", 0))], 11, C_MUTED))
+			header_box.add_child(_label("Рекорд этого этажа: %d очков · лучший цикл: %d · возвращений: %d/%d" % [int(record.get("best_score", 0)), int(record.get("best_loops", 0)), int(record.get("returns", 0)), int(record.get("runs", 0))], 11, C_MUTED))
 	header_box.add_child(_label("Режим: %s" % str(summary.get("expedition_mode_name", "Обычная экспедиция")), 11, C_ACCENT, true))
 	header_box.add_child(_label("Модификатор маршрута: %s" % str(summary.get("modifier_name", "Обычная экспедиция")), 11, C_MUTED, true))
 	if bool(summary.get("endgame_completed", false)):
@@ -2584,7 +2583,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if key_event.keycode == KEY_F1:
-		if overlay != null and overlay.visible and modal_kind in ["event", "perk", "confirm", "confirm_reset", "confirm_salvage"]:
+		if overlay != null and overlay.visible and modal_kind in ["event", "perk", "floor_choice", "confirm", "confirm_reset", "confirm_salvage"]:
 			return
 		_open_help_menu()
 		get_viewport().set_input_as_handled()
