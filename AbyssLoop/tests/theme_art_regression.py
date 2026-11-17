@@ -33,7 +33,7 @@ checks = {
     "route map uses themed background": 'draw_texture_rect(ABYSS_BACKDROP' in route,
     "route markers use blocky rectangular silhouettes": "draw_rect(marker_rect.grow(-2), fill, true)" in route,
     "route tiles have low-resolution type glyphs": "func _draw_pixel_symbol" in route and '"signal":' in route,
-    "hero token is independently drawn in original pixel blocks": "Original block-built explorer stays custom" in route,
+    "hero uses the four-facing pixel explorer with a field hat and backpack": "func _draw_hero_pixel_sprite(" in route and "func _get_hero_facing_direction(" in route and "Backpack sits behind the torso" in route and "Head and explorer hat" in route,
     "brand label no longer claims neutral theme": "header.brand.subtitle" in ui and "ЭКСПЕДИЦИЯ · ЗАМКНУТЫЙ ПУТЬ · ЭХО ГЛУБИН" in localization and "НЕЙТРАЛЬНЫЙ ПРОТОТИП ROGUELITE" not in ui,
     "themed route cell type names exist": "Каменный уступ" in content and "Светлая ниша" in content,
     "themed creature names exist without changing ids": '"scout": {' in content and '"name": "Щелкун-ползун"' in content,
