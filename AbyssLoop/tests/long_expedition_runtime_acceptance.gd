@@ -64,19 +64,6 @@ func _run_acceptance() -> void:
 			_check(false, "the run never becomes stuck in a failed settlement transaction")
 			break
 
-		if bool(manager.pending_floor_choice):
-			var target_loops := int(manager.get_expedition_goal_progress().get("target_loops", 12))
-			var target_bosses := int(manager.get_expedition_goal_progress().get("target_bosses", 4))
-			var completed_bosses := int(manager.run_ledger.get("bosses_defeated", 0))
-			var final_boss_done := bool(manager.run_ledger.get("endgame_completed", false)) and int(manager.loop_count) >= target_loops and completed_bosses >= target_bosses
-			var floor_choice := "return" if final_boss_done else "continue"
-			var floor_result: Dictionary = manager.resolve_floor_choice(floor_choice)
-			_check(bool(floor_result.get("ok", false)), "boss floor decision resolves with %s at loop %d" % [floor_choice, int(manager.loop_count)])
-			if not bool(floor_result.get("ok", false)):
-				break
-			await get_tree().process_frame
-			continue
-
 		if not manager.pending_event.is_empty():
 			manager.run_ledger["scrap"] = maxi(100000, int(manager.run_ledger.get("scrap", 0)))
 			manager.run_ledger["crystals"] = maxi(100000, int(manager.run_ledger.get("crystals", 0)))
@@ -93,6 +80,19 @@ func _run_acceptance() -> void:
 			var perk_id := _first_offered_perk(manager)
 			if perk_id.is_empty() or not bool(manager.choose_perk(perk_id)):
 				_check(false, "every level-up has a valid offered perk to resolve")
+				break
+			await get_tree().process_frame
+			continue
+
+		if bool(manager.pending_floor_choice):
+			var target_loops := int(manager.get_expedition_goal_progress().get("target_loops", 12))
+			var target_bosses := int(manager.get_expedition_goal_progress().get("target_bosses", 4))
+			var completed_bosses := int(manager.run_ledger.get("bosses_defeated", 0))
+			var final_boss_done := bool(manager.run_ledger.get("endgame_completed", false)) and int(manager.loop_count) >= target_loops and completed_bosses >= target_bosses
+			var floor_choice := "return" if final_boss_done else "continue"
+			var floor_result: Dictionary = manager.resolve_floor_choice(floor_choice)
+			_check(bool(floor_result.get("ok", false)), "boss floor decision resolves with %s at loop %d" % [floor_choice, int(manager.loop_count)])
+			if not bool(floor_result.get("ok", false)):
 				break
 			await get_tree().process_frame
 			continue

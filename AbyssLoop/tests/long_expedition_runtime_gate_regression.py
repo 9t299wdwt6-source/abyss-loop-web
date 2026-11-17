@@ -5,7 +5,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 runner = (ROOT / "tests/long_expedition_runtime_acceptance.gd").read_text(encoding="utf-8")
 scene = (ROOT / "tests/long_expedition_runtime_acceptance_runner.tscn").read_text(encoding="utf-8")
-workflow = (ROOT / ".github/workflows/abyssloop-web.yml").read_text(encoding="utf-8")
+workflow = (ROOT.parent / ".github/workflows/abyssloop-web.yml").read_text(encoding="utf-8")
 
 checks = {
     "runtime gate starts the actual long-expedition mode": 'manager.start_run("standard", LONG_SEED, "standard", "none", "long_expedition")' in runner,
@@ -13,6 +13,7 @@ checks = {
     "runtime gate verifies the four configured boss loops": '_boss_loops_seen == [3, 6, 9, 12]' in runner,
     "runtime gate verifies the four durable checkpoints and endgame result": 'checkpoint_loops == [3, 6, 9, 12]' in runner and 'final_summary.get("endgame_completed", false)' in runner,
     "runtime gate explicitly resolves each boss floor choice and returns after the final boss": 'if bool(manager.pending_floor_choice):' in runner and 'manager.resolve_floor_choice(floor_choice)' in runner and 'floor_choice := "return" if final_boss_done else "continue"' in runner,
+    "runtime gate resolves level-up perks before allowing a boss-floor decision": runner.index("if int(manager.pending_perk_count) > 0:") < runner.index("if bool(manager.pending_floor_choice):"),
     "runtime gate exercises production route and encounter methods": 'manager._tick_route(0.0)' in runner and 'manager._tick_combat(0.01)' in runner and 'manager.resolve_event_choice(choice_id)' in runner,
     "runtime scene points at the actual acceptance script": 'path="res://tests/long_expedition_runtime_acceptance.gd"' in scene,
     "CI runs the long expedition runtime scene with a bounded timeout": 'Run 12-loop long expedition runtime acceptance' in workflow and 'res://tests/long_expedition_runtime_acceptance_runner.tscn' in workflow and 'timeout 90s' in workflow,
