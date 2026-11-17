@@ -2329,7 +2329,7 @@ func _create_equipment_slot_icon(item: Dictionary) -> Texture2D:
 						_fill_equipment_icon_rect(image, 12, 4, 1, 7, Color("#fff0bd"))
 			"helmet":
 				# Domed helmet with brow and visor; silhouette differs from the shield.
-				_fill_equipment_icon_rect(image, 5, 6, 14, 9, outline_color())
+				_fill_equipment_icon_rect(image, 5, 6, 14, 9, _item_icon_outline_color())
 				_fill_equipment_icon_rect(image, 6, 7, 12, 7, metal)
 				_fill_equipment_icon_rect(image, 8, 4, 8, 4, metal_light)
 				_fill_equipment_icon_rect(image, 4, 13, 16, 3, leather)
@@ -2349,7 +2349,7 @@ func _create_equipment_slot_icon(item: Dictionary) -> Texture2D:
 				_fill_equipment_icon_rect(image, 4, 6, 16, 10, metal)
 				_fill_equipment_icon_rect(image, 6, 16, 12, 3, metal)
 				_fill_equipment_icon_rect(image, 8, 19, 8, 2, leather)
-				_fill_equipment_icon_rect(image, 8, 8, 8, 7, cloth_dark_color())
+				_fill_equipment_icon_rect(image, 8, 8, 8, 7, _item_icon_cloth_dark_color())
 				_fill_equipment_icon_rect(image, 10, 9, 4, 5, glow)
 			"amulet":
 				# Pendant on a chain with a bright central gem.
@@ -2397,10 +2397,10 @@ func _equipment_rarity_color(rarity: String) -> Color:
 		_:
 			return Color("#7f9c95")
 
-func outline_color() -> Color:
+func _item_icon_outline_color() -> Color:
 	return Color("#293739")
 
-func cloth_dark_color() -> Color:
+func _item_icon_cloth_dark_color() -> Color:
 	return Color("#435b43")
 
 func _prepare_overlay() -> void:
