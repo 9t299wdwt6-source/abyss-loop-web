@@ -584,9 +584,8 @@ func _draw_hero_pixel_sprite(center: Vector2, scale: float, facing: String, gait
 	var metal := Color("#718c91")
 	var glow := Color("#f7d978")
 	var step := 0
-	if gait_frame % 8 in [1, 2, 5, 6]:
+	if (gait_frame % 8) in [1, 2, 5, 6]:
 		step = 1
-	var side_view := facing in ["left", "right"]
 	var pack_on_left := facing != "left"
 
 	# Ground shadow and alternating boots/legs.
