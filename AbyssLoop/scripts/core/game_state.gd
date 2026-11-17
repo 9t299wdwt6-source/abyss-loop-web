@@ -21,6 +21,8 @@ var loadout: Dictionary = {"weapon": {}, "helmet": {}, "armor": {}, "shield": {}
 var armory: Array = []
 var runs_started: int = 0
 var runs_completed: int = 0
+# Highest Abyss floor permanently reached; only floors 1..this value can be selected.
+var highest_unlocked_floor: int = 1
 var best_loop: int = 0
 var total_victories: int = 0
 var total_bosses_defeated: int = 0
@@ -68,6 +70,24 @@ func _subtract_trophy_counts(total: Dictionary, kept: Dictionary) -> Dictionary:
 	for trophy_id in TROPHY_IDS:
 		result[trophy_id] = maxi(0, int(total.get(trophy_id, 0)) - int(kept.get(trophy_id, 0)))
 	return result
+
+func is_abyss_floor_unlocked(floor_number: int) -> bool:
+	return floor_number >= 1 and floor_number <= highest_unlocked_floor and floor_number <= ContentRegistry.ABYSS_FLOOR_COUNT
+
+func unlock_abyss_floor(floor_number: int) -> bool:
+	var target_floor := clampi(floor_number, 1, ContentRegistry.ABYSS_FLOOR_COUNT)
+	if target_floor <= highest_unlocked_floor:
+		return true
+	# Persist the unlock before the active expedition checkpoint is advanced.
+	# If the write fails, roll back so the next floor is never shown as unlocked
+	# without a durable profile record.
+	var previous_floor := highest_unlocked_floor
+	highest_unlocked_floor = target_floor
+	if not save_now():
+		highest_unlocked_floor = previous_floor
+		return false
+	changed.emit()
+	return true
 
 func _ready() -> void:
 	var saved: Dictionary = SaveSystem.load_game()
@@ -117,6 +137,7 @@ func _ready() -> void:
 					armory.append(armory_item_data.duplicate(true))
 		runs_started = maxi(0, int(saved.get("runs_started", 0)))
 		runs_completed = maxi(0, int(saved.get("runs_completed", 0)))
+		highest_unlocked_floor = clampi(int(saved.get("highest_unlocked_floor", 1)), 1, ContentRegistry.ABYSS_FLOOR_COUNT)
 		best_loop = maxi(0, int(saved.get("best_loop", 0)))
 		total_victories = maxi(0, int(saved.get("total_victories", 0)))
 		total_bosses_defeated = maxi(0, int(saved.get("total_bosses_defeated", 0)))
@@ -836,6 +857,8 @@ func _normalize_history_entry(source: Dictionary) -> Dictionary:
 		"processed_steps": maxi(0, int(source.get("processed_steps", 0))),
 		"start_loadout_ids": start_loadout_ids,
 		"seed": maxi(0, int(source.get("seed", 0))),
+		"floor_id": clampi(int(source.get("floor_id", 1)), 1, ContentRegistry.ABYSS_FLOOR_COUNT),
+		"floor_name": str(source.get("floor_name", "Этаж %d" % int(source.get("floor_id", 1)))).substr(0, 64),
 		"difficulty_id": str(source.get("difficulty_id", "standard")).substr(0, 32),
 		"modifier_id": str(source.get("modifier_id", "standard")).substr(0, 32),
 		"difficulty_name": str(source.get("difficulty_name", "Стандарт")).substr(0, 48),
@@ -926,6 +949,7 @@ func export_save_data() -> Dictionary:
 		"armory": armory.duplicate(true),
 		"runs_started": runs_started,
 		"runs_completed": runs_completed,
+		"highest_unlocked_floor": highest_unlocked_floor,
 		"best_loop": best_loop,
 		"total_victories": total_victories,
 		"total_bosses_defeated": total_bosses_defeated,
@@ -956,6 +980,7 @@ func reset_progress() -> void:
 	armory.clear()
 	runs_started = 0
 	runs_completed = 0
+	highest_unlocked_floor = 1
 	best_loop = 0
 	total_victories = 0
 	total_bosses_defeated = 0
