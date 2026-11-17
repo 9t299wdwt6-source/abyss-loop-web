@@ -195,7 +195,7 @@ checks["next-floor transition starts a fresh run at level one with an empty back
 checks["Godot smoke test now covers eight-floor progression instead of gameplay difficulty profiles"] = (
     "ContentRegistry.ABYSS_FLOOR_COUNT == 8" in smoke
     and "floor_smoke_manager.floor_id = 8" in smoke
-    and "_scale_healing(100) == 72" in smoke
+    and "_scale_healing(100) == 82" in smoke
     and "difficulty_smoke_manager" not in smoke
 )
 
