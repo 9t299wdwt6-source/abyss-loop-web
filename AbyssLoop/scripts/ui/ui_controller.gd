@@ -1406,6 +1406,7 @@ func _render_expedition() -> void:
 	log_label.custom_minimum_size.x = 285 if not compact_layout else 0
 	log_scroll.add_child(log_label)
 	_sync_expedition_view(true)
+	_try_show_boss_floor_choice()
 	if pause_button != null:
 		call_deferred("_focus_control_if_valid", pause_button)
 	if bool(GameState.settings.get("high_contrast", false)):
