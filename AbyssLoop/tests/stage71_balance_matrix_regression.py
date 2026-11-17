@@ -5,7 +5,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 capture = (ROOT / "tests/stage92_floor_progression_capture.gd").read_text(encoding="utf-8")
 scene = (ROOT / "tests/stage92_floor_progression_capture_runner.tscn").read_text(encoding="utf-8")
-workflow = (ROOT / ".github/workflows/abyssloop-web.yml").read_text(encoding="utf-8")
+workflow = (ROOT.parent / ".github/workflows/abyssloop-web.yml").read_text(encoding="utf-8")
 reporter = (ROOT / "tools/floor_progression_report.py").read_text(encoding="utf-8")
 manager = (ROOT / "scripts/systems/expedition_manager.gd").read_text(encoding="utf-8")
 
