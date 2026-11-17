@@ -713,20 +713,30 @@ func _get_tile_draw_weight(tile_id: String) -> float:
 
 func draw_tile(rng: RandomNumberGenerator, unlock_rift: bool, excluded_tile_ids: Array = [], floor_id: int = 1) -> Dictionary:
     var choices := ["cache", "hunt", "ward", "snare", "echo_spring"]
+    # Preserve the original unlock-gated pool for floor one and old callers.
+    # This keeps saved runs and older draw APIs deterministic.
+    if unlock_rift:
+        choices.append("rift")
+        choices.append("signal")
+        choices.append("archive")
+        choices.append("nursery")
+        choices.append("fault_line")
+        choices.append("spore_garden")
+        choices.append("crystal_hive")
+        choices.append("bone_orchard")
+        choices.append("echo_obelisk")
+        choices.append("lost_convoy")
+        choices.append("hunter_marker")
     var floor_definition: Dictionary = ContentRegistry.get_abyss_floor(floor_id)
-    # Each unlocked layer adds its own landscape/road cards to the shared hand.
+    # Each deeper layer adds its own landscape/road cards to the shared hand.
     # The hand stays mixed; only the weighted draw pool changes with depth.
-    var rare_tiles_unlocked := unlock_rift or floor_id >= 2
-    if rare_tiles_unlocked:
-        choices.append_array(["rift", "signal", "archive", "nursery", "fault_line", "spore_garden", "crystal_hive", "bone_orchard", "echo_obelisk", "lost_convoy", "hunter_marker"])
     var floor_pool_value: Variant = floor_definition.get("tile_pool", [])
-    if typeof(floor_pool_value) == TYPE_ARRAY and not floor_pool_value.is_empty():
+    if floor_id >= 2 and typeof(floor_pool_value) == TYPE_ARRAY and not floor_pool_value.is_empty():
         var floor_choices: Array = ["cache", "hunt", "ward", "snare", "echo_spring"]
-        if rare_tiles_unlocked:
-            for tile_value in floor_pool_value:
-                var floor_tile_id := str(tile_value)
-                if ContentRegistry.TILE_DEFS.has(floor_tile_id) and not floor_choices.has(floor_tile_id):
-                    floor_choices.append(floor_tile_id)
+        for tile_value in floor_pool_value:
+            var floor_tile_id := str(tile_value)
+            if ContentRegistry.TILE_DEFS.has(floor_tile_id) and not floor_choices.has(floor_tile_id):
+                floor_choices.append(floor_tile_id)
         choices = floor_choices
     var available_choices: Array = []
     for choice_value in choices:
