@@ -63,7 +63,6 @@ var first_hour_guide_label: Label
 var _first_hour_guide_signature: String = ""
 var objective_label: Label
 var challenge_label: Label
-var contract_label: Label
 var fight_status_label: Label
 var fight_health_bar: ProgressBar
 var status_effects_label: Label
@@ -1255,9 +1254,6 @@ func _render_expedition() -> void:
 	challenge_label = _label("", 12, C_ACCENT, true)
 	challenge_label.visible = false
 	expedition_root.add_child(challenge_label)
-	contract_label = _label("", 12, C_GOLD, true)
-	contract_label.visible = false
-	expedition_root.add_child(contract_label)
 	var body: BoxContainer = VBoxContainer.new() if compact_layout else HBoxContainer.new()
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.size_flags_vertical = Control.SIZE_SHRINK_BEGIN if compact_layout else Control.SIZE_EXPAND_FILL
@@ -2015,11 +2011,6 @@ func _render_summary(summary: Dictionary) -> void:
 	if typeof(objective_value) == TYPE_DICTIONARY and not objective_value.is_empty():
 		var objective_result: Dictionary = objective_value
 		box.add_child(_label("ЦЕЛЬ ЭКСПЕДИЦИИ: %s — %s (%d/%d)" % [str(objective_result.get("name", "Цель")), "выполнена" if bool(objective_result.get("completed", false)) else "не выполнена", int(objective_result.get("progress", 0)), int(objective_result.get("target", 1))], 12, C_GOLD, true))
-	var contract_value: Variant = summary.get("contract", {})
-	if typeof(contract_value) == TYPE_DICTIONARY and not contract_value.is_empty():
-		var contract_result: Dictionary = contract_value
-		var contract_result_state := "провален: " + str(contract_result.get("failure_reason", "срок истёк")) if bool(contract_result.get("failed", false)) else ("выполнен" if bool(contract_result.get("completed", false)) else "не выполнен")
-		box.add_child(_label("КОНТРАКТ: %s — %s (%d/%d); награда +%d материалов / +%d редких ресурсов" % [str(contract_result.get("name", "Контракт")), contract_result_state, int(contract_result.get("progress", 0)), int(contract_result.get("target", 0)), int(contract_result.get("scrap_reward", 0)) if bool(contract_result.get("completed", false)) else 0, int(contract_result.get("crystal_reward", 0)) if bool(contract_result.get("completed", false)) else 0], 12, C_GOLD, true))
 	box.add_child(_label("Сохранение добычи: %d%%" % int(round(float(summary.get("retention", 0.0)) * 100.0)), 12, C_GOLD, true))
 	var continue_button := _button("Продолжить развитие убежища  →", Callable(self, "_render_base"), true)
 	continue_button.custom_minimum_size.y = 46
