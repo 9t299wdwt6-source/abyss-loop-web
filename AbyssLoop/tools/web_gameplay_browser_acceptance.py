@@ -118,8 +118,8 @@ def main() -> int:
                 add("first road tile can be selected by pointer", selected_hash != pause_hash,
                     {"paused": pause_hash, "selected": selected_hash})
 
-                # Route node 2 is a normal, free road node; node 1 at the loop origin is protected.
-                page.mouse.click(585, 348)
+                # The blank cell at the top edge of the loop (near 424,390 on the 1280x800 layout) is a free road node; the loop origin remains protected.
+                page.mouse.click(424, 390)
                 page.wait_for_timeout(350)
                 page.mouse.move(900, 110)
                 page.wait_for_timeout(200)
@@ -131,7 +131,7 @@ def main() -> int:
                 # Wait for a complete autosave interval, then require the exported JS,
                 # WASM, and PCK files to be requested again by the reloaded page.
                 page.wait_for_timeout(2200)
-                road_node_clip = {"x": 545, "y": 319, "width": 88, "height": 67}
+                road_node_clip = {"x": 412, "y": 378, "width": 24, "height": 24}
                 placed_node_hash = hashlib.sha256(page.screenshot(clip=road_node_clip)).hexdigest()
                 counts_before_reload = dict(asset_response_counts)
                 page.reload(wait_until="domcontentloaded", timeout=args.timeout * 1000)

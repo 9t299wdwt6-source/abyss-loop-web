@@ -173,6 +173,50 @@ jobs:
           "$GODOT_BIN" --headless --path AbyssLoop --export-release "Web" build/web/index.html
           python3 AbyssLoop/tools/web_export_preflight.py --mode build --root AbyssLoop/build/web --report "$RUNNER_TEMP/web-build-preflight.md"
 
+      - name: Package latest project and Web build for download
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          import os
+          source = Path("AbyssLoop")
+          target = Path(os.environ["RUNNER_TEMP"]) / "AbyssLoop_Latest_Prototype61.zip"
+          if not (source / "project.godot").is_file():
+              raise SystemExit("AbyssLoop/project.godot is missing")
+          files = []
+          for path in sorted(source.rglob("*")):
+              if not path.is_file():
+                  continue
+              rel = path.relative_to(source)
+              if ".godot" in rel.parts or any(part in {".git", "__pycache__"} for part in rel.parts):
+                  continue
+              if path.suffix in {".pyc", ".log", ".tmp"}:
+                  continue
+              files.append((path, Path("AbyssLoop") / rel))
+          with ZipFile(target, "w", compression=ZIP_DEFLATED, compresslevel=6) as archive:
+              for path, arcname in files:
+                  archive.write(path, arcname.as_posix())
+          with ZipFile(target) as archive:
+              top_levels = {name.split("/", 1)[0] for name in archive.namelist() if name}
+              if top_levels != {"AbyssLoop"}:
+                  raise SystemExit(f"Unexpected archive roots: {sorted(top_levels)}")
+              if "AbyssLoop/project.godot" not in archive.namelist():
+                  raise SystemExit("Packaged Godot project is missing")
+              if not any(name.startswith("AbyssLoop/build/web/") for name in archive.namelist()):
+                  raise SystemExit("Latest Web export is missing from the package")
+          print(f"Created {target} with {len(files)} project files")
+          PY
+
+      - name: Upload latest project and Web build ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: AbyssLoop-Latest-Prototype61-${{ github.sha }}
+          path: ${{ runner.temp }}/AbyssLoop_Latest_Prototype61.zip
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Install Playwright Chromium
         run: |
           python3 -m venv "$RUNNER_TEMP/web-qa-venv"
